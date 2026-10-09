@@ -1,42 +1,54 @@
-# CO-Agent v0.6.1
+# CO-Agent 0.6.1
 
-CO-Agent is a local-first desktop AI workspace concept for chat, creation workflows, and future computer-use and media tools. This repository is being reconstructed from the v0.6.1 source archive.
+CO-Agent is a Windows-first desktop AI workspace built with React and Electron. This repository currently contains a reconstructed local-first chat and media workflow.
+
+## Included in this branch
+
+- Local Ollama connection check, installed-model listing, model download/deletion, and non-streaming local chat.
+- React workspace with chat, model settings, runtime diagnostics, and Video Studio.
+- FFmpeg/FFprobe media probing, WAV audio extraction, and sequence joining for compatible clips.
+- Optional Piper voice synthesis bridge (Piper and a voice model must be installed separately).
+- A restricted desktop bridge that launches only allow-listed Windows applications or opens a selected local path.
+- Read-only API request support for OpenAI-compatible, Anthropic, and Gemini endpoints in the runtime helper.
+- Basic service smoke tests and a GitHub Actions workflow for Windows and Ubuntu.
 
 ## Requirements
 
-- Node.js 20 or newer
-- npm
-- Windows, macOS, or Linux for development; Windows packaging uses NSIS
+- Node.js 20 or newer (Node 22 LTS recommended).
+- Ollama installed and running for local chat.
+- At least one local Ollama model. For example, run ollama pull gemma3:4b, then refresh status in CO-Agent.
+- FFmpeg/FFprobe npm packages for media features.
+- Optional Piper binary and compatible voice model for speech synthesis.
 
-## Run locally
+## Development
 
-```bash
-npm install
-npm run dev
-```
+    npm install
+    npm run dev
 
-Build the renderer:
+The development command starts Vite at 127.0.0.1:5173 and opens Electron.
 
-```bash
-npm run build
-```
+## Build and test
 
-Run tests:
+    npm test
+    npm run build
+    npm start
 
-```bash
-npm test
-```
+Create a Windows installer with npm run dist:win. Build outputs are written to release/.
 
-Build a Windows installer:
+## Troubleshooting
 
-```bash
-npm run dist:win
-```
+1. Start Ollama and verify that http://127.0.0.1:11434/api/version responds locally.
+2. Pull a model using the Ollama CLI or the in-app model manager.
+3. Refresh runtime status in Models & settings.
+4. If the Electron window is blank, run npm run dev from a terminal and inspect the first Vite or renderer error.
 
-## Current repository state
+## Limitations and safety
 
-The repository has a starter Electron/Vite/React workspace, a visible renderer error boundary, and a secure minimal preload bridge. This is **not yet the complete archive contents**: advanced agent runtime, Ollama/model management, computer automation, voice, video editing, and their tests still need to be restored from the supplied v0.6.1 archive. The chat UI explicitly reports when a model provider is not connected rather than pretending a request was executed.
+- This is not yet a byte-for-byte restoration of the recovered v0.6.1 source archive.
+- The media timeline currently assembles files in sequence and uses stream copy; clips generally need compatible codecs, dimensions, and frame rates.
+- General mouse/keyboard automation, screen capture/OCR, full original timeline editing, advanced captions/voiceover, streaming responses, and full API provider settings are not complete.
+- Piper assets are not bundled.
+- Desktop actions are allow-listed; arbitrary shell commands are not exposed to the renderer.
+- Review generated output before running actions or publishing media.
 
-## Security
-
-Electron uses context isolation and disables renderer Node.js integration. Do not expose arbitrary shell execution or unrestricted filesystem access through the preload bridge. Add privileged operations only through narrowly scoped IPC handlers with validation and explicit user approval.
+See RESTORE-ROADMAP.md for the remaining work and restoration status.
