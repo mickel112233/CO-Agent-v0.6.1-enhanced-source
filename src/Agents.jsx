@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, BrainCircuit, CheckCircle2, Circle, Clock3, Code2, FileCode2, FolderOpen, GitBranch, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Trash2, Wrench, XCircle } from 'lucide-react';
+import { Bot, BrainCircuit, CheckCircle2, Circle, FileCode2, FolderOpen, GitBranch, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Wrench, XCircle } from 'lucide-react';
 
 const desktop = window.coAgent;
-const DEFAULT_GOAL = 'Inspect this project, identify the highest-impact improvements, implement a focused fix, review it independently, and run tests and a production build.';
 const STATUS = {
   queued: { label: 'Queued', icon: Circle },
   running: { label: 'Running', icon: LoaderCircle },
@@ -83,7 +82,6 @@ export default function Agents() {
   }, [goal, workflow, results, selectedPaths, selectedExternalSkills]);
 
   const doneCount = useMemo(() => (workflow?.pipeline || []).filter(step => step.status === 'done').length, [workflow]);
-  const selectedFiles = useMemo(() => files.filter(file => selectedPaths.includes(file.path)), [files, selectedPaths]);
   const chooseWorkspace = async () => {
     setBusy('workspace'); setNotice('');
     try {
