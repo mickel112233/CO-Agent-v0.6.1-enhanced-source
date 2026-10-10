@@ -16,9 +16,16 @@ function commandFor(name) {
   if (process.platform !== 'win32') return name;
   return name;
 }
+async function runFixedCommand(file, args, options = {}) {
+  if (process.platform === 'win32' && ['npm', 'hyperframes', 'winget'].includes(file)) {
+    const command = [file, ...args].map(part => '"' + String(part).replace(/"/g, '\\\"') + '"').join(' ');
+    return execFileAsync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], { windowsHide: true, ...options });
+  }
+  return execFileAsync(commandFor(file), args, { windowsHide: true, ...options });
+}
 async function executableVersion(file, args = ['--version']) {
   try {
-    const result = await execFileAsync(commandFor(file), args, { windowsHide: true, timeout: 8000, maxBuffer: 1024 * 1024 });
+    const result = await runFixedCommand(file, args, { timeout: 8000, maxBuffer: 1024 * 1024 });
     return { available: true, version: String(result.stdout || result.stderr || '').trim().split(/\r?\n/)[0] };
   } catch (error) {
     return { available: false, version: '', error: String(error.message || 'Not found').slice(0, 240) };
@@ -45,7 +52,7 @@ async function installTool(id) {
   const tool = TOOLS[id];
   if (!tool || !tool.install) throw new Error('This integration has no supported one-click installer. Follow its official setup guide instead.');
   if (tool.install === 'winget' && process.platform !== 'win32') throw new Error('The one-click Tesseract installer is available on Windows only. Use the official installation guide for this operating system.');
-  const { stdout, stderr } = await execFileAsync(tool.command, tool.args, { windowsHide: true, timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+  const { stdout, stderr } = await runFixedCommand(tool.command, tool.args, { timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
   return { ok: true, id, message: String(stdout || stderr || (tool.name + ' installer completed.')).trim().slice(-5000) };
 }
 function repoDetails(root, slug, url, ref, manifest = {}) {
@@ -120,4 +127,14 @@ async function installRepo({ url, ref = '' } = {}, userDataPath) {
     throw error;
   }
 }
-module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, GITHUB_HTTPS, REF_RE };
+async function removeRepo(slug, userDataPath) {
+  if (typeof slug !== 'string' || !/^[a-z0-9._-]{1,100}$/.test(slug)) throw new Error('Invalid extension identifier.');
+  const root = path.join(userDataPath, 'extensions');
+  const target = path.resolve(root, slug);
+  if (path.dirname(target) !== path.resolve(root)) throw new Error('Invalid extension path.');
+  const metadata = await fs.readFile(path.join(target, '.co-agent-source.json'), 'utf8').then(JSON.parse).catch(() => null);
+  if (!metadata) throw new Error('This folder is not a repository imported by CO-Agent.');
+  await fs.rm(target, { recursive: true, force: false });
+  return { ok: true, removed: slug };
+}
+module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, removeRepo, GITHUB_HTTPS, REF_RE };
