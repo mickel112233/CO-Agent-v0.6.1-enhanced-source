@@ -155,6 +155,7 @@ You can inspect **any commit** in Git history. Version tags and GitHub Releases 
 
 - [Commit history](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/commits/main/)
 - [Tags](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tags)
+- [Pre-integration checkpoint branch](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tree/checkpoint/v0.6.1-before-tool-integrations)
 - [Releases](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
 - [Version and rollback guide](docs/VERSIONING.md)
 
