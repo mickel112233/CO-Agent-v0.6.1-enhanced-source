@@ -1,8 +1,8 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
-const invoke = channel => (...args) => ipcRenderer.invoke(channel, ...args);
+const invoke = channel => (...args) => ipcRenderer.invoke(channel, ...args);\nconst subscribe = (channel, callback) => {\n  if (typeof callback !== 'function') return () => {};\n  const listener = (_event, payload) => callback(payload);\n  ipcRenderer.on(channel, listener);\n  return () => ipcRenderer.removeListener(channel, listener);\n};
 contextBridge.exposeInMainWorld('coAgent', Object.freeze({
-  app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),
+  app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),\n  agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step') }),\n  workspace: Object.freeze({ getRoot: invoke('workspace:get-root'), chooseRoot: invoke('workspace:choose-root'), listFiles: invoke('workspace:list-files'), readFile: invoke('workspace:read-file'), applyChanges: invoke('workspace:apply-changes') }),\n  terminal: Object.freeze({ listCommands: invoke('terminal:list-commands'), runCommand: invoke('terminal:run-command'), cancelCommand: invoke('terminal:cancel-command'), onOutput: callback => subscribe('terminal:output', callback) }),
   platform: process.platform,
   runtime: Object.freeze({
     ollamaStatus: invoke('runtime:ollama-status'),
