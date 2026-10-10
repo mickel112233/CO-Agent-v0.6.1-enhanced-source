@@ -11,7 +11,11 @@ const MAX_CHANGE_BYTES = 600_000;
 const MAX_FILES_PER_CHANGE = 12;
 const MAX_OUTPUT_BYTES = 1_000_000;
 const IGNORED_DIRS = new Set(['.git', 'node_modules', 'dist', 'release', '.co-agent-backups', '.next', 'coverage', '.cache']);
-const BLOCKED_NAMES = new Set(['.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519', 'credentials.json', 'secrets.json']);
+const BLOCKED_NAMES = new Set(['id_rsa', 'id_ed25519', 'credentials.json', 'secrets.json']);
+function isBlockedName(name) {
+  const lower = String(name || '').toLowerCase();
+  return BLOCKED_NAMES.has(lower) || lower.startsWith('.env') || /\\.(pem|key|p12|pfx|secret)$/.test(lower) || /credential|password|secret|token/.test(lower);
+}
 const COMMANDS = Object.freeze({
   'npm-test': { label: 'Run tests', executable: 'npm', args: ['test'], windows: 'npm test', timeoutMs: 600_000 },
   'npm-build': { label: 'Build renderer', executable: 'npm', args: ['run', 'build'], windows: 'npm run build', timeoutMs: 600_000 },
@@ -43,7 +47,7 @@ function safeRelativePath(value) {
   if (!input || input.length > 500 || input.startsWith('/') || /^[A-Za-z]:/.test(input) || input.includes('\0')) throw new Error('Use a relative path inside the selected workspace.');
   const parts = input.split('/');
   if (parts.some(part => !part || part === '.' || part === '..')) throw new Error('Path traversal is not allowed.');
-  if (parts.some(part => IGNORED_DIRS.has(part) || BLOCKED_NAMES.has(part.toLowerCase()))) throw new Error('This path is blocked from the agent workspace.');
+  if (parts.some(part => IGNORED_DIRS.has(part) || isBlockedName(part))) throw new Error('This path is blocked from the agent workspace.');
   return parts.join(path.sep);
 }
 async function resolveSafe(value, { allowMissing = false } = {}) {
@@ -77,7 +81,7 @@ async function listFiles(options = {}) {
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (results.length >= maxFiles) break;
-      if (entry.name.startsWith('.co-agent-backups') || IGNORED_DIRS.has(entry.name) || BLOCKED_NAMES.has(entry.name.toLowerCase())) continue;
+      if (entry.name.startsWith('.co-agent-backups') || IGNORED_DIRS.has(entry.name) || isBlockedName(entry.name)) continue;
       const relative = prefix ? prefix + '/' + entry.name : entry.name;
       const absolute = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
@@ -102,9 +106,13 @@ async function applyChanges(payload = {}) {
   if (payload.approved !== true) throw new Error('File changes require explicit user approval.');
   if (!Array.isArray(payload.files) || payload.files.length < 1 || payload.files.length > MAX_FILES_PER_CHANGE) throw new Error('Approve between 1 and 12 file changes at a time.');
   const prepared = [];
+  const seenPaths = new Set();
   let total = 0;
   for (const item of payload.files) {
     const target = await resolveSafe(item.path, { allowMissing: true });
+    const pathKey = process.platform === 'win32' ? target.relative.toLowerCase() : target.relative;
+    if (seenPaths.has(pathKey)) throw new Error('Duplicate file path in the proposed change set: ' + item.path);
+    seenPaths.add(pathKey);
     if (typeof item.content !== 'string') throw new Error('Each file change must include complete text content.');
     const bytes = Buffer.byteLength(item.content, 'utf8');
     if (bytes > MAX_FILE_BYTES) throw new Error('A changed file exceeds the 120 KB limit: ' + item.path);
