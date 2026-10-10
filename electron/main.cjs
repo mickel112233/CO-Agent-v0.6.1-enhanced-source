@@ -44,6 +44,11 @@ async function ollamaChat(payload = {}) {
   const data = await response.json();
   return { ok: true, model, message: data.message?.content || '', done: data.done !== false };
 }
+async function confirmComputerAction(message, detail) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('The CO-Agent window is not available for action approval.');
+  const result = await dialog.showMessageBox(mainWindow, { type: 'warning', title: 'CO-Agent action approval', message, detail, buttons: ['Cancel', 'Allow once'], defaultId: 0, cancelId: 0, noLink: true });
+  return result.response === 1;
+}
 function registerIpc() {
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('runtime:ollama-models', async () => {
@@ -64,11 +69,24 @@ function registerIpc() {
   handle('computer:open-path', filePath => computer.openPath(filePath));
   handle('computer-use:capture-screen', () => computerUse.captureScreen());
   handle('computer-use:inspect-accessibility', () => computerUse.inspectAccessibility());
-  handle('computer-use:read-screen-text', payload => computerUse.readScreenText(payload));
+  handle('computer-use:read-screen-text', async payload => {
+    if (!await confirmComputerAction('Read text visible on your desktop?', 'This uses local Tesseract OCR on the selected screen capture. The image is processed on this computer.')) throw new Error('Screen OCR cancelled by user.');
+    return computerUse.readScreenText({ ...payload, approved: true });
+  });
   handle('computer-use:plan-actions', payload => computerUse.planActions(payload));
-  handle('computer-use:click', payload => computerUse.click(payload));
-  handle('computer-use:type-text', payload => computerUse.typeText(payload));
-  handle('computer-use:press-key', payload => computerUse.pressKey(payload));
+  handle('computer-use:click', async payload => {
+    if (!await confirmComputerAction('Allow one mouse click?', 'Click once at screenshot coordinates ' + Number(payload?.x) + ', ' + Number(payload?.y) + '. Review the desktop before allowing.')) throw new Error('Click cancelled by user.');
+    return computerUse.click({ ...payload, approved: true });
+  });
+  handle('computer-use:type-text', async payload => {
+    const length = String(payload?.text || '').length;
+    if (!await confirmComputerAction('Allow text input?', 'Type ' + length + ' character(s) into the currently focused application. Do not enter passwords, API keys, or private information.')) throw new Error('Text input cancelled by user.');
+    return computerUse.typeText({ ...payload, approved: true });
+  });
+  handle('computer-use:press-key', async payload => {
+    if (!await confirmComputerAction('Allow one key press?', 'Send the ' + String(payload?.key || '') + ' key once to the currently focused application.')) throw new Error('Key press cancelled by user.');
+    return computerUse.pressKey({ ...payload, approved: true });
+  });
   handle('studio:capabilities', () => studio.getCapabilities());
   handle('studio:probe', filePath => studio.probe(filePath));
   handle('studio:extract-audio', args => studio.extractAudio(args?.input, args?.outputDir));
