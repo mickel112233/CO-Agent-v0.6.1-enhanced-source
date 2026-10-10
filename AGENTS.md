@@ -21,10 +21,12 @@ Read this file before changing code. It is a fast orientation guide for coding a
 | `electron/studio.cjs` | FFmpeg/FFprobe probe, audio extraction and compatible-stream concat |
 | `electron/ocr.cjs` | Optional local Tesseract CLI discovery and image OCR |
 | `electron/hyperframes.cjs` | Optional Hyperframes CLI status, lint, preview and render |
+| `electron/integrations.cjs` | Optional tool status/installers, safe GitHub repo import, manifest inspection, selected skill loading and managed removal |
 | `electron/computer.cjs` | Small explicit allow-list of desktop app launch/open operations |
 | `electron/piper.cjs` | Optional Piper text-to-speech process wrapper |
 | `src/App.jsx` | Main chat, navigation, Ollama model/runtime UI |
 | `src/VideoEditor.jsx` | Video Studio, basic media assembly, OCR and Hyperframes controls |
+| `src/Integrations.jsx` | Optional tool manager, public GitHub repo import, manifest review and explicit skill selection |
 | `src/styles.css` | Shared renderer styles |
 | `test/*.test.cjs` | Node built-in test suite |
 | `.github/workflows/ci.yml` | Windows and Ubuntu test/build matrix |
@@ -54,7 +56,15 @@ npm run dev
 
 On Windows, run these commands from the repository root. `npm run dev` launches Vite and Electron; `npm run build` validates the renderer bundle but does not prove every native desktop feature works.
 
-## Optional integrations
+## Optional integrations and repository skills
+
+- Tesseract OCR and Hyperframes are optional; the Integrations UI checks status and can invoke supported package managers after explicit user confirmation.
+- GitHub imports accept public HTTPS GitHub owner/repository URLs only. Optional branch/tag refs are passed as a distinct argument to Git, never through a shell command.
+- Imported repositories live in the Electron user-data `extensions/` folder. The importer detects `SKILL.md`, `package.json`, and `openclaw.plugin.json`, but does not run install scripts, install dependencies, or activate arbitrary plugin code.
+- Only explicitly selected `SKILL.md` files are included in local Ollama chat context. Limit: eight skills, each capped at 30 KB, combined skill context capped at 60 KB.
+- Treat imported skill instructions as untrusted. Do not add automatic execution of repository scripts without a separate review/approval design, path validation, and tests.
+- Keep manifest reads inside the imported repository and reject symlinks for files that will be parsed or sent to the model.
+
 
 ### Tesseract OCR
 
