@@ -12,7 +12,7 @@
 
 
 /* Integrations manager */
-.integrations-view{width:min(1120px,calc(100% - 64px));margin:34px auto 60px;display:flex;flex-direction:column;gap:22px;color:#262620}
+.integrations-view{width:min(1120px,calc(100% - 64px));max-height:calc(100vh - 62px);overflow:auto;margin:34px auto 60px;display:flex;flex-direction:column;gap:22px;color:#262620}
 .integrations-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .integrations-heading h1{margin:5px 0 8px;font-family:Manrope,sans-serif;font-size:30px;letter-spacing:-.8px}
 .integrations-heading .subhead{max-width:720px;margin:0;color:#77776f;font-size:13px;line-height:1.7}
