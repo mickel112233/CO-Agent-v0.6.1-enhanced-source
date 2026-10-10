@@ -10,19 +10,22 @@ const STATUS = {
   blocked: { label: 'Blocked', icon: XCircle }
 };
 const errorText = error => error?.message || String(error);
+const readSavedState = (key, fallback) => { try { const value = window.localStorage.getItem(key); return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
 
 export default function Agents() {
-  const [goal, setGoal] = useState('');
+  const [goal, setGoal] = useState(() => readSavedState('co-agent:agent-goal', ''));
   const [model, setModel] = useState('');
   const [models, setModels] = useState([]);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [files, setFiles] = useState([]);
-  const [selectedPaths, setSelectedPaths] = useState([]);
-  const [workflow, setWorkflow] = useState(null);
+  const [selectedPaths, setSelectedPaths] = useState(() => readSavedState('co-agent:agent-context-paths', []));
+  const [importedRepos, setImportedRepos] = useState([]);
+  const [selectedExternalSkills, setSelectedExternalSkills] = useState(() => readSavedState('co-agent:agent-external-skills', []));
+  const [workflow, setWorkflow] = useState(() => readSavedState('co-agent:agent-workflow', null));
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [agentCatalog, setAgentCatalog] = useState({ agents: [], skills: [] });
-  const [results, setResults] = useState({});
+  const [results, setResults] = useState(() => readSavedState('co-agent:agent-results', {}));
   const [activeResult, setActiveResult] = useState('');
   const [commands, setCommands] = useState([]);
   const [commandId, setCommandId] = useState('npm-test');
@@ -45,7 +48,7 @@ export default function Agents() {
     let unsubscribe = () => {};
     (async () => {
       try {
-        const [runtime, catalog, commandList, rootResult] = await Promise.all([
+        const [runtime, catalog, commandList, rootResult, repoResult] = await Promise.all([
           desktop?.runtime?.ollamaStatus?.(),
           desktop?.agents?.list?.(),
           desktop?.terminal?.listCommands?.(),
@@ -114,7 +117,7 @@ export default function Agents() {
       const priorResults = workflow.pipeline.filter(item => item.status === 'done' && results[item.id]).map(item => ({
         title: item.title, role: item.role, result: JSON.stringify(results[item.id]).slice(0, 5000)
       }));
-      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, model });
+      let externalSkills = [];\n      if (selectedExternalSkills.length && desktop?.integrations?.getSkills) {\n        const loadedSkills = await desktop.integrations.getSkills(selectedExternalSkills);\n        if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');\n        externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];\n      }\n      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Agent step failed.');
       setResults(old => ({ ...old, [step.id]: result }));
       setActiveResult(step.id);
@@ -229,6 +232,7 @@ export default function Agents() {
 
       <aside className="agents-side-column">
         <div className="agents-side-card"><div className="agents-side-heading"><BrainCircuit size={16}/><h2>Agent team</h2><span>{agentCatalog.agents.length}</span></div><p>Specialists share the same goal and completed step results, but work independently and cannot silently run tools.</p>{agentCatalog.agents.map(agent => <div className="agents-catalog-row" key={agent.id}><span className="agents-catalog-avatar"><Bot size={14}/></span><div><strong>{agent.name}</strong><small>{agent.purpose}</small></div></div>)}</div>
+        {importedRepos.length > 0 && <div className="agents-side-card"><div className="agents-side-heading"><GitBranch size={16}/><h2>Imported skills</h2><span>{selectedExternalSkills.length}</span></div><p>Optional SKILL.md notes from imported public repositories. They are untrusted hints, not executable plugins.</p>{importedRepos.map(repo => <label className="agents-external-skill" key={repo.slug}><input type="checkbox" checked={selectedExternalSkills.includes(repo.slug)} disabled={!selectedExternalSkills.includes(repo.slug) && selectedExternalSkills.length >= 4} onChange={event => setSelectedExternalSkills(old => event.target.checked ? [...old, repo.slug] : old.filter(slug => slug !== repo.slug))}/><span><strong>{repo.name}</strong><small>{repo.description || repo.url}</small></span></label>)}<button className="text-link" onClick={() => { window.localStorage.setItem('co-agent:agent-external-skills', JSON.stringify(selectedExternalSkills)); setNotice('Selected imported skills are used only as untrusted context on the next agent step.'); }}>Save skill selection</button></div>}
         <div className="agents-side-card"><div className="agents-side-heading"><Wrench size={16}/><h2>Built-in skills</h2><span>{agentCatalog.skills.length}</span></div><p>Reusable quality harnesses are injected into specialist prompts based on the assigned task.</p>{agentCatalog.skills.map(skill => <details className="agents-skill-row" key={skill.id}><summary><span>{skill.name}</span><small>{skill.category}</small></summary><p>{skill.description}</p></details>)}</div>
         <div className="agents-side-card"><div className="agents-side-heading"><ShieldCheck size={16}/><h2>Harness guardrails</h2></div><ul className="agents-guardrail-list"><li>Separate planning, implementation, review, and testing roles.</li><li>Dependencies prevent steps from running out of order.</li><li>File proposals are previewed before applying.</li><li>Existing files receive backups under .co-agent-backups.</li><li>Terminal commands use fixed presets and native confirmation.</li><li>Command output, exit code, timeout, and errors are visible.</li><li>Secrets, symlinks, and protected folders are blocked from file tools.</li></ul></div>
         {workspaceRoot && <div className="agents-side-card"><div className="agents-side-heading"><FileCode2 size={16}/><h2>Context files</h2><span>{selectedPaths.length}/8</span></div><p>Select files for agents to inspect. Only checked files are sent to the local model.</p><div className="agents-file-list">{files.map(file => <label key={file.path} title={file.path}><input type="checkbox" checked={selectedPaths.includes(file.path)} disabled={!selectedPaths.includes(file.path) && selectedPaths.length >= 8} onChange={event => setSelectedPaths(old => event.target.checked ? [...old, file.path] : old.filter(item => item !== file.path))}/><span>{file.path}</span><small>{file.size > 1024 ? Math.round(file.size / 1024) + ' KB' : file.size + ' B'}</small></label>)}</div><small className="agents-context-note">Sensitive filenames, dependencies, build output, and symlink entries are filtered by the workspace layer.</small></div>}
