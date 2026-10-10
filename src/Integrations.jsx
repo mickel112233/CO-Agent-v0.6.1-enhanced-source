@@ -33,7 +33,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
 
   async function installTool(tool) {
     if (!tool.installAvailable) {
-      setNotice(tool.id === 'tesseract' ? 'Install GitHub Desktop or Tesseract manually using the official guide for this platform.' : 'Install Node.js/npm first, then use the official Hyperframes setup guide.');
+      setNotice(tool.id === 'tesseract' ? 'Tesseract does not have a one-click installer for this platform. Use the official setup guide.' : 'Install Node.js/npm first, then use the official Hyperframes setup guide.');
       return;
     }
     const command = tool.id === 'tesseract' ? 'winget install --id UB-Mannheim.TesseractOCR --exact' : 'npm install --global hyperframes';
