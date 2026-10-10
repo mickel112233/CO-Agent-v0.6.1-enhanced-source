@@ -14,6 +14,8 @@ test('workspace only resolves relative paths within selected root', async () => 
     assert.throws(() => workspace.safeRelativePath('../outside.txt'), /relative path|traversal/i);
     assert.throws(() => workspace.safeRelativePath('C:\\secret.txt'), /relative path/i);
     assert.throws(() => workspace.safeRelativePath('.env'), /blocked/i);
+    assert.throws(() => workspace.safeRelativePath('.env.development'), /blocked/i);
+    assert.throws(() => workspace.safeRelativePath('private.pem'), /blocked/i);
     assert.throws(() => workspace.safeRelativePath('node_modules/pkg/index.js'), /blocked/i);
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
@@ -45,7 +47,7 @@ test('workspace rejects symlink traversal and oversized file proposals', async (
   try {
     await workspace.setRoot(root);
     await fs.writeFile(path.join(outside, 'secret.txt'), 'secret', 'utf8');
-    await fs.symlink(outside, path.join(root, 'linked'), 'dir');
+    await fs.symlink(outside, path.join(root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
     await assert.rejects(workspace.readFile('linked/secret.txt'), /symbolic links/i);
     await assert.rejects(workspace.applyChanges({ approved: true, files: [{ path: 'large.txt', content: 'x'.repeat(workspace.MAX_FILE_BYTES + 1) }] }), /120 KB/i);
     await assert.rejects(workspace.applyChanges({ approved: true, files: Array.from({ length: 13 }, (_, i) => ({ path: 'f' + i + '.txt', content: 'x' })) }), /1 and 12/i);
