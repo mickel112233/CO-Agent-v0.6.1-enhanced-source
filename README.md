@@ -104,7 +104,7 @@ Choose a project folder to let agents inspect selected context files and propose
 
 The integrated terminal offers fixed commands: `npm test`, `npm run build`, `git status --short --branch`, `git diff --check`, and `npm audit --omit=dev`. Output streams into the terminal panel with exit status and timeout reporting. Each run requires native confirmation. These commands execute the selected project's scripts with your Windows account permissions, so only open workspaces you trust. The terminal does not accept arbitrary shell text. The chosen workspace is remembered for the next launch.
 
-Built-in skills cover planning, implementation, code review, test engineering, debugging, security, Electron IPC, frontend UX, documentation, and media pipelines. These are task-specific instructions for the model, not magical tools: a skill cannot access a file unless you select it, and cannot claim a test passed unless the terminal actually ran it.
+Built-in skills cover planning, implementation, code review, test engineering, debugging, security, Electron IPC, frontend UX, documentation, and media pipelines. You can also select imported public-repository `SKILL.md` notes as optional context for agent steps. These are untrusted task hints, not executable plugins or security policy: a skill cannot access a file unless you select it, and cannot claim a test passed unless the terminal actually ran it.
 
 ## 🖥️ Computer Use
 
