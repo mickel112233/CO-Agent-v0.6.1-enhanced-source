@@ -68,7 +68,7 @@ async function planActions(payload = {}) {
   if (!response.ok) throw new Error('Local action planning failed (' + response.status + ').');
   const data = await response.json();
   let parsed;
-  try { parsed = JSON.parse(String(data.message?.content || '').replace(/^\\s*\u0060\u0060\u0060(?:json)?/i, '').replace(/\u0060\u0060\u0060\\s*$/, '').trim()); } catch { throw new Error('The local model returned an invalid action plan. Try a more specific task.'); }
+  try { const raw = String(data.message?.content || '').replace(/^\\s*\\x60\\x60\\x60(?:json)?/i, '').replace(/\\x60\\x60\\x60\\s*$/, '').trim(); parsed = JSON.parse(raw); } catch { throw new Error('The local model returned an invalid action plan. Try a more specific task.'); }
   if (!Array.isArray(parsed.actions) || parsed.actions.length > 8) throw new Error('The local model returned an unsupported plan. Maximum 8 actions.');
   const actions = parsed.actions.map((action, index) => {
     const reason = String(action.reason || 'Review this suggested action.').slice(0, 240);
