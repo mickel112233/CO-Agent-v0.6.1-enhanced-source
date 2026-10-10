@@ -110,6 +110,8 @@ async function applyChanges(payload = {}) {
   let total = 0;
   for (const item of payload.files) {
     const target = await resolveSafe(item.path, { allowMissing: true });
+    const normalizedRelative = target.relative.split(path.sep).join('/');
+    if (normalizedRelative.startsWith('.github/workflows/')) throw new Error('Agent writes to GitHub workflow files are blocked; edit workflow security settings manually.');
     const pathKey = process.platform === 'win32' ? target.relative.toLowerCase() : target.relative;
     if (seenPaths.has(pathKey)) throw new Error('Duplicate file path in the proposed change set: ' + item.path);
     seenPaths.add(pathKey);
