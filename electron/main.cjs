@@ -5,6 +5,7 @@ const ollama = require('./ollama.cjs');
 const computer = require('./computer.cjs');
 const computerUse = require('./computer-use.cjs');
 const studio = require('./studio.cjs');
+const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const ocr = require('./ocr.cjs');
@@ -70,6 +71,9 @@ function registerIpc() {
   handle('studio:probe', filePath => studio.probe(filePath));
   handle('studio:extract-audio', args => studio.extractAudio(args?.input, args?.outputDir));
   handle('studio:concat', args => studio.concat(args?.inputs, args?.outputDir, args?.filename));
+  handle('studio:save-project', args => timeline.saveProject(args?.path, args?.project));
+  handle('studio:load-project', args => timeline.loadProject(args?.path));
+  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename));
   handle('studio:ocr-status', () => ocr.getStatus());
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
