@@ -87,7 +87,7 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   for (const clip of media.filter(item => item.type === 'video' || item.type === 'image')) {
     const index = clipInputIndex.get(clip.id);
     const next = 'base' + (++stage);
-    graph.push('[' + index + ':v]trim=start=' + clip.sourceStart + ':duration=' + clip.duration + ',setpts=PTS-STARTPTS,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v' + stage + ']');
+    graph.push('[' + index + ':v]trim=start=' + clip.sourceStart + ':duration=' + clip.duration + ',setpts=PTS-STARTPTS,scale=1280:720:force_original_aspect_ratio=decrease,setsar=1[v' + stage + ']');
     graph.push('[' + base + '][v' + stage + ']overlay=(W-w)/2:(H-h)/2:eof_action=pass:shortest=0:enable=between(t\\,' + clip.timelineStart + '\\,' + (clip.timelineStart + clip.duration) + ')[' + next + ']');
     base = next;
   }
