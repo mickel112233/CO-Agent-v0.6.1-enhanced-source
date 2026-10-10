@@ -81,9 +81,8 @@ public class COInput {
 }
 "@
 $x = __X__; $y = __Y__
-[void][System.Windows.Forms.Cursor]::Position
 Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($x,$y)
+[System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new($x,$y)
 $down = New-Object COInput+INPUT; $down.type=0; $down.mi.dwFlags=0x0002
 $up = New-Object COInput+INPUT; $up.type=0; $up.mi.dwFlags=0x0004
 [void][COInput]::SendInput(1,@($down),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
