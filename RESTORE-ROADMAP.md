@@ -22,7 +22,7 @@ This repository is an active reconstruction. The current source now includes pra
 
 Computer Use is a manual, safety-gated control surface, not a background takeover agent. Each mouse, text, or key action requires its own confirmation. Native input and accessibility-window inspection require Windows and an interactive desktop session. Screen OCR requires optional Tesseract and only runs after the user initiates it.
 
-Still unfinished: model-generated action planning, multi-step autonomous loops, stop/pause orchestration, full UI Automation element trees and element-level actions, semantic target selection, automatic post-action verification, app-specific adapters, and richer permission controls. No arbitrary shell/PowerShell command execution is exposed to the renderer.
+Local Ollama can now propose a short plan (up to eight click/type/key actions) from the user task and optional OCR text; every step still requires individual confirmation. Still unfinished: multi-step autonomous loops, stop/pause orchestration, full UI Automation element trees and element-level actions, semantic target selection, automatic post-action verification, app-specific adapters, and richer permission controls. No arbitrary shell/PowerShell command execution is exposed to the renderer.
 
 ## Multi-track video editor behavior and boundaries
 
