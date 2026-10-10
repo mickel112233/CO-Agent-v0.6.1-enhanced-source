@@ -55,6 +55,7 @@ async function planWorkflow(payload={}){
  const result=await askLocal(model,[{role:'system',content:system},{role:'user',content:'Goal:\n'+goal+'\nRequested skill focus: '+String(payload.skillFocus||'best fit').slice(0,500)}],{temperature:0.15});
  if(!Array.isArray(result.pipeline)||result.pipeline.length<2||result.pipeline.length>7)throw new Error('Planner did not return a valid 2–7 step workflow. Rephrase the goal and retry.');
  const allowedRoles=new Set(Object.keys(AGENT_PROFILES));const allowedSkills=new Set(BUILTIN_SKILLS.map(s=>s.id));
+ const sourceIdToIndex=new Map(result.pipeline.map((step,index)=>[String(step.id||('step-'+(index+1))),index]));
  const pipeline=result.pipeline.map((step,index)=>{
   if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
   if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
