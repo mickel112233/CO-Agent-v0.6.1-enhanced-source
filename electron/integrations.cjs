@@ -44,7 +44,8 @@ async function getStatus() {
     tools: [
       { ...TOOLS.tesseract, ...tesseract, installed: tesseract.available, installAvailable: process.platform === 'win32' && !!(await executableVersion('winget')).available },
       { ...TOOLS.hyperframes, ...hyperframes, installed: hyperframes.available, installAvailable: !!(await executableVersion('npm')).available },
-      { ...TOOLS.piper, ...piper, installed: piper.available, installAvailable: false }
+      { ...TOOLS.piper, ...piper, installed: piper.available, installAvailable: false },
+      { id: 'git', name: 'Git', kind: 'repository-runtime', required: false, description: 'Needed to import public GitHub repositories and skills.', docs: 'https://git-scm.com/downloads', ...git, installed: git.available, installAvailable: false }
     ],
     gitAvailable: git.available,
     extensionDirectory: ''
