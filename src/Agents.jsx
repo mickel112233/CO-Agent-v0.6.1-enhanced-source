@@ -59,6 +59,7 @@ export default function Agents() {
         setModel(runtime?.models?.[0]?.name || runtime?.models?.[0]?.model || '');
         setAgentCatalog({ agents: catalog?.agents || [], skills: catalog?.skills || [] });
         setCommands(commandList?.commands || []);
+        setImportedRepos(Array.isArray(repoResult) ? repoResult.filter(item => item.hasSkill) : []);
         setWorkspaceRoot(rootResult?.root || '');
         if (rootResult?.root) await refreshFiles();
       } catch (error) { setNotice(errorText(error)); }
