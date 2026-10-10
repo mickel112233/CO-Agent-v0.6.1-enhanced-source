@@ -64,6 +64,7 @@ function registerIpc() {
   handle('computer:open-path', filePath => computer.openPath(filePath));
   handle('computer-use:capture-screen', () => computerUse.captureScreen());
   handle('computer-use:inspect-accessibility', () => computerUse.inspectAccessibility());
+  handle('computer-use:read-screen-text', payload => computerUse.readScreenText(payload));
   handle('computer-use:click', payload => computerUse.click(payload));
   handle('computer-use:type-text', payload => computerUse.typeText(payload));
   handle('computer-use:press-key', payload => computerUse.pressKey(payload));
