@@ -251,3 +251,88 @@
 .agents-file-comparison>div{min-width:0}.agents-file-comparison>div>strong{display:block;margin:0 0 6px;color:#7c7c72;font-size:9px;text-transform:uppercase;letter-spacing:.6px}
 .agents-file-comparison pre{max-height:300px;min-height:90px;overflow:auto;margin:0;padding:9px;border:1px solid #e6e6df;border-radius:6px;background:#f8f8f4;color:#55554c;white-space:pre-wrap;overflow-wrap:anywhere;font:9px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
 @media(max-width:650px){.agents-file-comparison{grid-template-columns:minmax(0,1fr)}}
+
+/* Agent studio visual and interaction upgrade */
+.agents-view{--agent-ink:#20251f;--agent-muted:#777f75;--agent-line:#e5e9e1;--agent-green:#526e48;width:min(1540px,calc(100% - 48px));margin:25px auto 60px;color:var(--agent-ink)}
+.agents-heading{align-items:center;margin-bottom:18px}
+.agents-heading .eyebrow{display:flex;align-items:center;gap:6px;color:#718367;font-size:9px;letter-spacing:1.55px}
+.agents-heading h1{font-size:clamp(27px,3vw,36px);letter-spacing:-1.25px;line-height:1.14}
+.agents-heading-dot{color:#8aab79}
+.agents-heading .subhead{max-width:720px;font-size:12px;color:#7d857a}
+.agents-heading-mark{border-color:#e1e9dc;border-radius:999px;background:linear-gradient(135deg,#fbfdf9,#f0f5eb);padding:10px 14px;color:#55704c;box-shadow:0 5px 20px #263d1a08}
+.agents-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#75a66a;box-shadow:0 0 0 3px #75a66a1d}
+.agents-metrics{display:flex;align-items:center;gap:0;margin:0 0 15px;padding:12px 15px;border:1px solid #e5e9e1;border-radius:13px;background:linear-gradient(110deg,#fff 0%,#fbfcf9 100%);box-shadow:0 7px 24px #273d1a06}
+.agents-metric{display:flex;align-items:center;gap:9px;min-width:0;padding:1px 23px;border-right:1px solid #e9ece5}
+.agents-metric:first-child{padding-left:0}
+.agents-metric-icon{display:grid;place-items:center;width:32px;height:32px;flex-shrink:0;border:1px solid #e7eae2;border-radius:10px;background:#f8f9f6;color:#71816a}
+.agents-metric-icon.good{background:#eef6e9;color:#5c8a4f;border-color:#e2edda}
+.agents-metric-icon.active{background:#fff5e6;color:#9b793b;border-color:#f3e7ce}
+.agents-metric>div{display:flex;flex-direction:column;gap:2px}
+.agents-metric strong{font-size:17px;line-height:1.1;font-weight:800;letter-spacing:-.4px}
+.agents-metric small{font-size:9px;color:#858c81;white-space:nowrap}
+.agents-metrics-tail{display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:15px;color:#737f6c;font-size:10px;white-space:nowrap}
+.agents-safety{border-color:#e4e9dc;background:linear-gradient(100deg,#f7faf3,#fffdf7);box-shadow:0 4px 18px #273d1a05}
+.agents-grid{grid-template-columns:minmax(0,1.85fr) minmax(290px,.78fr);gap:16px}
+.agents-main-column,.agents-side-column{gap:15px}
+.agents-plan-card,.agents-pipeline-card,.agents-terminal-card,.agents-empty-pipeline,.agents-side-card{border-color:#e3e8df;border-radius:15px;box-shadow:0 7px 25px #273d1a07;transition:border-color .18s,box-shadow .18s}
+.agents-plan-card{padding:19px}
+.agents-plan-card:focus-within{border-color:#c5d5ba;box-shadow:0 10px 30px #273d1a0b}
+.agents-card-heading{gap:11px;margin-bottom:15px}
+.agents-icon{width:38px;height:38px;border:1px solid #e6ecdf;background:linear-gradient(135deg,#f4f8ef,#eaf1e4);color:#5d7b51}
+.agents-card-heading h2{font-size:14px;letter-spacing:-.2px}
+.agents-card-heading p{font-size:10px}
+.agents-step-chip{margin-left:auto;align-self:center;padding:5px 7px;border:1px solid #e8ece3;border-radius:6px;color:#889181;font-size:8px;font-weight:800;letter-spacing:1px;white-space:nowrap}
+.agents-prompt-chips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 10px}
+.agents-prompt-chips button{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #e3e9dd;border-radius:8px;background:#fbfcf9;color:#64765b;font-size:10px;font-weight:650;transition:transform .16s,border-color .16s,background .16s}
+.agents-prompt-chips button:hover{transform:translateY(-1px);border-color:#bdceb2;background:#f3f8ee}
+.agents-plan-card textarea{min-height:126px;padding:13px 14px;border-color:#e0e6dc;border-radius:11px;background:#fcfdfb;font-size:12px;transition:border-color .16s,box-shadow .16s}
+.agents-plan-card textarea:focus{border-color:#9db68e;box-shadow:0 0 0 4px #83a87620}
+.agents-prompt-foot{display:flex;justify-content:space-between;align-items:center;margin-top:5px;color:#9a9f95;font-size:9px}
+.agents-prompt-foot .text-link{padding:3px 0}
+.agents-prompt-foot button:disabled{opacity:.35;cursor:not-allowed}
+.agents-plan-controls{align-items:flex-end;margin-top:15px}
+.agents-plan-controls label{gap:6px}
+.agents-field-label{font-size:10px;font-weight:700;color:#6e7768}
+.agents-plan-controls select{min-height:39px;border-color:#e0e6dc;border-radius:9px;background-color:#fff}
+.agents-plan-controls .agents-create-button{min-height:39px;padding:0 15px;border-radius:9px;box-shadow:0 5px 13px #5e7c4b20}
+.agents-create-button span{margin-left:7px;font-size:15px;transition:transform .16s}
+.agents-create-button:hover span{transform:translateX(3px)}
+.agents-create-button:disabled{box-shadow:none;opacity:.52}
+.agents-pipeline-title{padding:18px 18px 13px}
+.agents-progress{padding:6px 10px;border:1px solid #e1eadb;background:#f2f7ed}
+.agents-progress-track{height:5px;background:#f0f3ec}
+.agents-progress-track span{background:linear-gradient(90deg,#8cac7a,#587e4d)}
+.agents-step{padding:16px 4px}
+.agents-step:hover{background:linear-gradient(90deg,#ffffff,#fbfcf9)}
+.agents-step-index{padding-top:2px}
+.agents-step-body>p{font-size:11px}
+.agents-step-meta span{border:1px solid #ecefe8;background:#f9faf7}
+.agents-step-actions .secondary-button{border-radius:8px}
+.agents-step-actions button:focus-visible,.agents-prompt-chips button:focus-visible,.agents-search input:focus-visible{outline:2px solid #8ba77b;outline-offset:2px}
+.agents-result{border-color:#e1e8dc;background:#fdfefc}
+.agents-file-proposals details{border-color:#e1e7dc;border-radius:9px}
+.agents-file-proposals summary:hover{background:#f8faf5}
+.agents-side-card{padding:15px}
+.agents-side-heading h2{font-size:12px}
+.agents-side-card>p{font-size:10px}
+.agents-search{display:flex;align-items:center;gap:7px;min-width:0;margin:10px 0;padding:8px 9px;border:1px solid #e4e9e0;border-radius:8px;background:#fbfcf9;color:#8a9384}
+.agents-search:focus-within{border-color:#b6c9aa;box-shadow:0 0 0 3px #83a87614}
+.agents-search input{width:100%;min-width:0;border:0;outline:none;background:transparent;color:#343b31;font:inherit;font-size:10px}
+.agents-search input::placeholder{color:#a0a69b}
+.agents-search button{display:grid;place-items:center;flex-shrink:0;padding:0;border:0;background:transparent;color:#929a8c}
+.agents-show-more{margin-top:8px;padding:6px 0}
+.agents-no-results{padding:9px;border-radius:7px;background:#fafbf8;color:#91988b;font-size:10px}
+.agents-context-search{margin:9px 0 5px}
+.agents-file-count{margin:5px 1px 7px;color:#91988b;font-size:9px}
+.agents-file-list{max-height:320px}
+.agents-file-list label:has(input:checked){background:#f0f6eb}
+.agents-file-list label:has(input:checked) span{color:#4f7045;font-weight:650}
+.agents-terminal-output{border-color:#252b25;background:radial-gradient(ellipse at top left,#252d24,#171a17 65%);box-shadow:inset 0 1px 0 #ffffff08}
+.agents-terminal-controls select{min-height:37px;border-color:#e0e6dc;border-radius:8px}
+.agents-terminal-card{padding:17px}
+.agents-empty-pipeline{padding:44px 20px;border-style:dashed;background:linear-gradient(140deg,#fff,#fbfcf8)}
+.agents-empty-pipeline>svg{width:31px;height:31px;padding:7px;box-sizing:content-box;border:1px solid #e6eddf;border-radius:12px;background:#f4f8ef;color:#6f8d62}
+.agents-notice{padding:10px 13px;border-radius:10px}
+@media(max-width:1100px){.agents-metric{padding:1px 13px}.agents-metrics-tail{display:none}}
+@media(max-width:800px){.agents-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.agents-metric{padding:2px 4px;border-right:0}.agents-metric:first-child{padding-left:4px}.agents-metrics-tail{display:flex;grid-column:1/-1;margin:0;padding:8px 4px 0;border-top:1px solid #edf0e9}.agents-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){.agents-view{width:calc(100% - 18px);margin-top:12px}.agents-heading-mark{align-self:flex-start}.agents-metrics{padding:11px}.agents-metric{gap:7px}.agents-metric-icon{width:29px;height:29px}.agents-metric strong{font-size:15px}.agents-prompt-chips button{flex:1;justify-content:center}.agents-plan-card{padding:13px}.agents-step-chip{display:none}.agents-plan-controls .agents-create-button{width:100%}}
