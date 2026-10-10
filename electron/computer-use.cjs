@@ -1,0 +1,139 @@
+'use strict';
+
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const { desktopCapturer } = require('electron');
+const execFileAsync = promisify(execFile);
+
+const KEY_CODES = Object.freeze({
+  ENTER: 0x0D, TAB: 0x09, ESC: 0x1B, ESCAPE: 0x1B, SPACE: 0x20,
+  BACKSPACE: 0x08, DELETE: 0x2E, UP: 0x26, DOWN: 0x28, LEFT: 0x25,
+  RIGHT: 0x27, HOME: 0x24, END: 0x23, PAGEUP: 0x21, PAGEDOWN: 0x22,
+  CTRL: 0x11, ALT: 0x12, SHIFT: 0x10, WIN: 0x5B, F1: 0x70, F2: 0x71,
+  F3: 0x72, F4: 0x73, F5: 0x74, F6: 0x75, F7: 0x76, F8: 0x77,
+  F9: 0x78, F10: 0x79, F11: 0x7A, F12: 0x7B
+});
+
+function assertApproved(payload) {
+  if (payload?.approved !== true) throw new Error('This computer action requires explicit user approval.');
+}
+function assertWindows() {
+  if (process.platform !== 'win32') throw new Error('Native mouse and keyboard control is currently supported on Windows only.');
+}
+function powershell(script, timeout = 10000) {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  return execFileAsync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout, maxBuffer: 1024 * 1024 });
+}
+async function captureScreen() {
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1600, height: 1000 }, fetchWindowIcons: false });
+  if (!sources.length) throw new Error('No screen source is available.');
+  return sources.map((source, index) => ({
+    id: source.id,
+    name: source.name || ('Screen ' + (index + 1)),
+    width: source.thumbnail.getSize().width,
+    height: source.thumbnail.getSize().height,
+    dataUrl: source.thumbnail.toDataURL()
+  }));
+}
+async function inspectAccessibility() {
+  assertWindows();
+  const script = String.raw`
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$condition = [System.Windows.Automation.Condition]::TrueCondition
+$items = @()
+$windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)
+foreach ($window in $windows) {
+  try {
+    $name = $window.Current.Name
+    if (-not $name) { continue }
+    $items += [pscustomobject]@{ name=$name; type=$window.Current.ControlType.ProgrammaticName; automationId=$window.Current.AutomationId; className=$window.Current.ClassName }
+  } catch {}
+}
+ConvertTo-Json -InputObject @($items) -Depth 3 -Compress
+`;
+  const { stdout } = await powershell(script, 12000);
+  let windows = [];
+  try { windows = JSON.parse(stdout.trim() || '[]'); } catch { throw new Error('Windows UI Automation returned an unreadable result.'); }
+  return { ok: true, platform: 'win32', windows: Array.isArray(windows) ? windows.slice(0, 150) : [windows] };
+}
+async function click(payload = {}) {
+  assertApproved(payload); assertWindows();
+  const x = Number(payload.x), y = Number(payload.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x > 10000 || y > 10000) throw new Error('Click coordinates must be integers between 0 and 10000.');
+  const script = String.raw`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class COInput {
+  [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public MOUSEINPUT mi; }
+  [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+  [DllImport("user32.dll", SetLastError=true)] public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+}
+"@
+$x = __X__; $y = __Y__
+[void][System.Windows.Forms.Cursor]::Position
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($x,$y)
+$down = New-Object COInput+INPUT; $down.type=0; $down.mi.dwFlags=0x0002
+$up = New-Object COInput+INPUT; $up.type=0; $up.mi.dwFlags=0x0004
+[void][COInput]::SendInput(1,@($down),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
+Start-Sleep -Milliseconds 40
+[void][COInput]::SendInput(1,@($up),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
+`.replace('__X__', String(x)).replace('__Y__', String(y));
+  await powershell(script);
+  return { ok: true, action: 'click', x, y };
+}
+async function typeText(payload = {}) {
+  assertApproved(payload); assertWindows();
+  const value = String(payload.text ?? '');
+  if (!value || value.length > 2000) throw new Error('Text must contain 1–2000 characters.');
+  const b64 = Buffer.from(value, 'utf8').toString('base64');
+  const script = String.raw`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class COKeyboard {
+  [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public KEYBDINPUT ki; }
+  [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+  [DllImport("user32.dll", SetLastError=true)] public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+}
+"@
+$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__TEXT__'))
+foreach ($ch in $text.ToCharArray()) {
+  $down = New-Object COKeyboard+INPUT; $down.type=1; $down.ki.wScan=[uint16][char]$ch; $down.ki.dwFlags=0x0004
+  $up = New-Object COKeyboard+INPUT; $up.type=1; $up.ki.wScan=[uint16][char]$ch; $up.ki.dwFlags=0x0004 -bor 0x0002
+  $size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKeyboard+INPUT')
+  [void][COKeyboard]::SendInput(1,@($down),$size)
+  [void][COKeyboard]::SendInput(1,@($up),$size)
+}
+`.replace('__TEXT__', b64);
+  await powershell(script);
+  return { ok: true, action: 'type', characters: value.length };
+}
+async function pressKey(payload = {}) {
+  assertApproved(payload); assertWindows();
+  const key = String(payload.key || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = KEY_CODES[key] ?? (/^[A-Z0-9]$/.test(key) ? key.charCodeAt(0) : null);
+  if (!code) throw new Error('Unsupported key. Use a single letter/digit, F1–F12, or a documented navigation key.');
+  const script = String.raw`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class COKey {
+  [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public KEYBDINPUT ki; }
+  [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+  [DllImport("user32.dll", SetLastError=true)] public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+}
+"@
+$code=__KEY__
+$down=New-Object COKey+INPUT; $down.type=1; $down.ki.wVk=$code
+$up=New-Object COKey+INPUT; $up.type=1; $up.ki.wVk=$code; $up.ki.dwFlags=2
+$size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKey+INPUT')
+[void][COKey]::SendInput(1,@($down),$size); Start-Sleep -Milliseconds 35; [void][COKey]::SendInput(1,@($up),$size)
+`.replace('__KEY__', String(code));
+  await powershell(script);
+  return { ok: true, action: 'key', key };
+}
+module.exports = { captureScreen, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved };
