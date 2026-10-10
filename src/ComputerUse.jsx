@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Monitor, RefreshCw, MousePointer2, Keyboard, Type, ShieldCheck, AlertTriangle, Eye, ScanSearch } from 'lucide-react';
+import { Monitor, RefreshCw, MousePointer2, Keyboard, Type, ShieldCheck, AlertTriangle, Eye, ScanSearch, CheckCircle2 } from 'lucide-react';
 
 const desktop = window.coAgent;
 
