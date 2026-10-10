@@ -10,6 +10,9 @@ This branch reconstructs the desktop integration path between the React renderer
 - Video Studio with media bin, preview, metadata and basic export controls.
 - Optional Tesseract CLI discovery and local OCR for common image formats.
 - Optional Hyperframes CLI discovery, project validation, lint, preview launch and MP4 render.
+- Integrations screen with optional-tool status and user-confirmed Windows Tesseract / npm Hyperframes installers.
+- Public HTTPS GitHub repository import with optional ref pinning, manifest detection, managed removal, and explicit opt-in for `SKILL.md` content in local Ollama chat.
+- Security checks for GitHub-only URLs, ref validation, safe process argument passing, imported manifest symlink rejection, and bounded skill content.
 - Local model selection/management UI and runtime diagnostics.
 - Read-only API subagent helper for OpenAI-compatible, Anthropic, and Gemini endpoints.
 - Desktop app launch restrictions and service smoke tests.
@@ -25,6 +28,12 @@ The current implementation is not equivalent to the complete original feature se
 
 - **Tesseract:** installed separately with trained language data; set `TESSERACT_PATH` if it is not on PATH or in a common Windows install location.
 - **Hyperframes:** external CLI, Node.js 22+, and FFmpeg. It is not silently downloaded or bundled by CO-Agent. Video Studio expects a project folder with `index.html`; render output is `co-agent-render.mp4` in that folder.
+
+## Repository integration boundaries
+
+The new repository importer is intentionally a safe first-stage workflow rather than a full generic plugin runtime. It supports public HTTPS GitHub repositories only. Imported files are stored under Electron user data in `extensions/`; the app does not execute imported code or automatically run package lifecycle scripts. A root `SKILL.md` can be explicitly enabled and included in local Ollama chat context, with bounded size/count and an untrusted-content warning. Generic OpenClaw plugins, dependency installation, private repositories, and arbitrary Git hosts are not activated/supported.
+
+The Integrations screen can invoke the Windows Tesseract installer through winget and install Hyperframes through npm after the user confirms. These tools remain optional. Piper remains manual setup.
 
 ## Verification
 
