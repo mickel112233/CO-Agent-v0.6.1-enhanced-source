@@ -278,7 +278,9 @@ A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`
 
 ## 🧭 Known gaps
 
-- Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).\n- Computer Use is a Windows-only, one-action-at-a-time MVP; autonomous planning, deep accessibility trees, and automatic action verification are not yet implemented.\n- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
+- Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
+- Computer Use is a Windows-only, one-action-at-a-time MVP; autonomous planning, deep accessibility trees, and automatic action verification are not yet implemented.
+- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
 - Chat does not yet stream tokens; Ollama model-pull progress is not fully surfaced.
 - The multi-track editor is not yet a full professional NLE; see the video-editor limitations above.
 - Full API-provider configuration/credential management is incomplete.
