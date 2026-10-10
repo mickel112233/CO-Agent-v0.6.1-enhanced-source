@@ -75,7 +75,7 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   const args = ['-y', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=30:d=' + duration];
   const clipInputIndex = new Map();
   for (const clip of media) {
-    const index = args.filter(arg => arg === '-i').length + 1;
+    const index = args.filter(arg => arg === '-i').length;
     if (clip.type === 'image') args.push('-loop', '1', '-t', String(clip.duration), '-i', clip.file);
     else args.push('-i', clip.file);
     clipInputIndex.set(clip.id, index);
