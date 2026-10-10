@@ -33,7 +33,6 @@ export default function ComputerUse() {
 
   async function readText() {
     if (!current) return;
-    if (!window.confirm('Read visible text from ' + current.name + ' using local Tesseract OCR? The screenshot stays on this device.')) return;
     setBusy('ocr'); setNotice('');
     try {
       const result = await desktop?.computerUse?.readScreenText({ sourceId: current.id, language: 'eng', approved: true });
@@ -76,7 +75,6 @@ export default function ComputerUse() {
   }
 
   async function perform(action, payload, description) {
-    if (!window.confirm('Approve computer action?\n\n' + description + '\n\nCO-Agent will perform only this one action. Review the screen first and avoid entering passwords or secrets.')) return;
     setBusy(action); setNotice('');
     try {
       const method = action === 'click' ? desktop.computerUse.click : action === 'type' ? desktop.computerUse.typeText : desktop.computerUse.pressKey;
