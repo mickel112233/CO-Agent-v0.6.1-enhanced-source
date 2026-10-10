@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     chat: invoke('runtime:chat')
   }),
   computer: Object.freeze({ allowedApps: invoke('computer:allowed-apps'), launchApp: invoke('computer:launch-app'), openPath: invoke('computer:open-path') }),
+  computerUse: Object.freeze({ captureScreen: invoke('computer-use:capture-screen'), inspectAccessibility: invoke('computer-use:inspect-accessibility'), click: invoke('computer-use:click'), typeText: invoke('computer-use:type-text'), pressKey: invoke('computer-use:press-key') }),
   studio: Object.freeze({
     capabilities: invoke('studio:capabilities'), probe: invoke('studio:probe'), extractAudio: invoke('studio:extract-audio'), concat: invoke('studio:concat'),
     ocrStatus: invoke('studio:ocr-status'), ocrImage: invoke('studio:ocr-image'),
