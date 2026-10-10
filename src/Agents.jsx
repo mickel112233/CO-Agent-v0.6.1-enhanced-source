@@ -52,7 +52,8 @@ export default function Agents() {
           desktop?.runtime?.ollamaStatus?.(),
           desktop?.agents?.list?.(),
           desktop?.terminal?.listCommands?.(),
-          desktop?.workspace?.getRoot?.()
+          desktop?.workspace?.getRoot?.(),
+          desktop?.integrations?.listRepos?.()
         ]);
         setModels(runtime?.models || []);
         setModel(runtime?.models?.[0]?.name || runtime?.models?.[0]?.model || '');
@@ -69,6 +70,16 @@ export default function Agents() {
     });
     return () => unsubscribe();
   }, [refreshFiles]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('co-agent:agent-goal', JSON.stringify(goal));
+      window.localStorage.setItem('co-agent:agent-workflow', JSON.stringify(workflow));
+      window.localStorage.setItem('co-agent:agent-results', JSON.stringify(results));
+      window.localStorage.setItem('co-agent:agent-context-paths', JSON.stringify(selectedPaths));
+      window.localStorage.setItem('co-agent:agent-external-skills', JSON.stringify(selectedExternalSkills));
+    } catch {}
+  }, [goal, workflow, results, selectedPaths, selectedExternalSkills]);
 
   const doneCount = useMemo(() => (workflow?.pipeline || []).filter(step => step.status === 'done').length, [workflow]);
   const selectedFiles = useMemo(() => files.filter(file => selectedPaths.includes(file.path)), [files, selectedPaths]);
@@ -117,7 +128,13 @@ export default function Agents() {
       const priorResults = workflow.pipeline.filter(item => item.status === 'done' && results[item.id]).map(item => ({
         title: item.title, role: item.role, result: JSON.stringify(results[item.id]).slice(0, 5000)
       }));
-      let externalSkills = [];\n      if (selectedExternalSkills.length && desktop?.integrations?.getSkills) {\n        const loadedSkills = await desktop.integrations.getSkills(selectedExternalSkills);\n        if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');\n        externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];\n      }\n      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
+      let externalSkills = [];
+      if (selectedExternalSkills.length && desktop?.integrations?.getSkills) {
+        const loadedSkills = await desktop.integrations.getSkills(selectedExternalSkills);
+        if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');
+        externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];
+      }
+      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Agent step failed.');
       setResults(old => ({ ...old, [step.id]: result }));
       setActiveResult(step.id);
