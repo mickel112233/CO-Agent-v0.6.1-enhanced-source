@@ -2,7 +2,11 @@
 
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const { desktopCapturer, screen } = require('electron');
+const ocr = require('./ocr.cjs');
 const execFileAsync = promisify(execFile);
 
 const KEY_CODES = Object.freeze({
@@ -38,6 +42,17 @@ async function captureScreen() {
       dataUrl: source.thumbnail.toDataURL()
     };
   });
+}
+async function readScreenText(payload = {}) {
+  assertApproved(payload);
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1600, height: 1000 }, fetchWindowIcons: false });
+  const source = sources.find(item => item.id === payload.sourceId) || sources[0];
+  if (!source) throw new Error('No screen source is available.');
+  const file = path.join(os.tmpdir(), 'co-agent-screen-ocr-' + process.pid + '-' + Date.now() + '.png');
+  try {
+    await fs.writeFile(file, source.thumbnail.toPNG());
+    return await ocr.recognizeImage(file, payload.language || 'eng');
+  } finally { await fs.rm(file, { force: true }).catch(() => {}); }
 }
 async function inspectAccessibility() {
   assertWindows();
@@ -143,4 +158,4 @@ $size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKey+INPUT')
   await powershell(script);
   return { ok: true, action: 'key', key };
 }
-module.exports = { captureScreen, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved };
+module.exports = { captureScreen, readScreenText, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved };
