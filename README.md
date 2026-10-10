@@ -26,6 +26,9 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | Capability | Available now | Boundary / requirement |
 |---|---|---|
 | Local AI chat | Chat through Ollama and select installed models | Ollama must be installed and running; responses currently do not stream |
+| Multi-agent workflows | Local-model task planner, eight specialist roles, dependency-aware pipeline, reviewer/tester steps, structured results, and ten built-in skills | Each step is started by the user; local Ollama required; agent file proposals require separate approval |
+| Workspace file tools | Select a project folder, browse/read context files, preview model-proposed full-file changes, and back up existing files before applying | Only selected files are sent to the local model; path traversal, symlinks, common secret files, and protected build/dependency folders are blocked |
+| In-app terminal | Run project tests, renderer build, Git status/diff check, and dependency audit with live output | Fixed command presets only; native confirmation each run; project scripts still execute with your user permissions |
 | Model management | Pull, list, and remove Ollama models | Downloads can be large; pull progress is not fully surfaced |
 | Video Studio | Multi-track timeline for video/image overlays, separate audio clips, captions/title cards, clip trim/split/move, project save/load, preview, and FFmpeg MP4 render | Functional editing MVP; no transitions, keyframes, waveform editing, advanced color tools, or full original timeline parity |
 | Image text extraction | Local Tesseract OCR for PNG/JPEG/TIFF/BMP/WebP | Optional Tesseract installation and language data |
@@ -92,6 +95,16 @@ The default Ollama endpoint is `http://127.0.0.1:11434`. CO-Agent does not insta
 A successful renderer build does not prove external tools, all IPC flows, or platform packaging work. Check the CI run and test the specific feature you need.
 
 </details>
+
+## 🧠 Agents, workflows, and terminal
+
+Open **Agents & terminal** in the sidebar. Describe the outcome you want, choose an installed local Ollama model, and create a 3–7 step workflow. The planner assigns specialist roles, skills, dependencies, deliverables, and acceptance criteria. Run each step individually; completed outputs become context for later steps. Available roles include lead planner, research analyst, implementation engineer, independent reviewer, test engineer, security reviewer, UX specialist, and documentation specialist.
+
+Choose a project folder to let agents inspect selected context files and propose source changes. Proposed file contents are previewed in the UI. **Review and apply files** triggers a native confirmation; existing files are backed up in `.co-agent-backups`. Agent output is untrusted, and changes are not applied automatically.
+
+The integrated terminal offers fixed commands: `npm test`, `npm run build`, `git status --short --branch`, `git diff --check`, and `npm audit --omit=dev`. Output streams into the terminal panel with exit status and timeout reporting. Each run requires native confirmation. These commands execute the selected project's scripts with your Windows account permissions, so only open workspaces you trust. The terminal does not accept arbitrary shell text. The chosen workspace is remembered for the next launch.
+
+Built-in skills cover planning, implementation, code review, test engineering, debugging, security, Electron IPC, frontend UX, documentation, and media pipelines. These are task-specific instructions for the model, not magical tools: a skill cannot access a file unless you select it, and cannot claim a test passed unless the terminal actually ran it.
 
 ## 🖥️ Computer Use
 
@@ -194,12 +207,12 @@ This is a conservative first step inspired by repository/skill workflows in tool
 | `electron/main.cjs` | Electron lifecycle, IPC dispatch, Ollama chat |
 | `electron/preload.cjs` | Allow-listed context-isolated renderer API |
 | `electron/ollama.cjs` | Local Ollama status and model management |
-| `electron/agent-runtime.cjs` | Read-only API subagent request helper |
+| `electron/agent-runtime.cjs` | Read-only API subagent request helper |\n| `electron/agent-orchestrator.cjs` | Local multi-agent planner, specialist roles, built-in skills, and structured workflow steps |\n| `electron/workspace.cjs` | Guarded project file context, approved file writes with backups, and allow-listed terminal commands |
 | `electron/studio.cjs` | FFmpeg/FFprobe media helpers |\n| `electron/timeline.cjs` | Timeline project validation, save/load, and FFmpeg rendering |\n| `electron/computer-use.cjs` | Approval-gated desktop capture, Windows input, accessibility inspection, and optional screen OCR |
 | `electron/ocr.cjs` | Tesseract discovery and OCR |
 | `electron/hyperframes.cjs` | Hyperframes CLI integration |
 | `electron/integrations.cjs` | Optional tool checks/installers, GitHub repository import and skill loading |
-| `src/App.jsx` | Main chat, navigation and model settings |
+| `src/App.jsx` | Main chat, navigation and model settings |\n| `src/Agents.jsx` | Multi-agent pipeline, context-file selection, proposal review, and live terminal UI |
 | `src/VideoEditor.jsx` | Basic media utilities and Video Studio mode switch |\n| `src/TimelineEditor.jsx` | Multi-track timeline, project controls, clip inspector and export UI |\n| `src/ComputerUse.jsx` | Desktop screenshot, OCR, accessibility and approval-gated input UI |
 | `src/Integrations.jsx` | Optional tools, GitHub repository import and skill selection UI |
 | `src/styles.css` | Renderer styles |
@@ -260,8 +273,7 @@ A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`
 
 - Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).\n- Computer Use is a Windows-only, one-action-at-a-time MVP; autonomous planning, deep accessibility trees, and automatic action verification are not yet implemented.\n- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
 - Chat does not yet stream tokens; Ollama model-pull progress is not fully surfaced.
-- The built-in media workflow is simple sequence assembly, not a complete multi-track editor.
-- General-purpose screen capture, OCR-driven computer control, and broad desktop automation are unfinished.
+- The multi-track editor is not yet a full professional NLE; see the video-editor limitations above.
 - Full API-provider configuration/credential management is incomplete.
 - Imported generic plugin code is not activated. Only explicitly selected `SKILL.md` text can be loaded into local chat.
 - Tesseract, Hyperframes, Piper, and Piper voice assets are optional external dependencies.
