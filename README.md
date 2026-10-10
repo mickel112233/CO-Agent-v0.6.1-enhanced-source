@@ -27,11 +27,11 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 |---|---|---|
 | Local AI chat | Chat through Ollama and select installed models | Ollama must be installed and running; responses currently do not stream |
 | Model management | Pull, list, and remove Ollama models | Downloads can be large; pull progress is not fully surfaced |
-| Video Studio | Import and preview clips, inspect metadata, extract audio, join compatible clips | Basic assembly, not a full nonlinear timeline editor |
+| Video Studio | Multi-track timeline for video/image overlays, separate audio clips, captions/title cards, clip trim/split/move, project save/load, preview, and FFmpeg MP4 render | Functional editing MVP; no transitions, keyframes, waveform editing, advanced color tools, or full original timeline parity |
 | Image text extraction | Local Tesseract OCR for PNG/JPEG/TIFF/BMP/WebP | Optional Tesseract installation and language data |
 | HTML-to-video | Hyperframes lint, preview, and MP4 rendering | Optional external Hyperframes CLI and FFmpeg |
 | Repository skills | Import public GitHub repositories and inspect manifests; explicitly enable a detected `SKILL.md` for local chat | Imported plugin code is not executed; skills are third-party instructions and must be reviewed |
-| Desktop bridge | Context-isolated IPC and a small allow-list of app/path actions | Not unrestricted computer-use automation |
+| Computer Use | Desktop screenshot capture, top-level Windows UI Automation inspection, optional local screenshot OCR, approved mouse click/text/key actions | Windows-only native input; one action per confirmation; no autonomous action loop or arbitrary shell execution |
 | Voice foundation | Optional Piper wrapper | Piper executable and voice models are not bundled |
 
 ## ⬇️ Download a test build (Windows)
@@ -92,6 +92,22 @@ The default Ollama endpoint is `http://127.0.0.1:11434`. CO-Agent does not insta
 A successful renderer build does not prove external tools, all IPC flows, or platform packaging work. Check the CI run and test the specific feature you need.
 
 </details>
+
+## 🖥️ Computer Use
+
+Open **Computer Use** from the sidebar to capture your desktop, inspect top-level window names through Windows UI Automation, optionally read visible text with locally installed Tesseract, and send an individual mouse click, text entry, or allow-listed key.
+
+- **Every input action requires a confirmation dialog.** Review the screenshot and approve only the specific action you intend.
+- Clicks are bounded to the selected display and coordinates are scaled from the captured screenshot.
+- Text entry is capped at 2,000 characters. Do not type passwords, API keys, or other secrets into the action field.
+- Screen OCR is optional and runs locally through Tesseract. It may extract sensitive visible content, so use it only when you intend to read that screen.
+- Native mouse/keyboard input and the UI Automation window list are currently supported on Windows with an interactive desktop. The app does not yet plan and run long autonomous computer-use sequences, inspect full accessibility trees, or verify arbitrary app state automatically.
+
+## 🎬 Multi-track Video Studio
+
+Video Studio opens the timeline editor first. Import local video, audio, and image files, add assets to video/audio tracks, add title/caption clips, adjust source in-points and durations, move clips, split at the playhead, save/load `.coagent-project.json` project files, and render an MP4 through the bundled FFmpeg runtime when available.
+
+The current renderer composites video and image clips on the timeline and mixes audio clips on the dedicated audio track. Source media stays where it is; project files store paths rather than copying all media into a project package. Keep source files available when reopening a project. This is a practical timeline MVP, not a claim of parity with Premiere/DaVinci or the recovered original editor: transitions, keyframes, effects, automatic captions/transcription, audio waveforms, undo/redo, and advanced color grading are still not implemented.
 
 ## 🧩 Integrations & optional tools
 
