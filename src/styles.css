@@ -84,3 +84,5 @@
 @media(max-width:640px){.integration-cards{grid-template-columns:1fr}.integrations-view{width:calc(100% - 24px);margin-top:22px}.integrations-heading{flex-direction:column}.integrations-heading h1{font-size:25px}.repo-heading{align-items:flex-start;flex-direction:column}.repo-heading .primary-button{width:100%}.installed-repo{gap:9px;padding:11px}.installed-repo-icon{flex-basis:32px;width:32px;height:32px}.repo-form-footer{align-items:stretch;flex-direction:column}.repo-form-footer .primary-button{justify-content:center}.integration-banner{padding:13px}}
 
 .preview-skill-button{margin-top:12px;align-self:flex-start;font-size:10px}.skill-preview{max-height:320px;overflow:auto;margin:9px 0 0;padding:12px;border:1px solid #e7e7df;border-radius:9px;background:#f8f8f4;color:#55554c;white-space:pre-wrap;overflow-wrap:anywhere;font:10px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+
+.active-skill-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid #e0e3d8;border-radius:7px;background:#f4f6ef;color:#607351;font-size:10px;font-weight:700;white-space:nowrap}
