@@ -71,11 +71,20 @@ function repoDetails(root, slug, url, ref, manifest = {}) {
     note: 'Repository files were cloned for review only. CO-Agent has not executed its code or installed its dependencies.'
   };
 }
+async function readSafeFile(root, name) {
+  const base = await fs.realpath(root);
+  const file = path.join(base, name);
+  const stat = await fs.lstat(file).catch(() => null);
+  if (!stat || !stat.isFile() || stat.isSymbolicLink()) return null;
+  const real = await fs.realpath(file).catch(() => null);
+  if (!real || path.dirname(real) !== base) return null;
+  return fs.readFile(real, 'utf8').catch(() => null);
+}
 async function inspectRepo(root, url, ref, slug) {
   const [pkgText, pluginText, skillText] = await Promise.all([
-    fs.readFile(path.join(root, 'package.json'), 'utf8').catch(() => null),
-    fs.readFile(path.join(root, 'openclaw.plugin.json'), 'utf8').catch(() => null),
-    fs.readFile(path.join(root, 'SKILL.md'), 'utf8').catch(() => null)
+    readSafeFile(root, 'package.json'),
+    readSafeFile(root, 'openclaw.plugin.json'),
+    readSafeFile(root, 'SKILL.md')
   ]);
   const parse = (value, label) => {
     if (!value) return null;
@@ -139,7 +148,7 @@ async function getSkillContents(slugs, userDataPath) {
     const metadata = await fs.readFile(path.join(repoRoot, '.co-agent-source.json'), 'utf8').then(JSON.parse).catch(() => null);
     if (!metadata) continue;
     const skillPath = path.join(repoRoot, 'SKILL.md');
-    const content = await fs.readFile(skillPath, 'utf8').catch(() => null);
+    const content = await readSafeFile(repoRoot, 'SKILL.md');
     if (!content || content.length > 30000) continue;
     result.push({ slug, content: content.slice(0, 30000), url: metadata.url });
   }
