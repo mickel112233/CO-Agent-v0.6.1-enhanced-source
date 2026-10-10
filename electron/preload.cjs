@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     status: invoke('integrations:status'),
     installTool: invoke('integrations:install-tool'),
     listRepos: invoke('integrations:list-repos'),
+    getSkills: invoke('integrations:get-skills'),
     installRepo: invoke('integrations:install-repo'),
     removeRepo: invoke('integrations:remove-repo')
   }),
