@@ -195,12 +195,12 @@ This is a conservative first step inspired by repository/skill workflows in tool
 | `electron/preload.cjs` | Allow-listed context-isolated renderer API |
 | `electron/ollama.cjs` | Local Ollama status and model management |
 | `electron/agent-runtime.cjs` | Read-only API subagent request helper |
-| `electron/studio.cjs` | FFmpeg/FFprobe media helpers |
+| `electron/studio.cjs` | FFmpeg/FFprobe media helpers |\n| `electron/timeline.cjs` | Timeline project validation, save/load, and FFmpeg rendering |\n| `electron/computer-use.cjs` | Approval-gated desktop capture, Windows input, accessibility inspection, and optional screen OCR |
 | `electron/ocr.cjs` | Tesseract discovery and OCR |
 | `electron/hyperframes.cjs` | Hyperframes CLI integration |
 | `electron/integrations.cjs` | Optional tool checks/installers, GitHub repository import and skill loading |
 | `src/App.jsx` | Main chat, navigation and model settings |
-| `src/VideoEditor.jsx` | Video Studio |
+| `src/VideoEditor.jsx` | Basic media utilities and Video Studio mode switch |\n| `src/TimelineEditor.jsx` | Multi-track timeline, project controls, clip inspector and export UI |\n| `src/ComputerUse.jsx` | Desktop screenshot, OCR, accessibility and approval-gated input UI |
 | `src/Integrations.jsx` | Optional tools, GitHub repository import and skill selection UI |
 | `src/styles.css` | Renderer styles |
 | `test/` | Automated service and validation tests |
@@ -258,7 +258,7 @@ A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`
 
 ## 🧭 Known gaps
 
-- Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
+- Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).\n- Computer Use is a Windows-only, one-action-at-a-time MVP; autonomous planning, deep accessibility trees, and automatic action verification are not yet implemented.\n- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
 - Chat does not yet stream tokens; Ollama model-pull progress is not fully surfaced.
 - The built-in media workflow is simple sequence assembly, not a complete multi-track editor.
 - General-purpose screen capture, OCR-driven computer control, and broad desktop automation are unfinished.
