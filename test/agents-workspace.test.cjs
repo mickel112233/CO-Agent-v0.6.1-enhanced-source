@@ -65,6 +65,19 @@ test('terminal only exposes fixed, reviewable command presets', () => {
   assert.throws(() => workspace.runCommand('rm-everything'), /approved terminal command/i);
 });
 
+test('workflow pipeline normalization maps dependencies and rejects unsafe planner output', () => {
+  const pipeline = agents.normalizePipeline([
+    { id: 'discover', title: 'Inspect', role: 'researcher', skill: 'reviewer', dependsOn: [] },
+    { id: 'implement', title: 'Implement', role: 'implementer', skill: 'implementer', dependsOn: ['discover'] },
+    { id: 'verify', title: 'Verify', role: 'tester', skill: 'test-engineer', dependsOn: ['implement', 'missing'] }
+  ]);
+  assert.deepEqual(pipeline[0].dependsOn, []);
+  assert.deepEqual(pipeline[1].dependsOn, ['step-1']);
+  assert.deepEqual(pipeline[2].dependsOn, ['step-2']);
+  assert.throws(() => agents.normalizePipeline([{ role: 'shell', skill: 'planner' }, { role: 'tester', skill: 'test-engineer' }]), /unsupported role/i);
+  assert.throws(() => agents.normalizePipeline([{ role: 'planner', skill: 'planner' }]), /2–7 step workflow/i);
+});
+
 test('built-in agent harness provides multiple specialist roles and skills', () => {
   const agentsList = agents.getAgents();
   const skills = agents.getSkills();
