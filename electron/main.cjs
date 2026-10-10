@@ -1,6 +1,8 @@
 'use strict';
 const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { isTrustedRendererUrl } = require('./security.cjs');
 const fs = require('node:fs/promises');
 const ollama = require('./ollama.cjs');
 const computer = require('./computer.cjs');
@@ -21,7 +23,7 @@ const registered = new Set();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
   if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
-  return isDev ? /^https?:\/\/127\.0\.0\.1:5173(?:\/|$)/.test(frame.url) : frame.url.startsWith('file://');
+  return isTrustedRendererUrl(frame.url, { isDev, appUrl: pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href });
 }
 function handle(channel, fn) {
   if (registered.has(channel)) ipcMain.removeHandler(channel);
@@ -168,8 +170,12 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) shell.openExternal(url);
+    try { if (new URL(url).protocol === 'https:') shell.openExternal(url); } catch { /* reject malformed external URLs */ }
     return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const appUrl = pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href;
+    if (!isTrustedRendererUrl(url, { isDev, appUrl })) event.preventDefault();
   });
   const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
   const load = isDev ? mainWindow.loadURL(devUrl) : mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
