@@ -50,6 +50,7 @@ test('workspace rejects symlink traversal and oversized file proposals', async (
     await fs.symlink(outside, path.join(root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
     await assert.rejects(workspace.readFile('linked/secret.txt'), /symbolic links/i);
     await assert.rejects(workspace.applyChanges({ approved: true, files: [{ path: 'large.txt', content: 'x'.repeat(workspace.MAX_FILE_BYTES + 1) }] }), /120 KB/i);
+    await assert.rejects(workspace.applyChanges({ approved: true, files: [{ path: '.github/workflows/ci.yml', content: 'unsafe: true' }] }), /workflow files are blocked/i);
     await assert.rejects(workspace.applyChanges({ approved: true, files: Array.from({ length: 13 }, (_, i) => ({ path: 'f' + i + '.txt', content: 'x' })) }), /1 and 12/i);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
