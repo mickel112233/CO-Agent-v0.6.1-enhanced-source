@@ -9,14 +9,15 @@ This repository is an active reconstruction. The current source now includes pra
 - Optional API-provider read-only helper for OpenAI-compatible, Anthropic, and Gemini endpoints.
 - Media probing, WAV extraction, compatible-clip concat, and FFmpeg capability checks.
 - **Multi-track timeline MVP:** video and image clips positioned on a timeline, separate audio clips, title/caption overlays, source in-point and duration editing, move/split/remove operations, local project save/load (.coagent-project.json), preview, and FFmpeg MP4 rendering.
-- **Computer-use MVP:** desktop screenshot capture, selected-display coordinate mapping, Windows top-level UI Automation window inspection, optional local Tesseract OCR of a captured screen, and explicit-approval mouse click, text input, and allow-listed keypresses.
+- **Computer-use MVP:** desktop screenshot capture, selected-display coordinate mapping, Windows top-level UI Automation window inspection, optional local Tesseract OCR, screenshot-aware local-model action planning, and explicit-approval mouse click, text input, and allow-listed keypresses. The plan is still reviewed and executed one action at a time.
+- **App skill library:** reusable playbooks for CUA, Godot, Blender, MCP tools, Electron app engineering, and quality/release harnesses.
 - Optional Tesseract OCR for still images and screenshots.
 - Optional Hyperframes CLI discovery, project validation, lint, preview launch and MP4 render.
 - Integrations screen with optional-tool status and user-confirmed Windows Tesseract / npm Hyperframes installers.
 - Public HTTPS GitHub repository import with optional ref pinning, manifest detection, managed removal, and explicit opt-in for SKILL.md content in local Ollama chat.
 - Security checks for GitHub-only URLs, ref validation, safe process argument passing, imported manifest symlink rejection, and bounded skill content.
 - Local model selection/management UI and runtime diagnostics.
-- **Multi-agent harness:** local-model workflow planner, specialist role prompts, twenty built-in skills, dependency-aware step execution, structured results, reviewable file proposals, and user-approved file writes with backups.
+- **Multi-agent harness:** local-model workflow planner, specialist role prompts, twenty-six built-in skills, dependency-aware step execution, structured results, reviewable file proposals, and user-approved file writes with backups.
 - **In-app developer terminal:** live output and fixed test/build/Git/audit presets, native command confirmation, timeout/output bounds, and explicit cancellation.
 - Workspace file tools with selected-context reads, symlink/path-traversal protection, secret-file filtering, change-size limits, and persisted project-folder selection.
 - GitHub Actions packaging workflow that tests the app, builds a Windows NSIS installer and ZIP, verifies that both exist, and uploads them as a downloadable artifact; version tags publish release assets.
