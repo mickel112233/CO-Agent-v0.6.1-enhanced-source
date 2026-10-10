@@ -1,0 +1,77 @@
+name: CO-Agent Windows Download
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: co-agent-windows-download-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-package:
+    name: Test and package Windows app
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Package Windows installer and ZIP
+        run: npx electron-builder --win nsis zip --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify downloadable files exist
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path release -File | Where-Object { $_.Extension -in @('.exe', '.zip') }
+          if (-not $files -or @($files).Count -lt 2) {
+            Get-ChildItem -Path release -Force -ErrorAction SilentlyContinue | Format-Table Name, Length
+            throw 'Expected both a Windows installer (.exe) and ZIP package in release/.'
+          }
+          $files | Format-Table Name, Length
+
+      - name: Upload Windows build for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: CO-Agent-Windows-${{ github.sha }}
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish versioned GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CO-Agent ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
