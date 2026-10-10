@@ -42,6 +42,15 @@ test('caption filter escaping handles common filter syntax characters', () => {
   assert.match(escaped, /\\,/);
 });
 
+test('local action plans allow only bounded, low-risk actions', () => {
+  const plan = computerUse.validatePlanActions({ actions: [{ type: 'click', x: 5, y: 9, reason: 'Open menu' }, { type: 'key', key: 'ENTER' }, { type: 'type', text: 'hello' }] }, 100, 100);
+  assert.equal(plan.length, 3);
+  assert.throws(() => computerUse.validatePlanActions({ actions: [{ type: 'click', x: 100, y: 4 }] }, 100, 100), /outside screenshot bounds/);
+  assert.throws(() => computerUse.validatePlanActions({ actions: [{ type: 'type', text: 'my password is abc' }] }, 100, 100), /sensitive-looking/);
+  assert.throws(() => computerUse.validatePlanActions({ actions: [{ type: 'shell', command: 'whoami' }] }, 100, 100), /unsupported type/);
+  assert.throws(() => computerUse.validatePlanActions({ actions: Array.from({ length: 9 }, () => ({ type: 'key', key: 'ENTER' })) }, 100, 100), /Maximum 8/);
+});
+
 test('computer-use actions reject missing approval and bound input', () => {
   assert.throws(() => computerUse.assertApproved({}), /explicit user approval/);
   assert.doesNotThrow(() => computerUse.assertApproved({ approved: true }));
