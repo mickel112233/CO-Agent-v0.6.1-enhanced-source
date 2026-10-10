@@ -58,7 +58,7 @@ async function planWorkflow(payload={}){
  const pipeline=result.pipeline.map((step,index)=>{
   if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
   if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
-  const dependencies=Array.isArray(step.dependsOn)?step.dependsOn.map(String).filter(id=>result.pipeline.slice(0,index).some(prev=>prev.id===id)).slice(0,6):[];
+  const dependencies=Array.isArray(step.dependsOn)?[...new Set(step.dependsOn.map(id=>sourceIdToIndex.get(String(id))).filter(depIndex=>Number.isInteger(depIndex)&&depIndex<index).map(depIndex=>'step-'+(depIndex+1)))].slice(0,6):[];
   return {id:'step-'+(index+1),title:String(step.title||'Workflow step '+(index+1)).slice(0,100),role:step.role,skill:step.skill,description:String(step.description||'').slice(0,1800),deliverable:String(step.deliverable||'A concise result and next steps').slice(0,500),dependsOn:dependencies,acceptanceCriteria:Array.isArray(step.acceptanceCriteria)?step.acceptanceCriteria.slice(0,6).map(x=>String(x).slice(0,240)):[],requiresWorkspaceContext:step.requiresWorkspaceContext!==false,status:'queued',result:null};
  });
  return {ok:true,model:model.model,title:String(result.title||'New workflow').slice(0,100),goal,pipeline,skills:getSkills(),agents:getAgents(),createdAt:new Date().toISOString()};
