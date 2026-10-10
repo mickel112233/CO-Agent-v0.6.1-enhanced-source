@@ -8,6 +8,8 @@ const studio = require('./studio.cjs');
 const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
+const agentOrchestrator = require('./agent-orchestrator.cjs');
+const workspace = require('./workspace.cjs');
 const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
@@ -51,6 +53,33 @@ async function confirmComputerAction(message, detail) {
 }
 function registerIpc() {
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
+  handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
+  handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));
+  handle('agents:run-step', payload => agentOrchestrator.runWorkflowStep(payload));
+  handle('workspace:get-root', () => { try { return { ok: true, root: workspace.getRoot() }; } catch { return { ok: true, root: '' }; } });
+  handle('workspace:choose-root', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { title: 'Choose a project workspace', properties: ['openDirectory'] });
+    if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
+    return workspace.setRoot(result.filePaths[0]);
+  });
+  handle('workspace:list-files', options => workspace.listFiles(options));
+  handle('workspace:read-file', relativePath => workspace.readFile(relativePath));
+  handle('workspace:apply-changes', async payload => {
+    const files = Array.isArray(payload?.files) ? payload.files : [];
+    if (!files.length || files.length > 12) throw new Error('Choose between 1 and 12 proposed files to apply.');
+    const summary = files.map(item => '• ' + String(item.path || '(unnamed)')).join('\\n');
+    if (!await confirmComputerAction('Apply agent-proposed file changes?', 'Workspace: ' + workspace.getRoot() + '\\n\\nFiles to create or replace:\\n' + summary + '\\n\\nExisting files are backed up in .co-agent-backups. Review the generated content before allowing this change.')) throw new Error('File changes cancelled by user.');
+    return workspace.applyChanges({ ...payload, approved: true });
+  });
+  handle('terminal:list-commands', () => ({ ok: true, commands: workspace.commandList() }));
+  handle('terminal:run-command', async commandId => {
+    const command = workspace.commandList().find(item => item.id === commandId);
+    if (!command) throw new Error('Select an approved terminal command.');
+    const root = workspace.getRoot();
+    if (!await confirmComputerAction('Run a development command?', command.label + '\\n\\nCommand: ' + command.command + '\\nWorking directory: ' + root + '\\n\\nThis runs the selected project command and its project-defined scripts. Only continue if you trust this workspace.')) throw new Error('Terminal command cancelled by user.');
+    return workspace.runCommand(commandId, event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('terminal:output', event); });
+  });
+  handle('terminal:cancel-command', () => workspace.cancelCommand());
   handle('runtime:ollama-models', async () => {
     const status = await ollama.getOllamaStatus();
     return { available: status.available, models: status.models || [], error: status.error || null };
