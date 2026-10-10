@@ -207,13 +207,20 @@ This is a conservative first step inspired by repository/skill workflows in tool
 | `electron/main.cjs` | Electron lifecycle, IPC dispatch, Ollama chat |
 | `electron/preload.cjs` | Allow-listed context-isolated renderer API |
 | `electron/ollama.cjs` | Local Ollama status and model management |
-| `electron/agent-runtime.cjs` | Read-only API subagent request helper |\n| `electron/agent-orchestrator.cjs` | Local multi-agent planner, specialist roles, built-in skills, and structured workflow steps |\n| `electron/workspace.cjs` | Guarded project file context, approved file writes with backups, and allow-listed terminal commands |
-| `electron/studio.cjs` | FFmpeg/FFprobe media helpers |\n| `electron/timeline.cjs` | Timeline project validation, save/load, and FFmpeg rendering |\n| `electron/computer-use.cjs` | Approval-gated desktop capture, Windows input, accessibility inspection, and optional screen OCR |
+| `electron/agent-runtime.cjs` | Read-only API subagent request helper |
+| `electron/agent-orchestrator.cjs` | Local multi-agent planner, specialist roles, built-in skills, and structured workflow steps |
+| `electron/workspace.cjs` | Guarded project file context, approved file writes with backups, and allow-listed terminal commands |
+| `electron/studio.cjs` | FFmpeg/FFprobe media helpers |
+| `electron/timeline.cjs` | Timeline project validation, save/load, and FFmpeg rendering |
+| `electron/computer-use.cjs` | Approval-gated desktop capture, Windows input, accessibility inspection, and optional screen OCR |
 | `electron/ocr.cjs` | Tesseract discovery and OCR |
 | `electron/hyperframes.cjs` | Hyperframes CLI integration |
 | `electron/integrations.cjs` | Optional tool checks/installers, GitHub repository import and skill loading |
-| `src/App.jsx` | Main chat, navigation and model settings |\n| `src/Agents.jsx` | Multi-agent pipeline, context-file selection, proposal review, and live terminal UI |
-| `src/VideoEditor.jsx` | Basic media utilities and Video Studio mode switch |\n| `src/TimelineEditor.jsx` | Multi-track timeline, project controls, clip inspector and export UI |\n| `src/ComputerUse.jsx` | Desktop screenshot, OCR, accessibility and approval-gated input UI |
+| `src/App.jsx` | Main chat, navigation and model settings |
+| `src/Agents.jsx` | Multi-agent pipeline, context-file selection, proposal review, and live terminal UI |
+| `src/VideoEditor.jsx` | Basic media utilities and Video Studio mode switch |
+| `src/TimelineEditor.jsx` | Multi-track timeline, project controls, clip inspector and export UI |
+| `src/ComputerUse.jsx` | Desktop screenshot, OCR, accessibility and approval-gated input UI |
 | `src/Integrations.jsx` | Optional tools, GitHub repository import and skill selection UI |
 | `src/styles.css` | Renderer styles |
 | `test/` | Automated service and validation tests |
