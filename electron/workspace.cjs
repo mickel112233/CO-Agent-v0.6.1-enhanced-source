@@ -14,7 +14,7 @@ const IGNORED_DIRS = new Set(['.git', 'node_modules', 'dist', 'release', '.co-ag
 const BLOCKED_NAMES = new Set(['id_rsa', 'id_ed25519', 'credentials.json', 'secrets.json']);
 function isBlockedName(name) {
   const lower = String(name || '').toLowerCase();
-  return BLOCKED_NAMES.has(lower) || lower.startsWith('.env') || /\\.(pem|key|p12|pfx|secret)$/.test(lower) || /credential|password|secret|token/.test(lower);
+  return BLOCKED_NAMES.has(lower) || lower.startsWith('.env') || ['.pem', '.key', '.p12', '.pfx', '.secret'].some(ext => lower.endsWith(ext)) || /credential|password|secret|token/.test(lower);
 }
 const COMMANDS = Object.freeze({
   'npm-test': { label: 'Run tests', executable: 'npm', args: ['test'], windows: 'npm test', timeoutMs: 600_000 },
