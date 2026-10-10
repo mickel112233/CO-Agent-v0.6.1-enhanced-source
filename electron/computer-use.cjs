@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { desktopCapturer, screen } = require('electron');
 const ocr = require('./ocr.cjs');
+const ollama = require('./ollama.cjs');
 const execFileAsync = promisify(execFile);
 
 const KEY_CODES = Object.freeze({
@@ -53,6 +54,42 @@ async function readScreenText(payload = {}) {
     await fs.writeFile(file, source.thumbnail.toPNG());
     return await ocr.recognizeImage(file, payload.language || 'eng');
   } finally { await fs.rm(file, { force: true }).catch(() => {}); }
+}
+async function planActions(payload = {}) {
+  const task = String(payload.task || '').trim();
+  if (!task || task.length > 2000) throw new Error('Describe the desktop task in 1–2000 characters.');
+  const width = Number(payload.width), height = Number(payload.height);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 10000 || height > 10000) throw new Error('A valid screenshot size is required.');
+  const status = await ollama.getOllamaStatus();
+  if (!status.available) throw new Error('Local planning needs Ollama. Start Ollama and install a model first.');
+  const model = ollama.validateModelName(payload.model || status.models?.[0]?.name);
+  const system = 'You are a conservative desktop action planner. Return ONLY JSON shaped as {"actions":[{"type":"click","x":12,"y":34,"reason":"..."},{"type":"type","text":"...","reason":"..."},{"type":"key","key":"ENTER","reason":"..."}]}. Supported types are click, type, key only. Maximum 8 actions. Click coordinates must be within the supplied screenshot dimensions. Never suggest entering passwords, API keys, financial details, or other secrets. Never suggest deleting files, purchases, sending messages/emails, submitting forms, or irreversible actions; ask the user to do those manually instead. Do not invent shell commands, scripts, URLs, or unsupported actions. Use OCR text as uncertain evidence, and explain uncertainty in reason.';
+  const response = await fetch(status.baseUrl + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model, stream: false, format: 'json', messages: [{ role: 'system', content: system }, { role: 'user', content: 'Task: ' + task + '\\nScreenshot dimensions: ' + width + 'x' + height + '\\nVisible OCR text (may be incomplete):\\n' + String(payload.screenText || '(OCR unavailable)').slice(0, 12000) }] }), signal: AbortSignal.timeout(90000) });
+  if (!response.ok) throw new Error('Local action planning failed (' + response.status + ').');
+  const data = await response.json();
+  let parsed;
+  try { parsed = JSON.parse(String(data.message?.content || '').replace(/^\\s*\u0060\u0060\u0060(?:json)?/i, '').replace(/\u0060\u0060\u0060\\s*$/, '').trim()); } catch { throw new Error('The local model returned an invalid action plan. Try a more specific task.'); }
+  if (!Array.isArray(parsed.actions) || parsed.actions.length > 8) throw new Error('The local model returned an unsupported plan. Maximum 8 actions.');
+  const actions = parsed.actions.map((action, index) => {
+    const reason = String(action.reason || 'Review this suggested action.').slice(0, 240);
+    if (action.type === 'click') {
+      const x = Number(action.x), y = Number(action.y);
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= width || y >= height) throw new Error('Planned click ' + (index + 1) + ' is outside screenshot bounds.');
+      return { id: index + 1, type: 'click', x, y, reason };
+    }
+    if (action.type === 'type') {
+      const text = String(action.text || '');
+      if (!text || text.length > 500 || /password|api[_ -]?key|secret|credit card/i.test(text)) throw new Error('Planned text action contains empty, long, or sensitive-looking text.');
+      return { id: index + 1, type: 'type', text, reason };
+    }
+    if (action.type === 'key') {
+      const key = String(action.key || '').toUpperCase();
+      if (!(KEY_CODES[key] || /^[A-Z0-9]$/.test(key))) throw new Error('Planned key action is unsupported.');
+      return { id: index + 1, type: 'key', key, reason };
+    }
+    throw new Error('Planned action ' + (index + 1) + ' uses unsupported type.');
+  });
+  return { ok: true, model, actions, requiresApproval: true };
 }
 async function inspectAccessibility() {
   assertWindows();
@@ -158,4 +195,4 @@ $size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKey+INPUT')
   await powershell(script);
   return { ok: true, action: 'key', key };
 }
-module.exports = { captureScreen, readScreenText, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved };
+module.exports = { captureScreen, readScreenText, planActions, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved };
