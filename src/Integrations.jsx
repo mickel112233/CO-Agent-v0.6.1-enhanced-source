@@ -108,12 +108,12 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
         {id:'hyperframes',name:'Hyperframes',description:'HTML/CSS to MP4 video rendering.',installed:false,loading:true},
         {id:'piper',name:'Piper TTS',description:'Optional local text-to-speech.',installed:false,loading:true}
       ]).map(tool => {
-        const Icon = tool.id === 'tesseract' ? ScanText : tool.id === 'hyperframes' ? Clapperboard : Volume2;
+        const Icon = tool.id === 'tesseract' ? ScanText : tool.id === 'hyperframes' ? Clapperboard : tool.id === 'git' ? FolderGit2 : Volume2;
         const installBusy = busy === tool.id;
         return <article className="integration-card" key={tool.id}>
           <div className="integration-card-top"><span className="integration-icon"><Icon size={20}/></span><span className={tool.installed ? 'integration-state ready' : 'integration-state optional'}>{tool.installed ? <CheckCircle2 size={13}/> : <Circle size={13}/>} {tool.installed ? 'Installed' : 'Optional'}</span></div>
           <h3>{tool.name}</h3><p>{tool.description}</p>
-          <div className="integration-card-meta">{tool.version ? <span>{tool.version}</span> : <span>{tool.kind === 'external-runtime' ? 'Manual setup' : 'External dependency'}</span>}{tool.required && <span>Required</span>}</div>
+          <div className="integration-card-meta">{tool.version ? <span>{tool.version}</span> : <span>{tool.kind === 'external-runtime' ? 'Manual setup' : tool.kind === 'repository-runtime' ? 'Needed for GitHub imports' : 'External dependency'}</span>}{tool.required && <span>Required</span>}</div>
           <div className="integration-card-actions">{tool.installAvailable ? <button className="secondary-button" disabled={!!busy} onClick={() => installTool(tool)}><Download size={14}/>{installBusy ? 'Installing…' : tool.installed ? 'Reinstall / update' : 'Install'}</button> : <button className="secondary-button" onClick={() => GenOpen(tool.docs || docs[tool.id])}><ExternalLink size={14}/> Setup guide</button>}<button className="text-link" onClick={() => GenOpen(tool.docs || docs[tool.id])}>Documentation <ExternalLink size={12}/></button></div>
           {!tool.installed && <p className="integration-note">{tool.id === 'tesseract' ? 'Windows installer uses winget. Other platforms: follow the official guide.' : tool.id === 'hyperframes' ? 'Requires Node.js and FFmpeg. The CLI remains a separate install.' : 'Piper and voice models must be installed/configured separately.'}</p>}
         </article>;
