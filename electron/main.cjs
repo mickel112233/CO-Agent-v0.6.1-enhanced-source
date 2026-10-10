@@ -71,6 +71,7 @@ function registerIpc() {
   handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));
   handle('integrations:install-tool', id => integrations.installTool(id));
   handle('integrations:list-repos', () => integrations.listRepos(app.getPath('userData')));
+  handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
   handle('voice:synthesize', args => piper.synthesize(args));
