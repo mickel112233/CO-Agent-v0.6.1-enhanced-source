@@ -2,7 +2,7 @@
 
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const { desktopCapturer } = require('electron');
+const { desktopCapturer, screen } = require('electron');
 const execFileAsync = promisify(execFile);
 
 const KEY_CODES = Object.freeze({
@@ -27,13 +27,17 @@ function powershell(script, timeout = 10000) {
 async function captureScreen() {
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1600, height: 1000 }, fetchWindowIcons: false });
   if (!sources.length) throw new Error('No screen source is available.');
-  return sources.map((source, index) => ({
-    id: source.id,
-    name: source.name || ('Screen ' + (index + 1)),
-    width: source.thumbnail.getSize().width,
-    height: source.thumbnail.getSize().height,
-    dataUrl: source.thumbnail.toDataURL()
-  }));
+  const displays = screen.getAllDisplays();
+  return sources.map((source, index) => {
+    const display = displays.find(item => String(item.id) === String(source.display_id)) || displays[index] || displays[0];
+    return {
+      id: source.id, displayId: display ? String(display.id) : '',
+      name: source.name || ('Screen ' + (index + 1)),
+      width: source.thumbnail.getSize().width, height: source.thumbnail.getSize().height,
+      bounds: display ? { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height } : null,
+      dataUrl: source.thumbnail.toDataURL()
+    };
+  });
 }
 async function inspectAccessibility() {
   assertWindows();
@@ -62,6 +66,10 @@ async function click(payload = {}) {
   assertApproved(payload); assertWindows();
   const x = Number(payload.x), y = Number(payload.y);
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x > 10000 || y > 10000) throw new Error('Click coordinates must be integers between 0 and 10000.');
+  const displays = screen.getAllDisplays();
+  const display = displays.find(item => String(item.id) === String(payload.displayId)) || displays[0];
+  if (!display || x >= display.bounds.width || y >= display.bounds.height) throw new Error('Click coordinates are outside the selected display bounds.');
+  const absoluteX = display.bounds.x + x, absoluteY = display.bounds.y + y;
   const script = String.raw`
 Add-Type @"
 using System;
@@ -81,9 +89,9 @@ $up = New-Object COInput+INPUT; $up.type=0; $up.mi.dwFlags=0x0004
 [void][COInput]::SendInput(1,@($down),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
 Start-Sleep -Milliseconds 40
 [void][COInput]::SendInput(1,@($up),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
-`.replace('__X__', String(x)).replace('__Y__', String(y));
+`.replace('__X__', String(absoluteX)).replace('__Y__', String(absoluteY));
   await powershell(script);
-  return { ok: true, action: 'click', x, y };
+  return { ok: true, action: 'click', x, y, displayId: String(display.id) };
 }
 async function typeText(payload = {}) {
   assertApproved(payload); assertWindows();
