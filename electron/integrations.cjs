@@ -127,6 +127,24 @@ async function installRepo({ url, ref = '' } = {}, userDataPath) {
     throw error;
   }
 }
+async function getSkillContents(slugs, userDataPath) {
+  if (!Array.isArray(slugs)) return [];
+  const root = path.resolve(userDataPath, 'extensions');
+  const selected = [...new Set(slugs)].slice(0, 8);
+  const result = [];
+  for (const slug of selected) {
+    if (typeof slug !== 'string' || !/^[a-z0-9._-]{1,100}$/.test(slug)) continue;
+    const repoRoot = path.resolve(root, slug);
+    if (path.dirname(repoRoot) !== root) continue;
+    const metadata = await fs.readFile(path.join(repoRoot, '.co-agent-source.json'), 'utf8').then(JSON.parse).catch(() => null);
+    if (!metadata) continue;
+    const skillPath = path.join(repoRoot, 'SKILL.md');
+    const content = await fs.readFile(skillPath, 'utf8').catch(() => null);
+    if (!content || content.length > 30000) continue;
+    result.push({ slug, content: content.slice(0, 30000), url: metadata.url });
+  }
+  return result;
+}
 async function removeRepo(slug, userDataPath) {
   if (typeof slug !== 'string' || !/^[a-z0-9._-]{1,100}$/.test(slug)) throw new Error('Invalid extension identifier.');
   const root = path.join(userDataPath, 'extensions');
@@ -137,4 +155,4 @@ async function removeRepo(slug, userDataPath) {
   await fs.rm(target, { recursive: true, force: false });
   return { ok: true, removed: slug };
 }
-module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, removeRepo, GITHUB_HTTPS, REF_RE };
+module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, getSkillContents, removeRepo, GITHUB_HTTPS, REF_RE };
