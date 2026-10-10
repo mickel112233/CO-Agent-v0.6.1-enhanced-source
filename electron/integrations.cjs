@@ -18,7 +18,7 @@ function commandFor(name) {
 }
 async function runFixedCommand(file, args, options = {}) {
   if (process.platform === 'win32' && ['npm', 'hyperframes', 'winget'].includes(file)) {
-    const command = [file, ...args].map(part => '"' + String(part).replace(/"/g, '\\\"') + '"').join(' ');
+    const command = [file, ...args].join(' ');
     return execFileAsync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], { windowsHide: true, ...options });
   }
   return execFileAsync(commandFor(file), args, { windowsHide: true, ...options });
