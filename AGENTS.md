@@ -17,14 +17,17 @@ Read this file before changing code. It is a fast orientation guide for coding a
 | `electron/main.cjs` | Electron main process, window creation, IPC handlers and app lifecycle |
 | `electron/preload.cjs` | Context-isolated, allow-listed `window.coAgent` bridge |
 | `electron/ollama.cjs` | Ollama availability, model list/pull/delete helpers |
-| `electron/agent-runtime.cjs` | Read-only API subagent requests for supported provider protocols |\n| `electron/agent-orchestrator.cjs` | Local Ollama workflow planning, specialist role prompts, built-in skills, structured agent step results |\n| `electron/workspace.cjs` | Selected-workspace file listing/reading, guarded approved file writes with backups, fixed terminal command presets |
+| `electron/agent-runtime.cjs` | Read-only API subagent requests for supported provider protocols |
+| `electron/agent-orchestrator.cjs` | Local Ollama workflow planning, specialist role prompts, built-in skills, structured agent step results |
+| `electron/workspace.cjs` | Selected-workspace file listing/reading, guarded approved file writes with backups, fixed terminal command presets |
 | `electron/studio.cjs` | FFmpeg/FFprobe probe, audio extraction and compatible-stream concat |
 | `electron/ocr.cjs` | Optional local Tesseract CLI discovery and image OCR |
 | `electron/hyperframes.cjs` | Optional Hyperframes CLI status, lint, preview and render |
 | `electron/integrations.cjs` | Optional tool status/installers, safe GitHub repo import, manifest inspection, selected skill loading and managed removal |
 | `electron/computer.cjs` | Small explicit allow-list of desktop app launch/open operations |
 | `electron/piper.cjs` | Optional Piper text-to-speech process wrapper |
-| `src/App.jsx` | Main chat, navigation, Ollama model/runtime UI |\n| `src/Agents.jsx` | User-controlled multi-agent pipeline, selected context files, proposed changes, imported skills, and live terminal |
+| `src/App.jsx` | Main chat, navigation, Ollama model/runtime UI |
+| `src/Agents.jsx` | User-controlled multi-agent pipeline, selected context files, proposed changes, imported skills, and live terminal |
 | `src/VideoEditor.jsx` | Video Studio, basic media assembly, OCR and Hyperframes controls |
 | `src/Integrations.jsx` | Optional tool manager, public GitHub repo import, manifest review and explicit skill selection |
 | `src/styles.css` | Shared renderer styles |
