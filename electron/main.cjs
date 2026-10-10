@@ -6,6 +6,8 @@ const computer = require('./computer.cjs');
 const studio = require('./studio.cjs');
 const piper = require('./piper.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
+const ocr = require('./ocr.cjs');
+const hyperframes = require('./hyperframes.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
@@ -55,11 +57,15 @@ function registerIpc() {
   handle('studio:probe', filePath => studio.probe(filePath));
   handle('studio:extract-audio', args => studio.extractAudio(args?.input, args?.outputDir));
   handle('studio:concat', args => studio.concat(args?.inputs, args?.outputDir, args?.filename));
+  handle('studio:ocr-status', () => ocr.getStatus());
+  handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
+  handle('studio:hyperframes-status', () => hyperframes.getStatus());
+  handle('studio:hyperframes-run', args => hyperframes.runAction(args?.action, args?.projectDir));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-files', async options => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: options?.multiple === false ? ['openFile'] : ['openFile','multiSelections'],
-      filters: Array.isArray(options?.filters) ? options.filters : [{ name: 'Media and documents', extensions: ['mp4','mov','mkv','webm','mp3','wav','png','jpg','jpeg','txt','md','pdf'] }]
+      filters: Array.isArray(options?.filters) ? options.filters : [{ name: 'Media and documents', extensions: ['mp4','mov','mkv','webm','mp3','wav','png','jpg','jpeg','tif','tiff','bmp','webp','txt','md','pdf'] }]
     });
     return result.canceled ? [] : result.filePaths;
   });
