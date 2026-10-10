@@ -9,3 +9,76 @@
 @media(max-width:620px){.sidebar{width:64px;padding:14px 7px}.brand{justify-content:center;padding:0 0 22px}.brand>span:not(.brand-mark){display:none}.new-chat{font-size:0;padding:11px}.nav-label,.nav-item:not(.active),.nav-item.active{font-size:0;justify-content:center;padding:12px 0}.nav-item svg{flex-shrink:0}.runtime{justify-content:center;padding:10px 0}.runtime>div{display:none}.sidebar-bottom .nav-item{font-size:0}.topbar{padding:0 12px}.settings-view,.studio-view{width:calc(100% - 24px);margin-top:22px}.settings-card{padding:14px}.model-install{flex-direction:column}.export-row>*{width:100%}.studio-heading h1,.settings-heading h1{font-size:24px}}
 
 .tool-integration-panel{display:flex;flex-direction:column;gap:10px}.tool-integration-panel>p{margin:0}.tool-hint{min-width:0;color:#85857d;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.ocr-result{width:100%;min-height:130px;resize:vertical;padding:12px;border:1px solid #e2e2dc;border-radius:10px;background:#fff;color:#292925;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}.media-row[role=button]{display:flex;align-items:center;gap:9px;width:100%;cursor:pointer}.media-row[role=button]>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tool-integration-panel code{padding:2px 4px;border-radius:4px;background:#f0f0eb;font-size:11px}@media(max-width:900px){.studio-status{flex-wrap:wrap}.tool-integration-panel .export-row{flex-wrap:wrap}.tool-integration-panel .export-row>*{max-width:100%}}
+
+
+/* Integrations manager */
+.integrations-view{width:min(1120px,calc(100% - 64px));margin:34px auto 60px;display:flex;flex-direction:column;gap:22px;color:#262620}
+.integrations-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.integrations-heading h1{margin:5px 0 8px;font-family:Manrope,sans-serif;font-size:30px;letter-spacing:-.8px}
+.integrations-heading .subhead{max-width:720px;margin:0;color:#77776f;font-size:13px;line-height:1.7}
+.integration-banner{display:flex;align-items:flex-start;gap:13px;padding:16px 18px;border:1px solid #e6e6df;border-radius:14px;background:linear-gradient(120deg,#fbfbf8,#f5f6f0)}
+.integration-banner-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border:1px solid #e2e4d8;border-radius:11px;background:#fff;color:#4f755e}
+.integration-banner strong{display:block;margin:2px 0 5px;font-size:13px}
+.integration-banner p{margin:0;color:#77776e;font-size:11px;line-height:1.7}
+.integration-section-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:2px}
+.integration-section-heading h2{margin:0 0 4px;font-size:17px;letter-spacing:-.3px}
+.integration-section-heading p{margin:0;color:#85857d;font-size:11px;line-height:1.6}
+.section-count{padding:5px 9px;border-radius:20px;background:#efefe9;color:#68685f;font-size:10px;white-space:nowrap}
+.integration-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.integration-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:16px;border:1px solid #e8e8e2;border-radius:13px;background:#fff;box-shadow:0 2px 7px #22220804}
+.integration-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-bottom:15px}
+.integration-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;background:#f3f3ed;color:#56564e}
+.integration-state{display:inline-flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap}
+.integration-state.ready{color:#377b50}.integration-state.optional{color:#88887f}
+.integration-card h3{margin:0 0 7px;font-size:14px}
+.integration-card>p{margin:0;color:#77776f;font-size:11px;line-height:1.7}
+.integration-card-meta{display:flex;align-items:center;min-height:27px;gap:8px;margin:10px 0 12px;color:#99998f;font-size:10px}
+.integration-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:auto}
+.integration-card-actions .secondary-button{display:inline-flex;align-items:center;gap:6px}
+.integration-card-actions .text-link{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:#77776f;font-size:10px;cursor:pointer}
+.integration-card .integration-note{margin-top:12px;padding-top:10px;border-top:1px solid #f0f0eb;color:#93938b;font-size:10px;line-height:1.6}
+.repo-heading{margin-top:12px}
+.repo-install-form{display:flex;flex-direction:column;gap:14px;padding:18px;border:1px solid #deded5;border-radius:14px;background:#fff}
+.repo-form-intro{display:flex;align-items:flex-start;gap:10px;color:#59594f}
+.repo-form-intro>svg{flex-shrink:0;margin-top:2px}
+.repo-form-intro strong{font-size:13px}
+.repo-form-intro p{margin:5px 0 0;color:#88887e;font-size:11px;line-height:1.65}
+.repo-install-form>label{display:flex;flex-direction:column;gap:6px;color:#4f4f47;font-size:11px;font-weight:600}
+.repo-install-form>label span{display:inline;color:#96968d;font-weight:400}
+.repo-install-form input{width:100%;min-width:0;padding:11px 12px;border:1px solid #e1e1da;border-radius:8px;outline:none;background:#fdfdfa;color:#282822;font-size:12px}
+.repo-install-form input:focus{border-color:#a4b39f;box-shadow:0 0 0 3px #819a791a}
+.repo-form-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.repo-form-footer>span{display:flex;align-items:center;gap:6px;color:#8a7752;font-size:10px}
+.repo-form-footer .primary-button{display:inline-flex;align-items:center;gap:7px}
+.installed-repos{display:flex;flex-direction:column;gap:10px}
+.installed-repo{display:flex;align-items:flex-start;gap:13px;padding:15px;border:1px solid #e7e7e0;border-radius:12px;background:#fff}
+.installed-repo-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:10px;background:#f3f3ed;color:#626257}
+.installed-repo-body{flex:1;min-width:0}
+.installed-repo-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.installed-repo-title strong{font-size:13px}
+.repo-type{padding:3px 7px;border-radius:20px;background:#f1f1eb;color:#77776e;font-size:9px}
+.installed-repo-body>p{margin:6px 0;color:#77776f;font-size:11px;line-height:1.6}
+.installed-repo-body>a{display:inline-flex;align-items:center;gap:5px;max-width:100%;color:#717168;font-size:10px;overflow-wrap:anywhere;text-decoration:none}
+.installed-repo-body>a:hover{text-decoration:underline}
+.repo-flags{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.repo-flags span{padding:4px 6px;border-radius:5px;background:#f2f4ee;color:#69775e;font-size:9px}
+.repo-flags .warning-flag{background:#fbf3e3;color:#95723c}
+.skill-toggle{display:flex;align-items:flex-start;gap:9px;margin-top:13px;padding:11px;border:1px solid #e7e7df;border-radius:9px;background:#fbfbf8;cursor:pointer}
+.skill-toggle input{width:15px;height:15px;margin:2px 0 0;accent-color:#596f50}
+.skill-toggle span{display:flex;flex-direction:column;gap:4px}
+.skill-toggle strong{font-size:11px;font-weight:600}
+.skill-toggle small{color:#85857c;font-size:10px;line-height:1.6}
+.repo-safety-note{display:flex;align-items:center;gap:5px;margin-top:10px!important;color:#85857c!important;font-size:10px!important}
+.empty-integrations{display:flex;flex-direction:column;align-items:center;gap:9px;padding:34px 20px;border:1px dashed #dcdcd3;border-radius:13px;background:#fcfcfa;color:#8a8a80;text-align:center}
+.empty-integrations strong{color:#55554c;font-size:13px}
+.empty-integrations>span{max-width:430px;font-size:11px;line-height:1.7}
+.empty-integrations .secondary-button{margin-top:5px}
+.integration-footnote{display:flex;align-items:flex-start;gap:9px;padding:13px 14px;border:1px solid #eee2ca;border-radius:10px;background:#fffaf0;color:#897348}
+.integration-footnote>svg{flex-shrink:0;margin-top:2px}
+.integration-footnote p{margin:0;font-size:10px;line-height:1.75}
+.integration-footnote strong{font-weight:700}
+.integration-footnote code,.integration-path code{padding:2px 4px;border-radius:4px;background:#f0f0e9;font-size:10px}
+.integration-path{margin:0;color:#99998f;font-size:10px;line-height:1.7}
+.spin{animation:co-spin 1s linear infinite}@keyframes co-spin{to{transform:rotate(360deg)}}
+@media(max-width:980px){.integration-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.integrations-view{width:calc(100% - 36px)}}
+@media(max-width:640px){.integration-cards{grid-template-columns:1fr}.integrations-view{width:calc(100% - 24px);margin-top:22px}.integrations-heading{flex-direction:column}.integrations-heading h1{font-size:25px}.repo-heading{align-items:flex-start;flex-direction:column}.repo-heading .primary-button{width:100%}.installed-repo{gap:9px;padding:11px}.installed-repo-icon{flex-basis:32px;width:32px;height:32px}.repo-form-footer{align-items:stretch;flex-direction:column}.repo-form-footer .primary-button{justify-content:center}.integration-banner{padding:13px}}
