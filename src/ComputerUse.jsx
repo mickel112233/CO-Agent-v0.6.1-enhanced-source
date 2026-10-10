@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Monitor, RefreshCw, MousePointer2, Keyboard, Type, ShieldCheck, AlertTriangle, Eye, ScanSearch, CheckCircle2 } from 'lucide-react';
+import { Monitor, RefreshCw, MousePointer2, Keyboard, Type, ShieldCheck, AlertTriangle, Eye, ScanSearch, CheckCircle2, Sparkles, Play } from 'lucide-react';
 
 const desktop = window.coAgent;
 
@@ -15,6 +15,8 @@ export default function ComputerUse() {
   const [notice, setNotice] = useState('');
   const [lastAction, setLastAction] = useState('');
   const [screenText, setScreenText] = useState('');
+  const [task, setTask] = useState('');
+  const [plan, setPlan] = useState([]);
 
   const capture = useCallback(async () => {
     setBusy('capture'); setNotice('');
@@ -42,6 +44,26 @@ export default function ComputerUse() {
     finally { setBusy(''); }
   }
 
+  async function planTask() {
+    if (!current || !task.trim()) return;
+    setBusy('plan'); setNotice(''); setPlan([]);
+    try {
+      const result = await desktop?.computerUse?.planActions({ task, screenText, width: current.width, height: current.height });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Could not plan the task.');
+      setPlan(result.actions || []);
+      setNotice('Local model ' + result.model + ' suggested ' + (result.actions || []).length + ' action(s). Review every step before approving it.');
+    } catch (error) { setNotice(error.message || String(error)); }
+    finally { setBusy(''); }
+  }
+
+  async function runPlanned(action) {
+    if (!current) return;
+    const payload = action.type === 'click' ? { x: Math.round(action.x * (current.bounds?.width || current.width) / current.width), y: Math.round(action.y * (current.bounds?.height || current.height) / current.height), displayId: current.displayId } : action.type === 'type' ? { text: action.text } : { key: action.key };
+    const summary = action.type === 'click' ? 'Click at screenshot coordinates ' + action.x + ', ' + action.y : action.type === 'type' ? 'Type suggested text: ' + action.text : 'Press suggested key: ' + action.key;
+    const success = await perform(action.type, payload, summary + '. Reason: ' + action.reason);
+    if (success) { setPlan(old => old.filter(item => item.id !== action.id)); setNotice('Approved step executed. Capture the screen and re-plan if the UI changed.'); }
+  }
+
   async function inspect() {
     setBusy('inspect'); setNotice('');
     try {
@@ -62,6 +84,7 @@ export default function ComputerUse() {
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Action failed.');
       setLastAction(description);
       setNotice('Action sent. Capture the screen again to verify the result.');
+      return true;
     } catch (error) { setNotice(error.message || String(error)); }
     finally { setBusy(''); }
   }
@@ -72,7 +95,7 @@ export default function ComputerUse() {
       <div><p className="eyebrow">LOCAL DESKTOP CONTROL</p><h1>Computer Use</h1><p className="subhead">Inspect your real Windows desktop, review visible windows, and run one explicitly approved mouse or keyboard action at a time.</p></div>
       <button className="secondary-button" onClick={capture} disabled={!!busy}><RefreshCw size={14} className={busy === 'capture' ? 'spin' : ''}/> Capture screen</button>
     </div>
-    <div className="computer-safety"><ShieldCheck size={20}/><div><strong>Approval required for every action</strong><p>No autonomous action loop or arbitrary shell execution is enabled. Review the screen, approve a specific action, then capture again to verify it.</p></div></div>
+    <div className="computer-safety"><ShieldCheck size={20}/><div><strong>Approval required for every action</strong><p>Local Ollama can propose a short plan from your task and optional OCR text, but it cannot execute the plan automatically. Review each action, approve it individually, then capture again to verify the result.</p></div></div>\n    <div className="computer-planner"><label>What should CO-Agent do?<textarea value={task} onChange={e => setTask(e.target.value)} maxLength={2000} placeholder="Example: open the settings page and find the display scaling option…"/></label><button className="primary-button" onClick={planTask} disabled={!current || !task.trim() || !!busy}><Sparkles size={14}/>{busy === 'plan' ? 'Planning locally…' : 'Plan with local model'}</button><small>Uses the selected local Ollama model plus optional screen OCR text. It cannot see pixels directly, so coordinates may be wrong. Never use it for passwords, purchases, deleting files, or sending/submitting content.</small>{plan.length > 0 && <div className="computer-plan-list"><div className="computer-plan-heading"><strong>Suggested steps · {plan.length}</strong><button className="text-link" onClick={() => setPlan([])}>Discard plan</button></div>{plan.map(action => <article key={action.id} className="computer-plan-step"><div><strong>{action.id}. {action.type === 'click' ? 'Click ' + action.x + ', ' + action.y : action.type === 'type' ? 'Type text' : 'Press ' + action.key}</strong><p>{action.reason}</p>{action.type === 'type' && <code>{action.text}</code>}</div><button className="secondary-button" disabled={!!busy} onClick={() => runPlanned(action)}><Play size={13}/> Approve step</button></article>)}</div>}</div>
     <div className="computer-use-grid">
       <div className="computer-screen-card">
         <div className="panel-heading"><strong><Monitor size={16}/> Desktop capture</strong><div className="computer-panel-actions"><span>{current ? current.width + ' × ' + current.height : 'No capture'}</span><button className="secondary-button" onClick={readText} disabled={!current || !!busy}><ScanSearch size={13}/>{busy === 'ocr' ? 'Reading…' : 'Read screen text'}</button></div></div>
