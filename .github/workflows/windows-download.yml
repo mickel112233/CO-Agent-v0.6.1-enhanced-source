@@ -3,7 +3,6 @@ name: CO-Agent Windows Download
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -63,14 +62,3 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish versioned GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: CO-Agent ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
-            release/*.exe
-            release/*.zip
-            release/*.blockmap
-            release/latest*.yml
