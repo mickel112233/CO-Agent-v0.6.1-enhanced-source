@@ -2,49 +2,48 @@
 
 # CO-Agent
 
-### A local-first AI workspace for desktop
+### Your local-first desktop AI workspace
 
-Bring local AI chat, media utilities, image text extraction, and agent-friendly video rendering workflows together in one desktop app.
+Chat with local models. Create and inspect media. Add optional tools. Import trusted GitHub skills when you need more capability.
 
-**Electron · React · Vite · Ollama · FFmpeg · Tesseract OCR · Hyperframes**
-
-[Quick start](#-quick-start) · [Features](#-capabilities) · [Optional tools](#-optional-tool-integrations) · [Architecture](#-repository-map) · [Versions](docs/VERSIONING.md) · [AI onboarding](AGENTS.md)
+**Electron · React · Ollama · FFmpeg · Tesseract OCR · Hyperframes · GitHub skill imports**
 
 [![CI](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.6.1-informational)](package.json)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](package.json)
+[![Release](https://img.shields.io/github/v/release/mickel112233/CO-Agent-v0.6.1-enhanced-source?display_name=tag)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
+[![Version](https://img.shields.io/badge/app-0.6.1-informational)](package.json)
+
+**[Quick start](#-quick-start) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> **Project status: active reconstruction.** This repository restores a working integration path and adds new optional integrations, but it is **not a byte-for-byte restoration** of the recovered archive and does not yet reproduce every original feature. Read [the restoration roadmap](RESTORE-ROADMAP.md). Features listed here describe the code currently present; they are not a promise that every environment is configured.
+> **Status: active reconstruction.** This repository is not a byte-for-byte restoration of the recovered original archive, and not every original feature is complete. Read [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md) before assuming a feature is fully implemented. Check [GitHub Actions](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions) for the current verification status.
 
-## ✨ Capabilities
+## ✨ What can CO-Agent do today?
 
-| Area | Current capability | Important boundary |
+| Capability | Available now | Boundary / requirement |
 |---|---|---|
-| Local AI | Chat through a local Ollama server; list, pull, and remove models | Chat is currently non-streaming |
-| API runtime helper | Read-only requests for supported OpenAI-compatible, Anthropic, and Gemini protocols | Full provider setup UI and secure credential management are not finished |
-| Video Studio | Import media, preview clips, inspect metadata, extract WAV audio, join compatible clips | Simple sequence assembly, not a full nonlinear editor |
-| Image text extraction | Run local Tesseract OCR on PNG, JPEG, TIFF, BMP, and WebP images | Requires a separate Tesseract install and language data |
-| Agent-friendly video | Lint, preview, and render existing Hyperframes HTML projects | Requires a separate Hyperframes CLI and FFmpeg |
-| Desktop bridge | Context-isolated, allow-listed IPC; a small explicit application launch allow-list | Not general-purpose computer-use automation |
-| Voice foundation | Optional Piper text-to-speech process wrapper | Executable and voice assets are not bundled |
-| Packaging | electron-builder configuration for Windows NSIS, Linux AppImage, and macOS DMG | CI/release workflow currently packages Windows and Linux |
+| Local AI chat | Chat through Ollama and select installed models | Ollama must be installed and running; responses currently do not stream |
+| Model management | Pull, list, and remove Ollama models | Downloads can be large; pull progress is not fully surfaced |
+| Video Studio | Import and preview clips, inspect metadata, extract audio, join compatible clips | Basic assembly, not a full nonlinear timeline editor |
+| Image text extraction | Local Tesseract OCR for PNG/JPEG/TIFF/BMP/WebP | Optional Tesseract installation and language data |
+| HTML-to-video | Hyperframes lint, preview, and MP4 rendering | Optional external Hyperframes CLI and FFmpeg |
+| Repository skills | Import public GitHub repositories and inspect manifests; explicitly enable a detected `SKILL.md` for local chat | Imported plugin code is not executed; skills are third-party instructions and must be reviewed |
+| Desktop bridge | Context-isolated IPC and a small allow-list of app/path actions | Not unrestricted computer-use automation |
+| Voice foundation | Optional Piper wrapper | Piper executable and voice models are not bundled |
 
 ## 🚀 Quick start
 
-### Requirements
+### Prerequisites
 
-- **Node.js 22 recommended** (Vite/Electron development and optional Hyperframes).
-- npm and Git.
-- **Ollama** for local chat: [ollama.com](https://ollama.com/).
-- Optional: Tesseract OCR for image text extraction.
-- Optional: Hyperframes CLI + FFmpeg for HTML-based video rendering.
+- **Node.js 22 recommended**, npm, and Git.
+- **Ollama** for local AI chat: [ollama.com](https://ollama.com/).
+- Optional: Tesseract OCR, Hyperframes CLI, Piper and voice models.
 
-### Install and run
+<details>
+<summary><strong>Install and run from source</strong></summary>
 
 ```bash
 git clone https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source.git
@@ -55,48 +54,57 @@ npm run build
 npm run dev
 ```
 
-Start Ollama separately, then download a model, for example:
+Start Ollama separately and install a model, for example:
 
 ```bash
 ollama pull gemma3:4b
 ```
 
-CO-Agent currently expects Ollama at `http://127.0.0.1:11434` by default. The app can list installed models and request pulls/removals from Ollama; it does not automatically install Ollama itself.
+The default Ollama endpoint is `http://127.0.0.1:11434`. CO-Agent does not install Ollama automatically.
 
-### Useful scripts
+</details>
 
-| Command | Purpose |
+<details>
+<summary><strong>Useful npm scripts</strong></summary>
+
+| Command | Action |
 |---|---|
-| `npm run dev` | Start Vite and launch the Electron app |
+| `npm run dev` | Start Vite and Electron for development |
 | `npm test` | Run Node's built-in test suite |
 | `npm run build` | Build the renderer into `dist/` |
-| `npm start` | Build and launch the packaged-style local app |
-| `npm run dist:win` | Build a Windows NSIS installer |
-| `npm run dist:linux` | Build a Linux AppImage |
-| `npm run dist:mac` | Build a macOS DMG (run on a supported macOS host) |
+| `npm start` | Build and launch the local desktop app |
+| `npm run dist:win` | Build Windows NSIS installer |
+| `npm run dist:linux` | Build Linux AppImage |
+| `npm run dist:mac` | Build macOS DMG (run on a supported macOS host) |
 
-A successful Vite build only verifies the renderer bundle. It does not prove that Ollama, Tesseract, Hyperframes, native packaging, or every desktop workflow works on your machine.
+A successful renderer build does not prove external tools, all IPC flows, or platform packaging work. Check the CI run and test the specific feature you need.
 
-## 🧰 Optional tool integrations
+</details>
 
-These tools are intentionally **optional external dependencies**. CO-Agent does not silently download them or bundle their full runtimes.
+## 🧩 Integrations & optional tools
 
-### Tesseract OCR
+Open **CO-Agent → Integrations** to check optional tool status, install supported tools, read setup guides, and manage imported repositories.
 
-Tesseract extracts text from image files locally on your computer. In **Video Studio → Image text extraction**, choose an image to read and copy the recognized text.
+The app deliberately keeps these integrations **optional**, rather than making every user download OCR, voice, or video-rendering runtimes. Install only what your workflow needs.
 
-1. Install Tesseract OCR and the language data you need. On Windows, the [Tesseract installation guide](https://tesseract-ocr.github.io/tessdoc/Installation.html) links to the UB Mannheim installers.
-2. Make sure the `eng` language data is installed for the default English OCR mode.
-3. Restart CO-Agent. The app checks common Windows install locations and your system `PATH`.
-4. If the executable is installed elsewhere, set `TESSERACT_PATH` to the full executable path before launching CO-Agent.
+<details>
+<summary><strong>Tesseract OCR — image to text</strong></summary>
 
-Supported image extensions: PNG, JPG/JPEG, TIFF, BMP, and WebP. OCR is local; recognition quality depends on image resolution, contrast, rotation, and installed language data.
+Use this for screenshots, scanned pages, and still images. Recognition runs locally.
 
-### Hyperframes
+- On Windows, the Integrations screen can offer the `winget` installer when available.
+- Otherwise, follow the [official Tesseract installation guide](https://tesseract-ocr.github.io/tessdoc/Installation.html).
+- Install English language data for the default `eng` OCR mode.
+- If it is installed outside common locations or `PATH`, set `TESSERACT_PATH` to the executable path before starting CO-Agent.
 
-[Hyperframes](https://github.com/heygen-com/hyperframes) turns HTML/CSS, media, and seekable animations into deterministic MP4 video. CO-Agent uses the external CLI to lint, preview, and render a project rather than embedding the full Hyperframes source tree.
+Supported extensions: PNG, JPG/JPEG, TIFF, BMP, and WebP. OCR accuracy depends on resolution, contrast, rotation, and language data.
 
-Requirements: Node.js 22+, FFmpeg, and the Hyperframes CLI. Install it globally so the `hyperframes` command is available:
+</details>
+
+<details>
+<summary><strong>Hyperframes — HTML/CSS/animation to MP4</strong></summary>
+
+Hyperframes is useful for animated titles, product explainers, motion graphics, and web-based video compositions. It is separate from the basic FFmpeg sequence-join feature.
 
 ```bash
 npm install -g hyperframes
@@ -104,62 +112,93 @@ hyperframes --version
 ffmpeg -version
 ```
 
-Then:
+You can also install Hyperframes from the Integrations screen when Node.js/npm are available. In Video Studio, select a project folder containing `index.html`, then run **Lint**, **Preview**, or **Render MP4**. The current integration writes `co-agent-render.mp4` into that project folder.
 
-1. Create or open an existing project using the [Hyperframes quickstart](https://hyperframes.app/docs/1-startup/2-quickstart).
-2. In CO-Agent, open **Video Studio → Hyperframes video renderer**.
-3. Choose the project folder containing `index.html`.
-4. Use **Lint project**, **Preview**, or **Render MP4**. The render output is written to `co-agent-render.mp4` inside the selected project folder.
+See the [Hyperframes CLI documentation](https://hyperframes.app/docs/5-packages/cli) for supported commands and setup.
 
-The Hyperframes CLI is an external process. A preview starts separately; inspect its browser/terminal output if it fails to launch. Hyperframes rendering is separate from the built-in FFmpeg sequence-join button.
+</details>
 
-## 🧭 Repository map
+<details>
+<summary><strong>Piper TTS — optional local speech</strong></summary>
 
-| Path | What it owns |
+Piper is not a required dependency. Its executable and voice assets are not bundled, so follow the [Piper project instructions](https://github.com/rhasspy/piper) and configure the runtime/voice files for your environment.
+
+</details>
+
+## 📦 Import a GitHub repository
+
+CO-Agent has an **Integrations & plugins** section for importing useful community skills and repositories without immediately executing third-party code.
+
+1. Open **Integrations → Import repository**.
+2. Paste a public HTTPS GitHub URL, such as `https://github.com/owner/repo`.
+3. Optionally enter a branch, tag, or ref to pin the source.
+4. Review the detected `SKILL.md`, `package.json`, and/or `openclaw.plugin.json` information.
+5. If a `SKILL.md` is detected, explicitly enable **Use this skill in local chat** only after reviewing its content.
+
+<details>
+<summary><strong>What the repository importer does — and does not do</strong></summary>
+
+**It does:**
+
+- Clone a public GitHub repository into CO-Agent's user-data `extensions/` directory.
+- Record its source URL and selected ref.
+- Inspect known manifests and identify a root `SKILL.md`.
+- Let you opt a detected skill into local Ollama chat context, with a limit of eight selected skills.
+- Let you remove imported repositories from the managed extensions folder.
+
+**It does not:**
+
+- Run `npm install`, lifecycle scripts, binaries, or plugin code.
+- Automatically activate arbitrary OpenClaw plugins or install dependencies.
+- Guarantee that a third-party skill is safe or correct.
+- Currently support private repositories, other Git hosts, local folders, or plugin runtime activation.
+
+Imported skills are untrusted instructions. Review them first, never paste secrets into them, and don't allow their content to override security boundaries. Importing a repository is not the same as enabling executable plugin code.
+
+This is a conservative first step inspired by repository/skill workflows in tools such as OpenClaw; it is not a clone of OpenClaw's full plugin runtime. See [OpenClaw's skills guide](https://github.com/openclaw/openclaw/blob/main/docs/tools/skills.md) for its distinct skill model and trust considerations.
+
+</details>
+
+## 🗺️ Project map
+
+| Path | Purpose |
 |---|---|
-| `electron/main.cjs` | Electron lifecycle, IPC handlers, app window |
-| `electron/preload.cjs` | Explicit, context-isolated `window.coAgent` API |
-| `electron/ollama.cjs` | Ollama status, model management, model-name validation |
-| `electron/agent-runtime.cjs` | Read-only API subagent requests |
-| `electron/studio.cjs` | FFmpeg/FFprobe operations |
+| `electron/main.cjs` | Electron lifecycle, IPC dispatch, Ollama chat |
+| `electron/preload.cjs` | Allow-listed context-isolated renderer API |
+| `electron/ollama.cjs` | Local Ollama status and model management |
+| `electron/agent-runtime.cjs` | Read-only API subagent request helper |
+| `electron/studio.cjs` | FFmpeg/FFprobe media helpers |
 | `electron/ocr.cjs` | Tesseract discovery and OCR |
-| `electron/hyperframes.cjs` | Hyperframes CLI status, project validation, lint/preview/render |
-| `electron/computer.cjs` | Small explicit app launch/open allow-list |
-| `electron/piper.cjs` | Optional Piper voice synthesis wrapper |
-| `src/App.jsx` | Main chat and runtime UI |
-| `src/VideoEditor.jsx` | Video Studio and optional tool controls |
+| `electron/hyperframes.cjs` | Hyperframes CLI integration |
+| `electron/integrations.cjs` | Optional tool checks/installers, GitHub repository import and skill loading |
+| `src/App.jsx` | Main chat, navigation and model settings |
+| `src/VideoEditor.jsx` | Video Studio |
+| `src/Integrations.jsx` | Optional tools, GitHub repository import and skill selection UI |
 | `src/styles.css` | Renderer styles |
 | `test/` | Automated service and validation tests |
-| `.github/workflows/ci.yml` | Windows/Ubuntu test and renderer-build matrix |
-| `.github/workflows/release.yml` | Build and publish release artifacts for pushed version tags |
+| `.github/workflows/ci.yml` | Windows/Ubuntu tests and renderer build |
+| `.github/workflows/release.yml` | Tagged Windows/Linux release packaging workflow |
 | `AGENTS.md` | Fast onboarding guide for AI coding agents |
-| `docs/VERSIONING.md` | How to find older commits, create checkpoints, and roll back |
-| `RESTORE-ROADMAP.md` | Current restoration status and known gaps |
+| `docs/VERSIONING.md` | Find older versions, create checkpoints, roll back |
+| `RESTORE-ROADMAP.md` | Implementation status and known gaps |
 
-For AI assistants, start with [AGENTS.md](AGENTS.md), then read [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md) and the relevant service/tests before editing.
-
-## 🧪 Testing and CI
-
-Run locally:
+### Handy developer commands
 
 ```bash
 npm test
 npm run build
 ```
 
-GitHub Actions runs tests and the Vite production build on Windows and Ubuntu for pushes to `main` and pull requests. Confirm the latest run is green before describing a commit as verified. A green renderer build is not equivalent to testing all optional external tools.
+Before opening a pull request, test the changed feature, add regression coverage, and update documentation. Read [AGENTS.md](AGENTS.md) before using an AI coding assistant to modify this repository.
 
-## 🕰️ Past versions, releases, and rollback
+## 🕰️ Version history & rollback
 
-You can inspect **any commit** in Git history. Version tags and GitHub Releases make important milestones easier to revisit.
+Every Git commit is a recoverable snapshot. Tags and releases make stable checkpoints easier to identify.
 
-- [Commit history](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/commits/main/)
-- [Tags](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tags)
-- [Pre-integration checkpoint branch](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tree/checkpoint/v0.6.1-before-tool-integrations)
-- [Releases](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
-- [Version and rollback guide](docs/VERSIONING.md)
+[**Browse commits**](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/commits/main/) · [**Browse tags**](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tags) · [**Browse releases**](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases) · [**Open Actions**](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions)
 
-To inspect an earlier snapshot without altering your current branch:
+<details>
+<summary><strong>Check out an older version safely</strong></summary>
 
 ```bash
 git fetch --all --tags
@@ -167,36 +206,45 @@ git log --oneline --decorate --graph -30
 git switch --detach <commit-sha-or-tag>
 ```
 
-To continue working from it, create a branch with `git switch -c investigate/older-version <commit-sha-or-tag>`. Prefer `git revert` to undo shared commits; avoid force-pushing or resetting shared history. Before risky work, commit a checkpoint and create a unique version tag. Pushing a `vX.Y.Z` tag triggers the release workflow described in [VERSIONING.md](docs/VERSIONING.md).
+To continue developing from an older snapshot, create a new branch:
 
-## 🔐 Security and privacy notes
+```bash
+git switch -c investigate/older-version <commit-sha-or-tag>
+```
 
-- Keep Electron's context isolation enabled and Node integration disabled in the renderer.
-- Only expose named, reviewed IPC operations through the preload bridge.
-- Do not pass arbitrary command strings to shell processes. External tools should be called with fixed actions and validated inputs.
-- Local OCR and Ollama requests run against local services; API provider requests, when used, send prompt data to the configured provider.
-- Never commit API keys, credentials, personal media, downloaded models, build outputs, or `node_modules`.
+To undo a change on shared history, prefer `git revert <commit-sha>`. Avoid `git reset --hard` or force-pushing shared history unless you intentionally accept the risk.
 
-## 🗺️ Known gaps
+A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tree/checkpoint/v0.6.1-before-tool-integrations). Read [docs/VERSIONING.md](docs/VERSIONING.md) for checkpoint and release instructions.
 
-- This is not yet a complete restoration of the recovered original project.
-- Full native computer control, general screen capture/OCR automation, and broad app automation are not implemented.
-- The built-in media workflow is basic sequence assembly, not a full multi-track nonlinear editor with captions and motion graphics.
-- Chat does not yet stream tokens; model-pull progress is not fully surfaced in the UI.
-- Full API provider configuration/settings and robust credential storage are incomplete.
-- Tesseract and Hyperframes are external optional tools, not bundled app dependencies.
-- Piper executable and voice assets are not bundled.
+</details>
 
-See [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md) for the current implementation boundary and future work.
+## 🔐 Security and privacy
+
+- Keep Electron context isolation enabled and Node integration disabled.
+- Expose only reviewed IPC methods through the preload bridge.
+- Do not pass arbitrary user-provided commands into a shell.
+- Local Ollama chat and Tesseract OCR are local by default; configured API providers send prompt data to their remote service.
+- Repository imports are restricted to public HTTPS GitHub URLs and are not executed automatically.
+- Never commit API keys, credentials, private media, downloaded models, build outputs, or `node_modules`.
+
+## 🧭 Known gaps
+
+- Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
+- Chat does not yet stream tokens; Ollama model-pull progress is not fully surfaced.
+- The built-in media workflow is simple sequence assembly, not a complete multi-track editor.
+- General-purpose screen capture, OCR-driven computer control, and broad desktop automation are unfinished.
+- Full API-provider configuration/credential management is incomplete.
+- Imported generic plugin code is not activated. Only explicitly selected `SKILL.md` text can be loaded into local chat.
+- Tesseract, Hyperframes, Piper, and Piper voice assets are optional external dependencies.
 
 ## 🤝 Contributing
 
-1. Read [AGENTS.md](AGENTS.md) and the roadmap.
-2. Keep changes focused and add tests for service behavior and validation.
-3. Run `npm test` and `npm run build`; report any command you could not run.
-4. Update documentation when setup or capabilities change.
-5. Use a branch and pull request for substantial changes.
+1. Read [AGENTS.md](AGENTS.md) and [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
+2. Use a branch for substantial changes.
+3. Add tests for service behavior, validation, and failure paths.
+4. Run `npm test` and `npm run build`, and report any command that could not be run.
+5. Keep commits focused and update docs when setup or behavior changes.
 
 ## License
 
-No repository license file has been confirmed yet. Until a license is added, do not assume the project is open for unrestricted reuse, redistribution, or relicensing.
+A repository license has not been confirmed. Until a license is added, do not assume unrestricted reuse, redistribution, or relicensing is permitted.
