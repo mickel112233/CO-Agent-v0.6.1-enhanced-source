@@ -17,6 +17,13 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     ocrStatus: invoke('studio:ocr-status'), ocrImage: invoke('studio:ocr-image'),
     hyperframesStatus: invoke('studio:hyperframes-status'), hyperframesRun: invoke('studio:hyperframes-run')
   }),
+  integrations: Object.freeze({
+    status: invoke('integrations:status'),
+    installTool: invoke('integrations:install-tool'),
+    listRepos: invoke('integrations:list-repos'),
+    installRepo: invoke('integrations:install-repo'),
+    removeRepo: invoke('integrations:remove-repo')
+  }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
   dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
 }));
