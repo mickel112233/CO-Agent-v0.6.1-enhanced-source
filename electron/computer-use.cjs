@@ -8,6 +8,7 @@ const path = require('node:path');
 const { desktopCapturer, screen } = require('electron');
 const ocr = require('./ocr.cjs');
 const ollama = require('./ollama.cjs');
+const { isLoopbackHttpUrl } = require('./security.cjs');
 const execFileAsync = promisify(execFile);
 
 const KEY_CODES = Object.freeze({
@@ -84,6 +85,7 @@ async function planActions(payload = {}) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 10000 || height > 10000) throw new Error('A valid screenshot size is required.');
   const status = await ollama.getOllamaStatus();
   if (!status.available) throw new Error('Local planning needs Ollama. Start Ollama and install a model first.');
+  if (!isLoopbackHttpUrl(status.baseUrl)) throw new Error('Computer-use planning only sends screenshots to loopback Ollama (127.0.0.1, localhost, or ::1) to protect desktop privacy. Change ATELIER_OLLAMA_URL to a local endpoint and retry.');
   const model = ollama.validateModelName(payload.model || status.models?.[0]?.name);
   const imageBase64 = String(payload.imageBase64 || '');
   if (imageBase64.length > 8 * 1024 * 1024 || (imageBase64 && !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64))) throw new Error('Screenshot image is invalid or exceeds the 8 MB planning limit. Capture the screen again and retry.');

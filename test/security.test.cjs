@@ -22,3 +22,14 @@ test('packaged renderer trust allows only the bundled index document', () => {
   assert.equal(isTrustedRendererUrl('javascript:alert(1)', options), false);
   assert.equal(isTrustedRendererUrl('not a url', options), false);
 });
+
+test('computer-use screenshot endpoint must be loopback only', () => {
+  const { isLoopbackHttpUrl } = require('../electron/security.cjs');
+  assert.equal(isLoopbackHttpUrl('http://127.0.0.1:11434'), true);
+  assert.equal(isLoopbackHttpUrl('http://localhost:11434/'), true);
+  assert.equal(isLoopbackHttpUrl('http://[::1]:11434'), true);
+  assert.equal(isLoopbackHttpUrl('https://example.com/ollama'), false);
+  assert.equal(isLoopbackHttpUrl('http://192.168.1.20:11434'), false);
+  assert.equal(isLoopbackHttpUrl('http://user@127.0.0.1:11434'), false);
+  assert.equal(isLoopbackHttpUrl('not a URL'), false);
+});

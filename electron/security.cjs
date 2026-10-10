@@ -24,4 +24,14 @@ function isTrustedRendererUrl(value, options = {}) {
   return actualDocument === expectedDocument;
 }
 
-module.exports = { isTrustedRendererUrl };
+function isLoopbackHttpUrl(value) {
+  if (typeof value !== 'string' || !value) return false;
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  return ['http:', 'https:'].includes(url.protocol) &&
+    ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
+    !url.username &&
+    !url.password;
+}
+
+module.exports = { isTrustedRendererUrl, isLoopbackHttpUrl };
