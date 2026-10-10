@@ -11,7 +11,7 @@ const TOOLS = Object.freeze({
   piper: Object.freeze({ id: 'piper', name: 'Piper TTS', kind: 'external-runtime', required: false, description: 'Optional local text-to-speech. Piper executable and voice models must be configured separately.', install: null, command: null, args: [], docs: 'https://github.com/rhasspy/piper' })
 });
 const GITHUB_HTTPS = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
-const REF_RE = /^[A-Za-z0-9._/-]{1,128}$/;
+const REF_RE = /^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._/-]{1,128}$/;
 function commandFor(name) {
   if (process.platform !== 'win32') return name;
   return name;
