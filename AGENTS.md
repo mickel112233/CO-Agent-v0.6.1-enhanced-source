@@ -18,7 +18,7 @@ Read this file before changing code. It is a fast orientation guide for coding a
 | `electron/preload.cjs` | Context-isolated, allow-listed `window.coAgent` bridge |
 | `electron/ollama.cjs` | Ollama availability, model list/pull/delete helpers |
 | `electron/agent-runtime.cjs` | Read-only API subagent requests for supported provider protocols |
-| `electron/agent-orchestrator.cjs` | Local Ollama workflow planning, specialist role prompts, built-in skills, structured agent step results |
+| `electron/agent-orchestrator.cjs` | Local Ollama workflow planning, 13 specialist role prompts, 20 built-in skills, structured agent step results |
 | `electron/workspace.cjs` | Selected-workspace file listing/reading, guarded approved file writes with backups, fixed terminal command presets |
 | `electron/studio.cjs` | FFmpeg/FFprobe probe, audio extraction and compatible-stream concat |
 | `electron/ocr.cjs` | Optional local Tesseract CLI discovery and image OCR |
