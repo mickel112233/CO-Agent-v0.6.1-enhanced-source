@@ -73,7 +73,7 @@ async function runWorkflowStep(payload={}){
  const contextText=contextFiles.map(item=>{const filePath=String(item.path||'');const content=String(item.content||'');if(content.length>30000)throw new Error('A context file exceeds the 30 KB per-file agent limit.');return '### Workspace file: '+filePath+'\nFILE CONTENT START\n'+content+'\nFILE CONTENT END';}).join('\n\n').slice(0,90000);
  const priorResults=Array.isArray(payload.priorResults)?payload.priorResults.slice(-6).map(item=>({title:String(item.title||'').slice(0,120),role:String(item.role||'').slice(0,40),result:String(item.result||'').slice(0,5000)})):[];
  const externalSkills=Array.isArray(payload.externalSkills)?payload.externalSkills.slice(0,4).map(skill=>({slug:String(skill.slug||'').slice(0,100),url:String(skill.url||'').slice(0,300),content:String(skill.content||'').slice(0,12000)})).filter(skill=>skill.slug&&skill.content).slice(0,4):[];
- const externalSkillText=externalSkills.map(skill=>'External skill '+skill.slug+' ('+skill.url+'):\\n'+skill.content).join('\\n\\n---\\n\\n').slice(0,32000);
+ const externalSkillText=externalSkills.map(skill=>'External skill '+skill.slug+' ('+skill.url+'):\n'+skill.content).join('\n\n---\n\n').slice(0,32000);
  const system=[
  'You are '+agent.name+' inside CO-Agent. Your job: '+agent.purpose,
  'Specialist skill ('+skill.name+'): '+skill.instructions,
