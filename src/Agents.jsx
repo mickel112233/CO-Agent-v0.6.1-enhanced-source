@@ -135,6 +135,13 @@ export default function Agents() {
       }
       const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Agent step failed.');
+      if (result.files?.length) {
+        result.files = await Promise.all(result.files.map(async file => {
+          const current = workspaceRoot ? await desktop.workspace.readFile(file.path) : { ok: false, error: 'No workspace selected.' };
+          const isNew = !current?.ok && /ENOENT|no such file/i.test(current?.error || '');
+          return { ...file, originalContent: current?.ok ? current.content : '', isNew, originalUnavailable: !current?.ok && !isNew };
+        }));
+      }
       setResults(old => ({ ...old, [step.id]: result }));
       setActiveResult(step.id);
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'done', result: result.summary } : item) }));
@@ -227,7 +234,7 @@ export default function Agents() {
                   {result.findings?.length > 0 && <><h4>Findings</h4><ul>{result.findings.map((item, i) => <li key={i}>{item}</li>)}</ul></>}
                   {result.risks?.length > 0 && <><h4>Risks to review</h4><ul className="agents-risk-list">{result.risks.map((item, i) => <li key={i}>{item}</li>)}</ul></>}
                   {result.needsUserInput && <p className="agents-inline-warning">Agent asks: {result.userQuestion || 'Please clarify the task.'}</p>}
-                  {result.files?.length > 0 && <div className="agents-file-proposals"><h4><FileCode2 size={14}/> Proposed file changes ({result.files.length})</h4>{result.files.map(file => <details key={file.path}><summary>{file.path} <span>{file.content.length.toLocaleString()} chars</span></summary><pre>{file.content}</pre></details>)}<button className="primary-button" onClick={() => applyProposals(step.id)} disabled={!!busy}><ShieldCheck size={14}/> Review and apply files</button></div>}
+                  {result.files?.length > 0 && <div className="agents-file-proposals"><h4><FileCode2 size={14}/> Proposed file changes ({result.files.length})</h4>{result.files.map(file => <details key={file.path}><summary>{file.path} <span>{file.isNew ? 'NEW FILE' : file.originalUnavailable ? 'CURRENT CONTENT UNAVAILABLE' : 'MODIFIED'} · {file.content.length.toLocaleString()} chars proposed</span></summary><div className="agents-file-comparison"><div><strong>Current file</strong><pre>{file.isNew ? '(New file — nothing to replace)' : file.originalUnavailable ? '(Could not read current file; inspect carefully before applying)' : file.originalContent}</pre></div><div><strong>Proposed file</strong><pre>{file.content}</pre></div></div></details>)}<button className="primary-button" onClick={() => applyProposals(step.id)} disabled={!!busy}><ShieldCheck size={14}/> Review and apply files</button></div>}
                   {result.applied?.length > 0 && <div className="agents-applied"><CheckCircle2 size={14}/> Applied {result.applied.length} file(s); backup folder created.</div>}
                   {result.suggestedCommands?.length > 0 && <div className="agents-suggested-commands"><strong>Suggested terminal checks</strong>{result.suggestedCommands.map(id => {const cmd=commands.find(item => item.id === id);return cmd ? <button key={id} onClick={() => {setCommandId(id);setNotice('Selected terminal command: '+cmd.label);}}>{cmd.label}</button> : null})}</div>}
                 </div>}
