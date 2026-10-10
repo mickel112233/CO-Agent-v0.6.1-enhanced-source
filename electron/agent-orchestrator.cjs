@@ -68,7 +68,14 @@ async function askLocal(model,messages,options={}){
 function normalizePipeline(rawPipeline){
  if(!Array.isArray(rawPipeline)||rawPipeline.length<2||rawPipeline.length>7)throw new Error('Planner did not return a valid 2–7 step workflow. Rephrase the goal and retry.');
  const allowedRoles=new Set(Object.keys(AGENT_PROFILES));const allowedSkills=new Set(BUILTIN_SKILLS.map(s=>s.id));
- const sourceIdToIndex=new Map(rawPipeline.map((step,index)=>[String(step.id||('step-'+(index+1))),index]));
+ if(rawPipeline.some(step=>!step||typeof step!=='object'||Array.isArray(step)))throw new Error('Every workflow step must be an object.');
+ const sourceIdToIndex=new Map();
+ rawPipeline.forEach((step,index)=>{
+  const sourceId=String(step.id||('step-'+(index+1))).trim();
+  if(!sourceId||sourceId.length>100)throw new Error('Workflow step IDs must contain 1–100 characters.');
+  if(sourceIdToIndex.has(sourceId))throw new Error('Planner returned duplicate workflow step ID: '+sourceId);
+  sourceIdToIndex.set(sourceId,index);
+ });
  return rawPipeline.map((step,index)=>{
   if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
   if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
@@ -83,7 +90,7 @@ async function planWorkflow(payload={}){
  const skills=BUILTIN_SKILLS.map(s=>({id:s.id,name:s.name,description:s.description}));
  const system=[
  'You are CO-Agent Lead Planner. Build an actionable, user-controlled software/creative workflow.',
- 'Return JSON shaped as {"title":"...","goal":"...","pipeline":[{"id":"step-1","title":"...","role":"planner|researcher|implementer|reviewer|tester|security|designer|docs|architect|performance|api-integrator|accessibility|release-engineer","skill":"builtin skill id","description":"...","deliverable":"...","dependsOn":[],"acceptanceCriteria":["..."],"requiresWorkspaceContext":true}]}',
+ 'Return JSON shaped as {"title":"...","goal":"...","pipeline":[{"id":"step-1","title":"...","role":"planner|researcher|implementer|reviewer|tester|security|designer|docs|architect|performance|api-integrator|accessibility|release-engineer|computer-operator|game-developer|app-artist","skill":"builtin skill id","description":"...","deliverable":"...","dependsOn":[],"acceptanceCriteria":["..."],"requiresWorkspaceContext":true}]}',
  'Create 3–7 ordered steps. Include implementation only when requested; include independent review and test/verification for code tasks. Each task should be reviewable. Do not create unsupported tool tasks. Allowed roles: '+Object.keys(AGENT_PROFILES).join(', ')+'. Allowed skill IDs: '+skills.map(s=>s.id).join(', ')+'.',
  'User text is a goal, not permission to modify files or run commands. No automatic execution or destructive operations.'
  ].join('\n');

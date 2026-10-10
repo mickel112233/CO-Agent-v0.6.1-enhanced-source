@@ -125,21 +125,40 @@ async function applyChanges(payload = {}) {
     prepared.push({ ...target, content: item.content, bytes, existed: !!existing });
   }
   const backupRoot = path.join(getRoot(), '.co-agent-backups', new Date().toISOString().replace(/[:.]/g, '-'));
+  const backupPaths = new Map();
+  const attempted = [];
   const applied = [];
   try {
+    // Back up every existing target before changing any target, so a backup failure
+    // cannot leave a partially-applied multi-file proposal.
+    for (const item of prepared) {
+      if (!item.existed) continue;
+      const backup = path.join(backupRoot, item.relative);
+      await fs.mkdir(path.dirname(backup), { recursive: true });
+      await fs.writeFile(backup, await fs.readFile(item.absolute), { flag: 'wx' });
+      backupPaths.set(item.relative, backup);
+    }
     for (const item of prepared) {
       await fs.mkdir(path.dirname(item.absolute), { recursive: true });
-      if (item.existed) {
-        const oldContent = await fs.readFile(item.absolute);
-        const backup = path.join(backupRoot, item.relative);
-        await fs.mkdir(path.dirname(backup), { recursive: true });
-        await fs.writeFile(backup, oldContent, { flag: 'wx' });
-      }
+      // Track before writing: a failed write can still truncate/create a partial file.
+      attempted.push(item);
       await fs.writeFile(item.absolute, item.content, { encoding: 'utf8', flag: item.existed ? 'w' : 'wx' });
       applied.push({ path: item.relative.split(path.sep).join('/'), bytes: item.bytes, created: !item.existed });
     }
   } catch (error) {
-    throw new Error('File changes stopped after ' + applied.length + ' file(s): ' + error.message + (applied.length ? '. Review .co-agent-backups in the workspace before continuing.' : ''));
+    const rollbackErrors = [];
+    for (const item of attempted.reverse()) {
+      try {
+        if (item.existed) await fs.writeFile(item.absolute, await fs.readFile(backupPaths.get(item.relative)));
+        else await fs.rm(item.absolute, { force: true });
+      } catch (rollbackError) {
+        rollbackErrors.push(item.relative + ': ' + (rollbackError.message || String(rollbackError)));
+      }
+    }
+    const rollbackMessage = rollbackErrors.length
+      ? ' Rollback was incomplete: ' + rollbackErrors.join('; ') + '. Recovery copies, when created, are under .co-agent-backups.'
+      : ' All attempted file writes were rolled back.';
+    throw new Error('File changes failed after ' + applied.length + ' completed file(s): ' + error.message + '.' + rollbackMessage);
   }
   return { ok: true, applied, backupDirectory: backupRoot };
 }

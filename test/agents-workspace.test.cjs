@@ -76,6 +76,14 @@ test('workflow pipeline normalization maps dependencies and rejects unsafe plann
   assert.deepEqual(pipeline[2].dependsOn, ['step-2']);
   assert.throws(() => agents.normalizePipeline([{ role: 'shell', skill: 'planner' }, { role: 'tester', skill: 'test-engineer' }]), /unsupported role/i);
   assert.throws(() => agents.normalizePipeline([{ role: 'planner', skill: 'planner' }]), /2–7 step workflow/i);
+  assert.throws(() => agents.normalizePipeline([
+    { id: 'same', role: 'planner', skill: 'planner' },
+    { id: 'same', role: 'tester', skill: 'test-engineer' }
+  ]), /duplicate workflow step ID/i);
+  assert.throws(() => agents.normalizePipeline([
+    null,
+    { role: 'tester', skill: 'test-engineer' }
+  ]), /step must be an object/i);
 });
 
 test('built-in agent harness provides multiple specialist roles and skills', () => {
