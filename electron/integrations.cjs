@@ -4,6 +4,8 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const execFileAsync = promisify(execFile);
+const ocr = require('./ocr.cjs');
+const hyperframesService = require('./hyperframes.cjs');
 
 const TOOLS = Object.freeze({
   tesseract: Object.freeze({ id: 'tesseract', name: 'Tesseract OCR', kind: 'native', required: false, description: 'Local image-to-text extraction for screenshots, scans, and still images.', install: 'winget', command: 'winget', args: ['install', '--id', 'UB-Mannheim.TesseractOCR', '--exact', '--accept-package-agreements', '--accept-source-agreements'], docs: 'https://tesseract-ocr.github.io/tessdoc/Installation.html' }),
@@ -33,8 +35,8 @@ async function executableVersion(file, args = ['--version']) {
 }
 async function getStatus() {
   const [tesseract, hyperframes, piper, git] = await Promise.all([
-    executableVersion('tesseract'),
-    executableVersion('hyperframes'),
+    ocr.getStatus(),
+    hyperframesService.getStatus(),
     executableVersion('piper'),
     executableVersion('git')
   ]);
