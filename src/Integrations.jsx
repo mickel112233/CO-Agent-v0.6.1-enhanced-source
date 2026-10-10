@@ -17,6 +17,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [showRepoForm, setShowRepoForm] = useState(false);
+  const [skillPreviews, setSkillPreviews] = useState({});
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
@@ -75,6 +76,19 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     finally { setBusy(''); }
   }
 
+  async function previewSkill(repo) {
+    if (skillPreviews[repo.slug] !== undefined) {
+      setSkillPreviews(old => { const next = { ...old }; delete next[repo.slug]; return next; });
+      return;
+    }
+    setBusy('preview:' + repo.slug);
+    try {
+      const result = await desktop.integrations.getSkills([repo.slug]);
+      setSkillPreviews(old => ({ ...old, [repo.slug]: result?.[0]?.content || 'SKILL.md could not be read safely.' }));
+    } catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
+
   function toggleSkill(repo, checked) {
     onSkillsChange(checked ? [...new Set([...selectedSkills, repo.slug])].slice(0, 8) : selectedSkills.filter(slug => slug !== repo.slug));
   }
@@ -118,7 +132,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     {repos.length ? <div className="installed-repos">{repos.map(repo => <article className="installed-repo" key={repo.slug}>
       <div className="installed-repo-icon">{repo.hasSkill ? <Sparkles size={18}/> : <Package size={18}/>}</div>
       <div className="installed-repo-body"><div className="installed-repo-title"><strong>{repo.name}</strong><span className="repo-type">{repo.type}</span></div><p>{repo.description || 'No description provided.'}</p><a href={repo.url} onClick={e => { e.preventDefault(); GenOpen(repo.url); }}>{repo.url} <ExternalLink size={11}/></a><div className="repo-flags">{repo.hasSkill && <span>SKILL.md detected</span>}{repo.hasPluginManifest && <span>Plugin manifest detected</span>}{repo.hasPackageJson && <span>package.json detected</span>}{repo.installScripts?.length > 0 && <span className="warning-flag">Install scripts: {repo.installScripts.join(', ')}</span>}</div>
-        {repo.hasSkill && <label className="skill-toggle"><input type="checkbox" checked={selectedSkills.includes(repo.slug)} onChange={e => toggleSkill(repo, e.target.checked)}/><span><strong>Use this skill in local chat</strong><small>Its SKILL.md instructions are added as third-party context only while selected. Maximum 8 skills.</small></span></label>}
+        {repo.hasSkill && <><button className="secondary-button preview-skill-button" disabled={busy === 'preview:' + repo.slug} onClick={() => previewSkill(repo)}>{busy === 'preview:' + repo.slug ? 'Loading preview…' : skillPreviews[repo.slug] !== undefined ? 'Hide SKILL.md preview' : 'Review SKILL.md before enabling'}</button>{skillPreviews[repo.slug] !== undefined && <pre className="skill-preview">{skillPreviews[repo.slug]}</pre>}<label className="skill-toggle"><input type="checkbox" checked={selectedSkills.includes(repo.slug)} onChange={e => toggleSkill(repo, e.target.checked)}/><span><strong>Use this skill in local chat</strong><small>Its SKILL.md instructions are added as third-party context only while selected. Maximum 8 skills.</small></span></label></>}
         <p className="repo-safety-note"><ShieldCheck size={13}/> Files imported only. No plugin code or install scripts have been run.</p>
       </div>
       <button className="icon-button danger" title="Remove imported repository" disabled={!!busy} onClick={() => removeRepository(repo)}><Trash2 size={15}/></button>
