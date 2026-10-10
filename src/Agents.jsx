@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, BrainCircuit, CheckCircle2, Circle, Clock3, Code2, FileCode2, FolderOpen, GitBranch, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Trash2, Wrench, XCircle } from 'lucide-react';
 
 const desktop = window.coAgent;
@@ -29,6 +29,7 @@ export default function Agents() {
   const [terminalLog, setTerminalLog] = useState([]);
   const [terminalStatus, setTerminalStatus] = useState('idle');
   const [terminalResult, setTerminalResult] = useState(null);
+  const terminalReceivedOutput = useRef(false);
 
   const refreshFiles = useCallback(async () => {
     if (!desktop?.workspace) return;
@@ -59,6 +60,7 @@ export default function Agents() {
       } catch (error) { setNotice(errorText(error)); }
     })();
     if (desktop?.terminal?.onOutput) unsubscribe = desktop.terminal.onOutput(event => {
+      terminalReceivedOutput.current = true;
       setTerminalLog(old => [...old, { stream: event.stream || 'stdout', text: event.text || '' }].slice(-800));
       setTerminalStatus('running');
     });
@@ -140,14 +142,14 @@ export default function Agents() {
 
   const runTerminal = async () => {
     if (!workspaceRoot || !commandId || busy || terminalStatus === 'running') return;
-    setBusy('terminal'); setTerminalStatus('running'); setTerminalResult(null); setTerminalLog([]);
+    setBusy('terminal'); setTerminalStatus('running'); setTerminalResult(null); setTerminalLog([]); terminalReceivedOutput.current = false;
     setNotice('A native confirmation will appear before the command runs.');
     try {
       const result = await desktop.terminal.runCommand(commandId);
       if (result?.ok === false && result?.error) throw new Error(result.error);
       setTerminalResult(result);
       setTerminalStatus(result?.ok ? 'success' : 'failed');
-      if (result?.output && !terminalLog.length) setTerminalLog([{ stream: 'stdout', text: result.output }]);
+      if (result?.output && !terminalReceivedOutput.current) setTerminalLog([{ stream: 'stdout', text: result.output }]);
       setNotice(result?.ok ? 'Command completed successfully.' : (result?.timedOut ? 'Command timed out.' : 'Command exited with code ' + result?.exitCode + '. Review terminal output.'));
     } catch (error) {
       setTerminalStatus('failed'); setNotice(errorText(error));
