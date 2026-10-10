@@ -101,7 +101,7 @@ Open **Computer Use** from the sidebar to capture your desktop, inspect top-leve
 - Clicks are bounded to the selected display and coordinates are scaled from the captured screenshot.
 - Text entry is capped at 2,000 characters. Do not type passwords, API keys, or other secrets into the action field.
 - Screen OCR is optional and runs locally through Tesseract. It may extract sensitive visible content, so use it only when you intend to read that screen.
-- Native mouse/keyboard input and the UI Automation window list are currently supported on Windows with an interactive desktop. The app does not yet plan and run long autonomous computer-use sequences, inspect full accessibility trees, or verify arbitrary app state automatically.
+- Native mouse/keyboard input and the UI Automation window list are currently supported on Windows with an interactive desktop. The local Ollama model can suggest a short plan from your task and optional OCR text, but CO-Agent does not execute long sequences autonomously, inspect full accessibility trees, or verify arbitrary app state automatically.
 
 ## 🎬 Multi-track Video Studio
 
