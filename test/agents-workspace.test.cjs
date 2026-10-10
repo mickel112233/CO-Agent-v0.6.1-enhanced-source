@@ -81,7 +81,11 @@ test('workflow pipeline normalization maps dependencies and rejects unsafe plann
 test('built-in agent harness provides multiple specialist roles and skills', () => {
   const agentsList = agents.getAgents();
   const skills = agents.getSkills();
-  for (const role of ['planner', 'implementer', 'reviewer', 'tester', 'security', 'designer']) assert.ok(agentsList.some(agent => agent.id === role));
-  for (const skill of ['planner', 'implementer', 'reviewer', 'test-engineer', 'security', 'electron', 'frontend', 'docs', 'media']) assert.ok(skills.some(item => item.id === skill));
+  for (const role of ['planner', 'implementer', 'reviewer', 'tester', 'security', 'designer', 'architect', 'performance', 'api-integrator', 'accessibility', 'release-engineer']) assert.ok(agentsList.some(agent => agent.id === role));
+  for (const skill of ['planner', 'implementer', 'reviewer', 'test-engineer', 'security', 'electron', 'frontend', 'docs', 'media', 'architecture', 'performance', 'api-integration', 'accessibility', 'devops', 'dependency-audit', 'database', 'prompt-engineering', 'browser-testing', 'performance-testing']) assert.ok(skills.some(item => item.id === skill));
+  assert.equal(skills.length, 20);
+  assert.equal(agentsList.length, 13);
+  const extended = agents.normalizePipeline([{ id: 'design', role: 'architect', skill: 'architecture' }, { id: 'verify', role: 'accessibility', skill: 'accessibility', dependsOn: ['design'] }]);
+  assert.deepEqual(extended[1].dependsOn, ['step-1']);
   assert.deepEqual(agents.parseJson('{"ok":true}'), { ok: true });
 });
