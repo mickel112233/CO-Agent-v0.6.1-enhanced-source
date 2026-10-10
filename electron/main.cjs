@@ -8,6 +8,7 @@ const piper = require('./piper.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
+const integrations = require('./integrations.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
@@ -61,6 +62,11 @@ function registerIpc() {
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
   handle('studio:hyperframes-run', args => hyperframes.runAction(args?.action, args?.projectDir));
+  handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));
+  handle('integrations:install-tool', id => integrations.installTool(id));
+  handle('integrations:list-repos', () => integrations.listRepos(app.getPath('userData')));
+  handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
+  handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-files', async options => {
     const result = await dialog.showOpenDialog(mainWindow, {
