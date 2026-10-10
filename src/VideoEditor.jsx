@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import TimelineEditor from './TimelineEditor.jsx';
 import { Film, FolderOpen, Scissors, AudioLines, Download, RefreshCw, Trash2, Plus, AlertCircle, CheckCircle2, ScanText, Clapperboard, Play, FileCheck2 } from 'lucide-react';
 
 const desktop = window.coAgent;
 const imageFilters = [{ name: 'Images for OCR', extensions: ['png','jpg','jpeg','tif','tiff','bmp','webp'] }];
 
 export default function VideoEditor() {
+  const [mode, setMode] = useState('timeline');
   const [files, setFiles] = useState([]);
   const [outputDir, setOutputDir] = useState('');
   const [name, setName] = useState('co-agent-export.mp4');
@@ -119,8 +121,10 @@ export default function VideoEditor() {
     finally { setHyperBusy(false); }
   }
 
+  if (mode === 'timeline') return <TimelineEditor onBasic={() => setMode('basic')}/>;
+
   return <section className="studio-view">
-    <div className="studio-heading"><div><p className="eyebrow">CREATION WORKSPACE</p><h1>Video Studio</h1><p className="subhead">Import media, inspect clips, extract audio, assemble sequences, and use optional OCR and HTML-to-video tools.</p></div><button className="primary-button" onClick={importFiles}><Plus size={16}/> Import media</button></div>
+    <div className="studio-heading"><div><p className="eyebrow">CREATION WORKSPACE</p><h1>Video Studio</h1><p className="subhead">Import media, inspect clips, extract audio, assemble sequences, and use optional OCR and HTML-to-video tools.</p></div><div className="studio-heading-actions"><button className="secondary-button" onClick={() => setMode('timeline')}><Film size={14}/> Advanced timeline</button><button className="primary-button" onClick={importFiles}><Plus size={16}/> Import media</button></div></div>
     <div className="studio-status">
       <span className={caps.ffmpeg ? 'cap-ok' : 'cap-missing'}>{caps.ffmpeg ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} FFmpeg {caps.ffmpeg ? 'ready' : 'missing'}</span>
       <span className={caps.ffprobe ? 'cap-ok' : 'cap-missing'}>{caps.ffprobe ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} FFprobe {caps.ffprobe ? 'ready' : 'missing'}</span>
