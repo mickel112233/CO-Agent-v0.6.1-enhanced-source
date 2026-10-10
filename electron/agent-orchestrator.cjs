@@ -41,6 +41,17 @@ async function askLocal(model,messages,options={}){
  if(!content)throw new Error('The local model returned an empty agent response.');
  return parseJson(content);
 }
+function normalizePipeline(rawPipeline){
+ if(!Array.isArray(rawPipeline)||rawPipeline.length<2||rawPipeline.length>7)throw new Error('Planner did not return a valid 2–7 step workflow. Rephrase the goal and retry.');
+ const allowedRoles=new Set(Object.keys(AGENT_PROFILES));const allowedSkills=new Set(BUILTIN_SKILLS.map(s=>s.id));
+ const sourceIdToIndex=new Map(rawPipeline.map((step,index)=>[String(step.id||('step-'+(index+1))),index]));
+ return rawPipeline.map((step,index)=>{
+  if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
+  if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
+  const dependencies=Array.isArray(step.dependsOn)?[...new Set(step.dependsOn.map(id=>sourceIdToIndex.get(String(id))).filter(depIndex=>Number.isInteger(depIndex)&&depIndex<index).map(depIndex=>'step-'+(depIndex+1)))].slice(0,6):[];
+  return {id:'step-'+(index+1),title:String(step.title||'Workflow step '+(index+1)).slice(0,100),role:step.role,skill:step.skill,description:String(step.description||'').slice(0,1800),deliverable:String(step.deliverable||'A concise result and next steps').slice(0,500),dependsOn:dependencies,acceptanceCriteria:Array.isArray(step.acceptanceCriteria)?step.acceptanceCriteria.slice(0,6).map(x=>String(x).slice(0,240)):[],requiresWorkspaceContext:step.requiresWorkspaceContext!==false,status:'queued',result:null};
+ });
+}
 async function planWorkflow(payload={}){
  const goal=String(payload.goal||'').trim();
  if(goal.length<8||goal.length>5000)throw new Error('Describe the goal in 8–5000 characters.');
@@ -53,15 +64,7 @@ async function planWorkflow(payload={}){
  'User text is a goal, not permission to modify files or run commands. No automatic execution or destructive operations.'
  ].join('\n');
  const result=await askLocal(model,[{role:'system',content:system},{role:'user',content:'Goal:\n'+goal+'\nRequested skill focus: '+String(payload.skillFocus||'best fit').slice(0,500)}],{temperature:0.15});
- if(!Array.isArray(result.pipeline)||result.pipeline.length<2||result.pipeline.length>7)throw new Error('Planner did not return a valid 2–7 step workflow. Rephrase the goal and retry.');
- const allowedRoles=new Set(Object.keys(AGENT_PROFILES));const allowedSkills=new Set(BUILTIN_SKILLS.map(s=>s.id));
- const sourceIdToIndex=new Map(result.pipeline.map((step,index)=>[String(step.id||('step-'+(index+1))),index]));
- const pipeline=result.pipeline.map((step,index)=>{
-  if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
-  if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
-  const dependencies=Array.isArray(step.dependsOn)?[...new Set(step.dependsOn.map(id=>sourceIdToIndex.get(String(id))).filter(depIndex=>Number.isInteger(depIndex)&&depIndex<index).map(depIndex=>'step-'+(depIndex+1)))].slice(0,6):[];
-  return {id:'step-'+(index+1),title:String(step.title||'Workflow step '+(index+1)).slice(0,100),role:step.role,skill:step.skill,description:String(step.description||'').slice(0,1800),deliverable:String(step.deliverable||'A concise result and next steps').slice(0,500),dependsOn:dependencies,acceptanceCriteria:Array.isArray(step.acceptanceCriteria)?step.acceptanceCriteria.slice(0,6).map(x=>String(x).slice(0,240)):[],requiresWorkspaceContext:step.requiresWorkspaceContext!==false,status:'queued',result:null};
- });
+ const pipeline=normalizePipeline(result.pipeline);
  return {ok:true,model:model.model,title:String(result.title||'New workflow').slice(0,100),goal,pipeline,skills:getSkills(),agents:getAgents(),createdAt:new Date().toISOString()};
 }
 async function runWorkflowStep(payload={}){
@@ -90,4 +93,4 @@ async function runWorkflowStep(payload={}){
  const commands=Array.isArray(result.suggestedCommands)?result.suggestedCommands.filter(id=>['npm-test','npm-build','git-status','git-diff-check','npm-audit'].includes(id)).slice(0,5):[];
  return {ok:true,model:model.model,role:agent.name,skill:skill.name,summary:String(result.summary||'').slice(0,8000),findings:Array.isArray(result.findings)?result.findings.slice(0,12).map(x=>String(x).slice(0,1200)):[],risks:Array.isArray(result.risks)?result.risks.slice(0,10).map(x=>String(x).slice(0,1000)):[],files,suggestedCommands:commands,needsUserInput:!!result.needsUserInput,userQuestion:String(result.userQuestion||'').slice(0,1200)};
 }
-module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,planWorkflow,runWorkflowStep,parseJson};
+module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,normalizePipeline,planWorkflow,runWorkflowStep,parseJson};
