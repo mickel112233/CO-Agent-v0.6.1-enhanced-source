@@ -1,6 +1,7 @@
 'use strict';
 const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const ollama = require('./ollama.cjs');
 const computer = require('./computer.cjs');
 const computerUse = require('./computer-use.cjs');
@@ -17,9 +18,15 @@ const integrations = require('./integrations.cjs');
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 const registered = new Set();
+function isTrustedIpcSender(event) {
+  const frame = event?.senderFrame;
+  if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
+  return isDev ? /^https?:\/\/127\.0\.0\.1:5173(?:\/|$)/.test(frame.url) : frame.url.startsWith('file://');
+}
 function handle(channel, fn) {
   if (registered.has(channel)) ipcMain.removeHandler(channel);
-  ipcMain.handle(channel, async (_event, ...args) => {
+  ipcMain.handle(channel, async (event, ...args) => {
+    if (!isTrustedIpcSender(event)) return { ok: false, error: 'Blocked IPC request from an untrusted renderer frame.' };
     try { return await fn(...args); }
     catch (error) { return { ok: false, error: error?.message || String(error) }; }
   });
@@ -60,15 +67,19 @@ function registerIpc() {
   handle('workspace:choose-root', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { title: 'Choose a project workspace', properties: ['openDirectory'] });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
-    return workspace.setRoot(result.filePaths[0]);
+    const selected = await workspace.setRoot(result.filePaths[0]);
+    const preferencesPath = path.join(app.getPath('userData'), 'agent-workspace.json');
+    await fs.mkdir(path.dirname(preferencesPath), { recursive: true });
+    await fs.writeFile(preferencesPath, JSON.stringify({ root: selected.root }), 'utf8');
+    return selected;
   });
   handle('workspace:list-files', options => workspace.listFiles(options));
   handle('workspace:read-file', relativePath => workspace.readFile(relativePath));
   handle('workspace:apply-changes', async payload => {
     const files = Array.isArray(payload?.files) ? payload.files : [];
     if (!files.length || files.length > 12) throw new Error('Choose between 1 and 12 proposed files to apply.');
-    const summary = files.map(item => '• ' + String(item.path || '(unnamed)')).join('\\n');
-    if (!await confirmComputerAction('Apply agent-proposed file changes?', 'Workspace: ' + workspace.getRoot() + '\\n\\nFiles to create or replace:\\n' + summary + '\\n\\nExisting files are backed up in .co-agent-backups. Review the generated content before allowing this change.')) throw new Error('File changes cancelled by user.');
+    const summary = files.map(item => '• ' + String(item.path || '(unnamed)')).join('\n');
+    if (!await confirmComputerAction('Apply agent-proposed file changes?', 'Workspace: ' + workspace.getRoot() + '\n\nFiles to create or replace:\n' + summary + '\n\nExisting files are backed up in .co-agent-backups. Review the generated content before allowing this change.')) throw new Error('File changes cancelled by user.');
     return workspace.applyChanges({ ...payload, approved: true });
   });
   handle('terminal:list-commands', () => ({ ok: true, commands: workspace.commandList() }));
@@ -76,7 +87,7 @@ function registerIpc() {
     const command = workspace.commandList().find(item => item.id === commandId);
     if (!command) throw new Error('Select an approved terminal command.');
     const root = workspace.getRoot();
-    if (!await confirmComputerAction('Run a development command?', command.label + '\\n\\nCommand: ' + command.command + '\\nWorking directory: ' + root + '\\n\\nThis runs the selected project command and its project-defined scripts. Only continue if you trust this workspace.')) throw new Error('Terminal command cancelled by user.');
+    if (!await confirmComputerAction('Run a development command?', command.label + '\n\nCommand: ' + command.command + '\nWorking directory: ' + root + '\n\nThis runs the selected project command and its project-defined scripts. Only continue if you trust this workspace.')) throw new Error('Terminal command cancelled by user.');
     return workspace.runCommand(commandId, event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('terminal:output', event); });
   });
   handle('terminal:cancel-command', () => workspace.cancelCommand());
@@ -166,7 +177,12 @@ function createWindow() {
   mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => console.error('Renderer load failed:', { code, description, url }));
   mainWindow.on('closed', () => { mainWindow = null; });
 }
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    const preferencesPath = path.join(app.getPath('userData'), 'agent-workspace.json');
+    const preferences = JSON.parse(await fs.readFile(preferencesPath, 'utf8'));
+    if (preferences.root) await workspace.setRoot(preferences.root);
+  } catch {}
   registerIpc();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
