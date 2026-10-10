@@ -4,6 +4,8 @@ CO-Agent uses Git history as the source of truth. A commit is a recoverable snap
 
 ## Find an earlier version
 
+A named safety checkpoint is available at [\`checkpoint/v0.6.1-before-tool-integrations\`](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tree/checkpoint/v0.6.1-before-tool-integrations). It preserves the repository state before the current Tesseract/Hyperframes integration and documentation refresh.
+
 - Browse all commits: https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/commits/main/
 - Compare two versions: `https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/compare/<older-ref>...<newer-ref>`
 - Browse tags: https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/tags
