@@ -34,7 +34,19 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | Desktop bridge | Context-isolated IPC and a small allow-list of app/path actions | Not unrestricted computer-use automation |
 | Voice foundation | Optional Piper wrapper | Piper executable and voice models are not bundled |
 
-## 🚀 Quick start
+## ⬇️ Download a test build (Windows)
+
+**You do not need to install Node.js or build from source to try a packaged Windows build.**
+
+1. Open [**CO-Agent Windows Download — latest workflow runs**](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/workflows/windows-download.yml).
+2. Open the newest successful **CO-Agent Windows Download** run.
+3. Under **Artifacts**, download **CO-Agent-Windows-…** and extract the downloaded artifact ZIP.
+4. Run the included **CO-Agent Setup 0.6.1.exe** to install, or use the standalone app ZIP if you prefer not to run the installer.
+5. Launch CO-Agent. For local chat, install and start [Ollama](https://ollama.com/) and pull a model such as `gemma3:4b`.
+
+The workflow runs the automated tests, builds the renderer, packages the Windows installer and ZIP, verifies that both packages exist, and only then uploads the artifact. Tagged `v*` builds are also published to [GitHub Releases](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases). Unsigned test builds may trigger a Windows SmartScreen warning; only proceed if you trust the source.
+
+> **Important:** a downloadable app is not the same as a feature-complete restoration. See [the known gaps](#-known-gaps) and [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
 
 ### Prerequisites
 
@@ -177,6 +189,7 @@ This is a conservative first step inspired by repository/skill workflows in tool
 | `src/styles.css` | Renderer styles |
 | `test/` | Automated service and validation tests |
 | `.github/workflows/ci.yml` | Windows/Ubuntu tests and renderer build |
+| `.github/workflows/windows-download.yml` | Tests and packages downloadable Windows installer + ZIP on pushes and manual runs |
 | `.github/workflows/release.yml` | Tagged Windows/Linux release packaging workflow |
 | `AGENTS.md` | Fast onboarding guide for AI coding agents |
 | `docs/VERSIONING.md` | Find older versions, create checkpoints, roll back |
