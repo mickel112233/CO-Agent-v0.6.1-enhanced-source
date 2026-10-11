@@ -39,6 +39,9 @@ test('timeline projects save and load only the explicit CO-Agent project format'
     assert.equal(loaded.project.title, 'Round trip');
     assert.equal(loaded.project.clips[0].text, 'Hello world');
     await assert.rejects(() => timeline.saveProject(path.join(dir, 'unsafe.json'), project), /extension/);
+    const oversized = path.join(dir, 'oversized.coagent-project.json');
+    await fs.writeFile(oversized, ' '.repeat(timeline.MAX_PROJECT_BYTES + 1), 'utf8');
+    await assert.rejects(() => timeline.loadProject(oversized), /2 MB safety limit/i);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
 

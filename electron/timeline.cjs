@@ -9,6 +9,7 @@ try { ffmpegPath = require('ffmpeg-static'); } catch {}
 try { ffprobePath = require('ffprobe-static').path; } catch {}
 
 const MAX_CLIPS = 120;
+const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 const MAX_DURATION = 60 * 60;
 const TYPES = new Set(['video', 'audio', 'image', 'caption']);
 function number(value, label, min, max) {
@@ -51,6 +52,9 @@ async function saveProject(filePath, project) {
 async function loadProject(filePath) {
   const file = path.resolve(String(filePath || ''));
   if (!/\.coagent-project\.json$/i.test(file)) throw new Error('Choose a .coagent-project.json project file.');
+  const stat = await fs.stat(file);
+  if (!stat.isFile()) throw new Error('Project path must point to a regular file.');
+  if (stat.size > MAX_PROJECT_BYTES) throw new Error('Project file exceeds the 2 MB safety limit.');
   const parsed = JSON.parse(await fs.readFile(file, 'utf8'));
   return { ok: true, path: file, project: normalizeProject(parsed) };
 }
@@ -124,4 +128,4 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   await run(ffmpegPath, args);
   return { ok: true, output, duration, clips: normalized.clips.length };
 }
-module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, MAX_CLIPS, MAX_DURATION };
+module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
