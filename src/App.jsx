@@ -78,17 +78,17 @@ export default function App() {
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Bot size={19}/></span><span>CO-Agent</span><span className="version">0.6.1</span></div>
-      <button className="new-chat" onClick={() => { setSection('Chat'); setMessages([]); setNotice(''); }}><Plus size={17}/> New chat</button>
+      <button className="new-chat" title="Start a new conversation" aria-label="Start a new conversation" onClick={() => { setSection('Chat'); setMessages([]); setNotice(''); }}><Plus size={17}/> New chat</button>
       <div className="nav-label">WORKSPACE</div>
-      <button className={'nav-item ' + (section === 'Chat' ? 'active' : '')} onClick={() => setSection('Chat')}><MessageSquare size={17}/> Chat</button>
-      <button className={'nav-item ' + (section === 'Video Studio' ? 'active' : '')} onClick={() => setSection('Video Studio')}><Video size={17}/> Video Studio</button>
-      <button className={'nav-item ' + (section === 'Agents' ? 'active' : '')} onClick={() => setSection('Agents')}><BrainCircuit size={17}/> Agents & terminal</button>
-      <button className={'nav-item ' + (section === 'Computer Use' ? 'active' : '')} onClick={() => setSection('Computer Use')}><MousePointer2 size={17}/> Computer Use</button>
-      <button className={'nav-item ' + (section === 'Integrations' ? 'active' : '')} onClick={() => setSection('Integrations')}><Plug size={17}/> Integrations</button>
+      <button className={'nav-item ' + (section === 'Chat' ? 'active' : '')} title="Chat" aria-label="Chat" aria-current={section === 'Chat' ? 'page' : undefined} onClick={() => setSection('Chat')}><MessageSquare size={17}/> Chat</button>
+      <button className={'nav-item ' + (section === 'Video Studio' ? 'active' : '')} title="Video Studio" aria-label="Video Studio" aria-current={section === 'Video Studio' ? 'page' : undefined} onClick={() => setSection('Video Studio')}><Video size={17}/> Video Studio</button>
+      <button className={'nav-item ' + (section === 'Agents' ? 'active' : '')} title="Agents & terminal" aria-label="Agents and terminal" aria-current={section === 'Agents' ? 'page' : undefined} onClick={() => setSection('Agents')}><BrainCircuit size={17}/> Agents & terminal</button>
+      <button className={'nav-item ' + (section === 'Computer Use' ? 'active' : '')} title="Computer Use" aria-label="Computer Use" aria-current={section === 'Computer Use' ? 'page' : undefined} onClick={() => setSection('Computer Use')}><MousePointer2 size={17}/> Computer Use</button>
+      <button className={'nav-item ' + (section === 'Integrations' ? 'active' : '')} title="Integrations" aria-label="Integrations" aria-current={section === 'Integrations' ? 'page' : undefined} onClick={() => setSection('Integrations')}><Plug size={17}/> Integrations</button>
       <div className="sidebar-bottom">
         <div className="runtime"><span className="status-dot" style={{background:runtime.available?'#4e9c70':'#c7a15b'}}/><div><strong>{runtime.available ? 'Ollama connected' : 'Runtime not connected'}</strong><small>{runtime.available ? runtime.models.length + ' local model(s) found' : 'Check local AI status'}</small></div></div>
-        <button className={'nav-item ' + (section === 'Settings' ? 'active' : '')} onClick={() => setSection('Settings')}><Settings2 size={17}/> Models & settings</button>
-        <button className={'nav-item muted ' + (section === 'Help' ? 'active' : '')} onClick={() => setSection('Help')}><CircleHelp size={17}/> Help & diagnostics</button>
+        <button className={'nav-item ' + (section === 'Settings' ? 'active' : '')} title="Models & settings" aria-label="Models and settings" aria-current={section === 'Settings' ? 'page' : undefined} onClick={() => setSection('Settings')}><Settings2 size={17}/> Models & settings</button>
+        <button className={'nav-item muted ' + (section === 'Help' ? 'active' : '')} title="Help & diagnostics" aria-label="Help and diagnostics" aria-current={section === 'Help' ? 'page' : undefined} onClick={() => setSection('Help')}><CircleHelp size={17}/> Help & diagnostics</button>
       </div>
     </aside>
     <main className="main">
