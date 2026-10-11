@@ -8,6 +8,17 @@ let ffprobePath = null;
 try { ffmpegPath = require('ffmpeg-static'); } catch {}
 try { ffprobePath = require('ffprobe-static').path; } catch {}
 
+function validateMediaPath(value, label = 'Media path') {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(label + ' is required.');
+  if (value.length > 32768 || /[\\x00-\\x1f\\x7f]/.test(value)) throw new Error(label + ' contains invalid control characters or is too long.');
+  return path.resolve(value);
+}
+async function requireRegularFile(value, label = 'Media file') {
+  const file = validateMediaPath(value, label);
+  const stat = await fs.stat(file);
+  if (!stat.isFile()) throw new Error(label + ' must be a regular file.');
+  return file;
+}
 function safeName(value) {
   const name = path.basename(String(value || 'export.mp4')).replace(/[^a-zA-Z0-9._ -]/g, '_');
   return name || 'export.mp4';
@@ -33,24 +44,38 @@ function run(binary, args, timeoutMs = 30 * 60 * 1000) {
   });
 }
 async function probe(input) {
-  const file = path.resolve(String(input || ''));
-  await fs.access(file);
+  const file = await requireRegularFile(input, 'Media input');
   if (!ffprobePath) throw new Error('FFprobe is unavailable.');
   return new Promise((resolve, reject) => {
-    const child = spawn(ffprobePath, ['-v','error','-show_format','-show_streams','-of','json',file], { windowsHide: true });
-    let out = '', err = '';
-    child.stdout.on('data', d => out += d.toString());
-    child.stderr.on('data', d => err += d.toString());
-    child.on('error', reject);
+    const child = spawn(ffprobePath, ['-v','error','-show_format','-show_streams','-of','json',file], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '', settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error); else resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(new Error('Media inspection timed out after 30 seconds.'));
+    }, 30000);
+    child.stdout.on('data', chunk => {
+      out += chunk.toString();
+      if (out.length > 8 * 1024 * 1024) {
+        child.kill();
+        finish(new Error('Media inspection output exceeded the 8 MB safety limit.'));
+      }
+    });
+    child.stderr.on('data', chunk => { err = (err + chunk.toString()).slice(-4000); });
+    child.on('error', error => finish(error));
     child.on('close', code => {
-      if (code !== 0) return reject(new Error(err || 'ffprobe failed'));
-      try { resolve(JSON.parse(out)); } catch (e) { reject(e); }
+      if (code !== 0) return finish(new Error(err || 'ffprobe failed'));
+      try { finish(null, JSON.parse(out)); } catch { finish(new Error('FFprobe returned invalid media metadata.')); }
     });
   });
 }
 async function extractAudio(input, outputDir) {
-  const source = path.resolve(String(input || ''));
-  await fs.access(source);
+  const source = await requireRegularFile(input, 'Audio extraction input');
   const dir = await ensureDir(outputDir);
   const target = path.join(dir, path.parse(source).name + '-audio.wav');
   await run(ffmpegPath, ['-y','-i',source,'-vn','-acodec','pcm_s16le','-ar','16000','-ac','1',target]);
@@ -59,7 +84,7 @@ async function extractAudio(input, outputDir) {
 async function concat(inputs, outputDir, filename = 'export.mp4') {
   if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 100) throw new Error('Choose between 1 and 100 media files.');
   const files = [];
-  for (const item of inputs) { const p = path.resolve(String(item)); await fs.access(p); files.push(p); }
+  for (const item of inputs) files.push(await requireRegularFile(item, 'Concat input'));
   const dir = await ensureDir(outputDir);
   const target = path.join(dir, safeName(filename));
   const list = path.join(dir, 'co-agent-concat-' + Date.now() + '.txt');
@@ -70,4 +95,4 @@ async function concat(inputs, outputDir, filename = 'export.mp4') {
   } finally { await fs.rm(list, { force: true }); }
   return { ok: true, output: target };
 }
-module.exports = { probe, extractAudio, concat, ensureDir, getCapabilities: () => ({ ffmpeg: !!ffmpegPath, ffprobe: !!ffprobePath }) };
+module.exports = { probe, extractAudio, concat, ensureDir, validateMediaPath, getCapabilities: () => ({ ffmpeg: !!ffmpegPath, ffprobe: !!ffprobePath }) };

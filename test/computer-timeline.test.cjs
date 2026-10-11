@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const timeline = require('../electron/timeline.cjs');
 const computerUse = require('../electron/computer-use.cjs');
+const studio = require('../electron/studio.cjs');
 
 test('timeline project normalization enforces supported clip types and bounds', () => {
   const project = timeline.normalizeProject({ title: 'Demo', clips: [
@@ -66,4 +67,11 @@ test('computer-use actions reject missing approval and bound input', () => {
   assert.throws(() => computerUse.assertApproved({}), /explicit user approval/);
   assert.doesNotThrow(() => computerUse.assertApproved({ approved: true }));
   assert.throws(() => computerUse.KEY_CODES.NOT_A_KEY === undefined ? (() => { const code = null; if (!code) throw new Error('Unsupported key'); })() : null, /Unsupported key/);
+});
+
+test('media path validation rejects control characters and invalid values', () => {
+  assert.throws(() => studio.validateMediaPath('clip.mp4\\nfile'), /control characters/i);
+  assert.throws(() => studio.validateMediaPath('clip.mp4\\tfile'), /control characters/i);
+  assert.throws(() => studio.validateMediaPath(''), /required/i);
+  assert.doesNotThrow(() => studio.validateMediaPath('clip.mp4'));
 });
