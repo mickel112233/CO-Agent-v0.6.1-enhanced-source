@@ -37,5 +37,5 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     removeRepo: invoke('integrations:remove-repo')
   }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
-  dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
+  dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), openTextFiles: invoke('dialog:open-text-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
 }));

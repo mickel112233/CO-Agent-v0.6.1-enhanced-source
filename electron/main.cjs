@@ -16,6 +16,7 @@ const workspace = require('./workspace.cjs');
 const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
+const textAttachments = require('./text-attachments.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
@@ -147,6 +148,15 @@ function registerIpc() {
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
   handle('voice:synthesize', args => piper.synthesize(args));
+  handle('dialog:open-text-files', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Attach text files to your next message',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Text and source files', extensions: ['txt','md','markdown','json','csv','log','js','jsx','ts','tsx','py','html','css','yaml','yml','xml','toml','ini','sql','sh','ps1','bat','c','h','cpp','hpp','java','go','rs','php'] }]
+    });
+    if (result.canceled) return [];
+    return textAttachments.readTextAttachments(result.filePaths);
+  });
   handle('dialog:open-files', async options => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: options?.multiple === false ? ['openFile'] : ['openFile','multiSelections'],
