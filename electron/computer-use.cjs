@@ -106,20 +106,40 @@ Add-Type -AssemblyName UIAutomationTypes
 $root = [System.Windows.Automation.AutomationElement]::RootElement
 $condition = [System.Windows.Automation.Condition]::TrueCondition
 $items = @()
+$controls = @()
 $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)
 foreach ($window in $windows) {
   try {
     $name = $window.Current.Name
     if (-not $name) { continue }
     $items += [pscustomobject]@{ name=$name; type=$window.Current.ControlType.ProgrammaticName; automationId=$window.Current.AutomationId; className=$window.Current.ClassName }
+    if ($controls.Count -ge 400) { continue }
+    $descendants = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    $limit = [Math]::Min($descendants.Count, 100)
+    for ($i = 0; $i -lt $limit -and $controls.Count -lt 400; $i++) {
+      try {
+        $control = $descendants.Item($i)
+        $current = $control.Current
+        $type = $current.ControlType.ProgrammaticName
+        $label = $current.Name
+        $rect = $current.BoundingRectangle
+        if (($label -or $type -match 'Button|Edit|ComboBox|TabItem|CheckBox|ListItem|MenuItem|Hyperlink|RadioButton') -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
+          $controls += [pscustomobject]@{ name=$label; type=$type; automationId=$current.AutomationId; className=$current.ClassName; enabled=$current.IsEnabled; x=[int]$rect.X; y=[int]$rect.Y; width=[int]$rect.Width; height=[int]$rect.Height }
+        }
+      } catch {}
+    }
   } catch {}
 }
-ConvertTo-Json -InputObject @($items) -Depth 3 -Compress
+ConvertTo-Json -InputObject ([pscustomobject]@{ windows=@($items | Select-Object -First 150); controls=@($controls) }) -Depth 4 -Compress
 `;
-  const { stdout } = await powershell(script, 12000);
-  let windows = [];
-  try { windows = JSON.parse(stdout.trim() || '[]'); } catch { throw new Error('Windows UI Automation returned an unreadable result.'); }
-  return { ok: true, platform: 'win32', windows: Array.isArray(windows) ? windows.slice(0, 150) : [windows] };
+  const { stdout } = await powershell(script, 20000);
+  let result;
+  try { result = JSON.parse(stdout.trim() || '{}'); } catch { throw new Error('Windows UI Automation returned an unreadable result.'); }
+  return {
+    ok: true, platform: 'win32',
+    windows: Array.isArray(result.windows) ? result.windows.slice(0, 150) : result.windows ? [result.windows] : [],
+    controls: Array.isArray(result.controls) ? result.controls.slice(0, 400) : result.controls ? [result.controls] : []
+  };
 }
 async function click(payload = {}) {
   assertApproved(payload); assertWindows();

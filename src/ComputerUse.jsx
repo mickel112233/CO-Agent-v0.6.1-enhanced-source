@@ -7,6 +7,7 @@ export default function ComputerUse() {
   const [screens, setScreens] = useState([]);
   const [screenIndex, setScreenIndex] = useState(0);
   const [windows, setWindows] = useState([]);
+  const [accessibilityControls, setAccessibilityControls] = useState([]);
   const [x, setX] = useState('640');
   const [y, setY] = useState('360');
   const [text, setText] = useState('');
@@ -47,7 +48,8 @@ export default function ComputerUse() {
     if (!current || !task.trim()) return;
     setBusy('plan'); setNotice(''); setPlan([]);
     try {
-      const result = await desktop?.computerUse?.planActions({ task, screenText, imageBase64: String(current.dataUrl || '').split(',')[1] || '', width: current.width, height: current.height });
+      const accessibilityText = accessibilityControls.map(item => [item.type, item.name, item.enabled ? 'enabled' : 'disabled', 'bounds ' + [item.x,item.y,item.width,item.height].join(',')].filter(Boolean).join(' | ')).join('\n').slice(0, 8000);
+      const result = await desktop?.computerUse?.planActions({ task, screenText: [screenText, accessibilityText ? 'Accessibility-first control evidence:\n' + accessibilityText : ''].filter(Boolean).join('\n\n').slice(0, 12000), imageBase64: String(current.dataUrl || '').split(',')[1] || '', width: current.width, height: current.height });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Could not plan the task.');
       setPlan(result.actions || []);
       setNotice('Local model ' + result.model + ' suggested ' + (result.actions || []).length + ' action(s). Review every step before approving it.');
@@ -69,7 +71,8 @@ export default function ComputerUse() {
       const result = await desktop?.computerUse?.inspectAccessibility();
       if (result?.ok === false || result?.error) throw new Error(result.error || 'UI Automation failed.');
       setWindows(result.windows || []);
-      setNotice('Accessibility inspection found ' + (result.windows || []).length + ' top-level window(s).');
+      setAccessibilityControls(result.controls || []);
+      setNotice('Accessibility inspection found ' + (result.windows || []).length + ' window(s) and ' + (result.controls || []).length + ' visible control(s). Planning can now use these labels and bounds as additional evidence.');
     } catch (error) { setNotice(error.message || String(error)); }
     finally { setBusy(''); }
   }
@@ -110,7 +113,7 @@ export default function ComputerUse() {
         <div className="panel-heading"><strong><ScanSearch size={16}/> Windows accessibility</strong><button className="tool-button" title="Inspect windows" onClick={inspect} disabled={!!busy}><RefreshCw size={14}/></button></div>
         <p className="computer-help">Read top-level window names and basic UI Automation properties from Windows. This helps identify the app you intend to control; it does not inspect private content in the background.</p>
         <button className="secondary-button" onClick={inspect} disabled={!!busy}><Eye size={14}/>{busy === 'inspect' ? 'Inspecting…' : 'Inspect accessible windows'}</button>
-        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Control'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}
+        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Window'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}{accessibilityControls.length > 0 && <div className="computer-window-list computer-control-list"><strong className="computer-control-heading">Visible interactive controls · {accessibilityControls.length}</strong>{accessibilityControls.slice(0, 80).map((item, i) => <div key={i}><strong>{item.name || item.type || 'Unnamed control'}</strong><small>{item.type || 'Control'} · {item.enabled ? 'enabled' : 'disabled'} · {item.x},{item.y} · {item.width}×{item.height}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div>}
       </div>
     </div>
     {lastAction && <p className="computer-last-action"><CheckCircle2 size={15}/> Last approved action: {lastAction}</p>}
