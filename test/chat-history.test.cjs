@@ -17,6 +17,20 @@ test('rejects duplicate IDs, unsupported roles, and oversized history', () => {
   assert.throws(() => validateHistory([{ id: 'x', messages: [{ role: 'user', content: 'x'.repeat(17000) }] }]), /2 MB|message/i);
 });
 
+test('keeps the newest messages when the global history budget is exceeded', () => {
+  const conversations = Array.from({ length: 30 }, (_, index) => ({
+    id: 'chat_' + index,
+    title: 'Chat ' + index,
+    updatedAt: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString(),
+    messages: Array.from({ length: 80 }, (_, messageIndex) => ({ role: messageIndex % 2 ? 'assistant' : 'user', content: 'x'.repeat(16000) }))
+  }));
+  const result = validateHistory(conversations);
+  const totalChars = result.reduce((sum, item) => sum + item.messages.reduce((count, message) => count + message.content.length, 0), 0);
+  assert.ok(totalChars <= 2 * 1024 * 1024);
+  assert.equal(result[0].id, 'chat_29');
+  assert.ok(result[0].messages.length > 0);
+});
+
 test('accepts the versioned on-disk envelope', () => {
   assert.equal(validateHistory({ version: 1, conversations: [{ id: 'chat_1', messages: [] }] }).length, 1);
 });

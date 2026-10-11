@@ -68,6 +68,8 @@ function registerIpc() {
   handle('chat-history:load', async () => {
     const file = path.join(app.getPath('userData'), 'chat-history.json');
     try {
+      const stat = await fs.stat(file);
+      if (stat.size > 3 * 1024 * 1024) throw new Error('Chat history file exceeds the 3 MB on-disk safety limit.');
       const raw = JSON.parse(await fs.readFile(file, 'utf8'));
       return { ok: true, conversations: require('./chat-history.cjs').validateHistory(raw) };
     } catch (error) {

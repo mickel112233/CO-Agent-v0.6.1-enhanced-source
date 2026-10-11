@@ -10,7 +10,6 @@ function validateHistory(input) {
   const list = Array.isArray(input) ? input : input?.conversations;
   if (!Array.isArray(list)) throw new Error('Chat history must contain a conversations array.');
   if (list.length > MAX_CONVERSATIONS) throw new Error('Chat history exceeds the conversation limit.');
-  let total = 0;
   const seen = new Set();
   const safe = list.map((item) => {
     const id = String(item?.id || '');
@@ -21,15 +20,26 @@ function validateHistory(input) {
     const messages = item.messages.map((message) => {
       if (!['user', 'assistant'].includes(message?.role) || typeof message?.content !== 'string') throw new Error('Chat history contains an invalid message.');
       if (message.content.length > MAX_MESSAGE_CHARS) throw new Error('Chat history contains a message above the 16 KB limit.');
-      const content = message.content;
-      total += content.length;
-      if (total > MAX_TOTAL_CHARS) throw new Error('Chat history exceeds the 2 MB text limit.');
-      return { role: message.role, content };
+      return { role: message.role, content: message.content };
     });
     const date = new Date(item?.updatedAt);
     return { id, title, updatedAt: Number.isNaN(date.getTime()) ? new Date(0).toISOString() : date.toISOString(), messages };
+  }).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+
+  // Keep the newest chats and newest messages first when the global text budget is reached.
+  // This prevents one long-running session from making all future history saves fail.
+  let remaining = MAX_TOTAL_CHARS;
+  return safe.map(item => {
+    const kept = [];
+    for (let index = item.messages.length - 1; index >= 0 && remaining > 0; index--) {
+      const message = item.messages[index];
+      const content = message.content.length <= remaining ? message.content : message.content.slice(-remaining);
+      kept.unshift({ role: message.role, content });
+      remaining -= content.length;
+      if (content.length < message.content.length) break;
+    }
+    return { ...item, messages: kept };
   });
-  return safe.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
 module.exports = { validateHistory, MAX_CONVERSATIONS, MAX_MESSAGES_PER_CONVERSATION, MAX_MESSAGE_CHARS, MAX_TOTAL_CHARS };
