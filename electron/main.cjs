@@ -22,6 +22,7 @@ const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
+const activeChatRequests = new Map();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
   if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
@@ -36,7 +37,7 @@ function handle(channel, fn) {
   });
   registered.add(channel);
 }
-async function ollamaChat(payload = {}) {
+async function ollamaChat(payload = {}, requestSignal) {
   const status = await ollama.getOllamaStatus();
   if (!status.available) throw new Error('Ollama is not reachable at ' + status.baseUrl + '. Start Ollama and retry.');
   const model = ollama.validateModelName(payload.model || status.models?.[0]?.name);
@@ -51,7 +52,7 @@ async function ollamaChat(payload = {}) {
   const response = await fetch(status.baseUrl + '/api/chat', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model, stream: false, messages: chatMessages }),
-    signal: AbortSignal.timeout(180000)
+    signal: requestSignal ? AbortSignal.any([requestSignal, AbortSignal.timeout(180000)]) : AbortSignal.timeout(180000)
   });
   if (!response.ok) throw new Error('Ollama chat failed (' + response.status + '): ' + (await response.text()).slice(0, 1000));
   const data = await response.json();
@@ -125,12 +126,25 @@ function registerIpc() {
   });
   handle('runtime:ollama-pull', model => ollama.pullOllamaModel(model));
   handle('runtime:ollama-delete', model => ollama.deleteOllamaModel(model));
+  handle('runtime:chat-cancel', requestId => {
+    const controller = activeChatRequests.get(String(requestId || ''));
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort();
+    return { ok: true, cancelled: true };
+  });
   handle('runtime:chat', async payload => {
-    if ((payload?.provider || 'ollama') === 'ollama') return ollamaChat(payload);
-    const provider = payload.providerConfig;
-    if (!provider || !['openai','anthropic','gemini'].includes(provider.protocol)) throw new Error('Choose a supported API provider and configure its endpoint/model.');
-    const answer = await agentRuntime.readOnlySubagent(provider, payload.apiKey || '', { name: 'CO-Agent', instructions: 'Answer the user accurately and clearly.' }, { title: 'User conversation', prompt: (payload.messages || []).map(m => (m.role || 'user') + ': ' + (m.content || '')).join('\n').slice(-12000) });
-    return { ok: true, model: provider.model, message: answer };
+    const requestId = String(payload?.requestId || '');
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)) throw new Error('Chat request ID is missing or invalid.');
+    if (activeChatRequests.has(requestId)) throw new Error('A request with this ID is already running.');
+    const controller = new AbortController();
+    activeChatRequests.set(requestId, controller);
+    try {
+      if ((payload?.provider || 'ollama') === 'ollama') return await ollamaChat(payload, controller.signal);
+      const provider = payload.providerConfig;
+      if (!provider || !['openai','anthropic','gemini'].includes(provider.protocol)) throw new Error('Choose a supported API provider and configure its endpoint/model.');
+      const answer = await agentRuntime.readOnlySubagent(provider, payload.apiKey || '', { name: 'CO-Agent', instructions: 'Answer the user accurately and clearly.' }, { title: 'User conversation', prompt: (payload.messages || []).map(m => (m.role || 'user') + ': ' + (m.content || '')).join('\n').slice(-12000) }, fetch, controller.signal);
+      return { ok: true, model: provider.model, message: answer };
+    } finally { activeChatRequests.delete(requestId); }
   });
   handle('computer:allowed-apps', () => computer.allowedApps);
   handle('computer:launch-app', name => computer.launchApp(name));

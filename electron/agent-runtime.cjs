@@ -17,10 +17,10 @@ function validateProvider(provider, key) {
   return { ...provider, baseUrl: url.toString().replace(/\/+$/, ''), model: provider.model.trim() };
 }
 
-async function readOnlySubagent(provider, key, agent, task, fetchImpl = fetch) {
+async function readOnlySubagent(provider, key, agent, task, fetchImpl = fetch, requestSignal) {
   provider = validateProvider(provider, key);
   const { system, prompt } = makeMessages(agent, task);
-  const timeout = AbortSignal.timeout(180_000);
+  const timeout = requestSignal ? AbortSignal.any([requestSignal, AbortSignal.timeout(180_000)]) : AbortSignal.timeout(180_000);
   let endpoint, headers, body;
   if (provider.protocol === 'openai') {
     endpoint = /\/chat\/completions\/?$/.test(provider.baseUrl)
