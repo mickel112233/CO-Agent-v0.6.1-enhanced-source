@@ -70,8 +70,8 @@ test('computer-use actions reject missing approval and bound input', () => {
 });
 
 test('media path validation rejects control characters and invalid values', () => {
-  assert.throws(() => studio.validateMediaPath('clip.mp4\\nfile'), /control characters/i);
-  assert.throws(() => studio.validateMediaPath('clip.mp4\\tfile'), /control characters/i);
+  assert.throws(() => studio.validateMediaPath('clip.mp4\nfile'), /control characters/i);
+  assert.throws(() => studio.validateMediaPath('clip.mp4\tfile'), /control characters/i);
   assert.throws(() => studio.validateMediaPath(''), /required/i);
   assert.doesNotThrow(() => studio.validateMediaPath('clip.mp4'));
 });

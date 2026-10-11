@@ -10,7 +10,7 @@ try { ffprobePath = require('ffprobe-static').path; } catch {}
 
 function validateMediaPath(value, label = 'Media path') {
   if (typeof value !== 'string' || !value.trim()) throw new Error(label + ' is required.');
-  if (value.length > 32768 || /[\\x00-\\x1f\\x7f]/.test(value)) throw new Error(label + ' contains invalid control characters or is too long.');
+  if (value.length > 32768 || /[\x00-\x1f\x7f]/.test(value)) throw new Error(label + ' contains invalid control characters or is too long.');
   return path.resolve(value);
 }
 async function requireRegularFile(value, label = 'Media file') {
