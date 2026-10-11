@@ -51,6 +51,32 @@ test('Gemini child request uses a separate prompt without function declarations'
   assert.equal(Object.hasOwn(captured.body, 'tools'), false);
 });
 
+test('API requests can be cancelled through an AbortSignal', async () => {
+  const controller = new AbortController();
+  let signal;
+  let started;
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  const pending = readOnlySubagent(
+    { protocol: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', model: 'tiny-local' },
+    '',
+    agent,
+    task,
+    async (_url, init) => {
+      signal = init.signal;
+      started();
+      return new Promise((_resolve, reject) => {
+        if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      });
+    },
+    controller.signal
+  );
+  await requestStarted;
+  controller.abort();
+  await assert.rejects(pending, /aborted/i);
+  assert.equal(signal.aborted, true);
+});
+
 test('API provider configuration validates model, key, and secure endpoint', () => {
   const { validateProvider } = require('../electron/agent-runtime.cjs');
   assert.equal(validateProvider({ protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: ' gpt-4o-mini ' }, 'secret').model, 'gpt-4o-mini');
