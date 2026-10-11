@@ -72,15 +72,21 @@ async function resolveSafe(value, { allowMissing = false } = {}) {
 }
 async function listFiles(options = {}) {
   const root = getRoot();
-  const maxFiles = Math.max(1, Math.min(2000, Number(options.maxFiles) || 500));
+  const requestedMax = Number(options?.maxFiles);
+  const maxFiles = Number.isFinite(requestedMax) && requestedMax > 0
+    ? Math.max(1, Math.min(2000, Math.floor(requestedMax)))
+    : 500;
+  // Read one extra eligible file so "truncated" means files were actually omitted,
+  // not merely that the workspace happened to contain exactly maxFiles files.
+  const scanLimit = maxFiles + 1;
   const results = [];
   async function walk(directory, prefix = '') {
-    if (results.length >= maxFiles) return;
+    if (results.length >= scanLimit) return;
     let entries;
     try { entries = await fs.readdir(directory, { withFileTypes: true }); } catch { return; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (results.length >= maxFiles) break;
+      if (results.length >= scanLimit) break;
       if (entry.name.startsWith('.co-agent-backups') || IGNORED_DIRS.has(entry.name) || isBlockedName(entry.name)) continue;
       const relative = prefix ? prefix + '/' + entry.name : entry.name;
       const absolute = path.join(directory, entry.name);
@@ -92,7 +98,9 @@ async function listFiles(options = {}) {
     }
   }
   await walk(root);
-  return { ok: true, root, files: results, truncated: results.length >= maxFiles };
+  const truncated = results.length > maxFiles;
+  if (truncated) results.length = maxFiles;
+  return { ok: true, root, files: results, truncated };
 }
 async function readFile(relativePath) {
   const target = await resolveSafe(relativePath);

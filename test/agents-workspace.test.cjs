@@ -22,6 +22,24 @@ test('workspace only resolves relative paths within selected root', async () => 
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
 
+test('workspace listing only reports truncation when eligible files are omitted', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-listing-'));
+  try {
+    await workspace.setRoot(root);
+    await fs.writeFile(path.join(root, 'a.txt'), 'a', 'utf8');
+    await fs.writeFile(path.join(root, 'b.txt'), 'b', 'utf8');
+    const exact = await workspace.listFiles({ maxFiles: 2 });
+    assert.equal(exact.files.length, 2);
+    assert.equal(exact.truncated, false);
+    const limited = await workspace.listFiles({ maxFiles: 1 });
+    assert.equal(limited.files.length, 1);
+    assert.equal(limited.truncated, true);
+    const defaults = await workspace.listFiles(null);
+    assert.equal(defaults.files.length, 2);
+    assert.equal(defaults.truncated, false);
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
 test('workspace lists, reads, applies approved file proposals and backs up originals', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-workspace-'));
   try {
