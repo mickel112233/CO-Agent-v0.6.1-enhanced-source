@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     ollamaStatus: invoke('runtime:ollama-status'),
     ollamaModels: invoke('runtime:ollama-models'),
     pullModel: invoke('runtime:ollama-pull'),
+    onPullProgress: callback => subscribe('runtime:ollama-pull-progress', callback),
     deleteModel: invoke('runtime:ollama-delete'),
     chat: invoke('runtime:chat'),
     cancelChat: invoke('runtime:chat-cancel')

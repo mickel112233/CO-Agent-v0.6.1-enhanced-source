@@ -124,7 +124,9 @@ function registerIpc() {
     const status = await ollama.getOllamaStatus();
     return { available: status.available, models: status.models || [], error: status.error || null };
   });
-  handle('runtime:ollama-pull', model => ollama.pullOllamaModel(model));
+  handle('runtime:ollama-pull', model => ollama.pullOllamaModel(model, progress => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('runtime:ollama-pull-progress', progress);
+  }));
   handle('runtime:ollama-delete', model => ollama.deleteOllamaModel(model));
   handle('runtime:chat-cancel', requestId => {
     const controller = activeChatRequests.get(String(requestId || ''));
