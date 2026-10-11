@@ -23,8 +23,12 @@ function safeFilename(value, fallback) {
 function normalizeProject(project) {
   if (!project || typeof project !== 'object' || !Array.isArray(project.clips)) throw new Error('A project with a clips array is required.');
   if (project.clips.length > MAX_CLIPS) throw new Error('A project may contain at most ' + MAX_CLIPS + ' clips.');
+  const seenIds = new Set();
   const clips = project.clips.map((clip, index) => {
     if (!clip || !TYPES.has(clip.type)) throw new Error('Clip ' + index + ' has an unsupported type.');
+    const rawId = String(clip.id || ('clip-' + index)).slice(0, 100);
+    if (!rawId.trim() || seenIds.has(rawId)) throw new Error('Clip IDs must be non-empty and unique. Duplicate ID: ' + rawId);
+    seenIds.add(rawId);
     const timelineStart = number(clip.timelineStart ?? 0, 'Clip timeline start', 0, MAX_DURATION);
     const duration = number(clip.duration ?? 5, 'Clip duration', 0.05, MAX_DURATION);
     const sourceStart = number(clip.sourceStart ?? 0, 'Clip source start', 0, MAX_DURATION);
@@ -32,7 +36,7 @@ function normalizeProject(project) {
     const text = String(clip.text || '').slice(0, 500);
     const file = clip.type === 'caption' ? '' : path.resolve(String(clip.file || ''));
     if (clip.type !== 'caption' && (!clip.file || file.length > 2048)) throw new Error('Clip ' + index + ' requires a valid media file path.');
-    return { id: String(clip.id || ('clip-' + index)).slice(0, 100), type: clip.type, file, timelineStart, duration, sourceStart, text, track: String(clip.track || (clip.type === 'audio' ? 'Audio 1' : clip.type === 'caption' ? 'Titles' : 'Video 1')).slice(0, 80) };
+    return { id: rawId, type: clip.type, file, timelineStart, duration, sourceStart, text, track: String(clip.track || (clip.type === 'audio' ? 'Audio 1' : clip.type === 'caption' ? 'Titles' : 'Video 1')).slice(0, 80) };
   });
   return { version: 1, title: String(project.title || 'Untitled project').slice(0, 160), width: 1280, height: 720, fps: 30, clips };
 }

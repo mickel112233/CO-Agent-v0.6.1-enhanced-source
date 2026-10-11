@@ -16,6 +16,14 @@ test('timeline project normalization enforces supported clip types and bounds', 
   assert.equal(project.clips[0].timelineStart, 1);
   assert.equal(project.clips[1].text, 'Hello');
   assert.throws(() => timeline.normalizeProject({ clips: [{ type: 'shell', duration: 1 }] }), /unsupported type/);
+  assert.throws(() => timeline.normalizeProject({ clips: [
+    { id: 'same', type: 'caption', text: 'First' },
+    { id: 'same', type: 'caption', text: 'Second' }
+  ] }), /unique/i);
+  assert.throws(() => timeline.normalizeProject({ clips: [
+    { id: 'x'.repeat(100) + 'a', type: 'caption' },
+    { id: 'x'.repeat(100) + 'b', type: 'caption' }
+  ] }), /unique/i);
   assert.throws(() => timeline.normalizeProject({ clips: [{ type: 'caption', duration: 999999, text: 'x' }] }), /between/);
   assert.throws(() => timeline.normalizeProject({ clips: Array.from({ length: 121 }, () => ({ type: 'caption', duration: 1 })) }), /at most 120/);
 });
