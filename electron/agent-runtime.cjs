@@ -3,7 +3,22 @@ function makeMessages(agent, task) {
   return { system, prompt: String(task.prompt || '').slice(0, 6000) };
 }
 
+function validateProvider(provider, key) {
+  if (!provider || !['openai', 'anthropic', 'gemini'].includes(provider.protocol)) throw new Error('Choose a supported API provider protocol.');
+  if (typeof provider.model !== 'string' || !provider.model.trim() || provider.model.length > 200) throw new Error('Enter a valid provider model name (1–200 characters).');
+  if (typeof provider.baseUrl !== 'string' || !provider.baseUrl.trim() || provider.baseUrl.length > 2048) throw new Error('Enter a valid API base URL.');
+  let url;
+  try { url = new URL(provider.baseUrl); } catch { throw new Error('The API base URL is invalid.'); }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) throw new Error('API endpoints must use HTTPS (HTTP is allowed only for loopback local services).');
+  if (url.username || url.password || url.search || url.hash) throw new Error('API base URLs cannot contain credentials, query parameters, or fragments.');
+  if (provider.protocol !== 'openai' && (typeof key !== 'string' || !key.trim())) throw new Error('An API key is required for this provider.');
+  if (typeof key !== 'string' || key.length > 4096) throw new Error('API key is invalid or too long.');
+  return { ...provider, baseUrl: url.toString().replace(/\\/$/, ''), model: provider.model.trim() };
+}
+
 async function readOnlySubagent(provider, key, agent, task, fetchImpl = fetch) {
+  provider = validateProvider(provider, key);
   const { system, prompt } = makeMessages(agent, task);
   const timeout = AbortSignal.timeout(180_000);
   let endpoint, headers, body;
@@ -49,4 +64,4 @@ function allocateSubagentTasks(context, requested) {
   return selected;
 }
 
-module.exports = { readOnlySubagent, allocateSubagentTasks };
+module.exports = { readOnlySubagent, allocateSubagentTasks, validateProvider };

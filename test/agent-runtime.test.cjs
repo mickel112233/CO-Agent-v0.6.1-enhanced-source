@@ -50,3 +50,14 @@ test('Gemini child request uses a separate prompt without function declarations'
   assert.match(captured.url, /:generateContent\?key=secret$/);
   assert.equal(Object.hasOwn(captured.body, 'tools'), false);
 });
+
+test('API provider configuration validates model, key, and secure endpoint', () => {
+  const { validateProvider } = require('../electron/agent-runtime.cjs');
+  assert.equal(validateProvider({ protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: ' gpt-4o-mini ' }, 'secret').model, 'gpt-4o-mini');
+  assert.throws(() => validateProvider({ protocol: 'openai', baseUrl: 'http://example.com/v1', model: 'model' }, 'key'), /HTTPS/i);
+  assert.throws(() => validateProvider({ protocol: 'openai', baseUrl: 'https://user:pass@example.com/v1', model: 'model' }, 'key'), /credentials/i);
+  assert.throws(() => validateProvider({ protocol: 'openai', baseUrl: 'https://example.com/v1?token=x', model: 'model' }, 'key'), /query/i);
+  assert.throws(() => validateProvider({ protocol: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude' }, ''), /API key/i);
+  assert.throws(() => validateProvider({ protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: '' }, 'key'), /model name/i);
+  assert.doesNotThrow(() => validateProvider({ protocol: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local-model' }, ''));
+});
