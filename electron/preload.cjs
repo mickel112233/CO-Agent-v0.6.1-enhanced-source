@@ -9,6 +9,7 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('coAgent', Object.freeze({
   app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),
+  chatHistory: Object.freeze({ load: invoke('chat-history:load'), save: invoke('chat-history:save') }),
   agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step') }),
   workspace: Object.freeze({ getRoot: invoke('workspace:get-root'), chooseRoot: invoke('workspace:choose-root'), listFiles: invoke('workspace:list-files'), readFile: invoke('workspace:read-file'), applyChanges: invoke('workspace:apply-changes') }),
   terminal: Object.freeze({ listCommands: invoke('terminal:list-commands'), runCommand: invoke('terminal:run-command'), cancelCommand: invoke('terminal:cancel-command'), onOutput: callback => subscribe('terminal:output', callback) }),

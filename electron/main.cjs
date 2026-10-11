@@ -62,6 +62,25 @@ async function confirmComputerAction(message, detail) {
   return result.response === 1;
 }
 function registerIpc() {
+  handle('chat-history:load', async () => {
+    const file = path.join(app.getPath('userData'), 'chat-history.json');
+    try {
+      const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+      return { ok: true, conversations: require('./chat-history.cjs').validateHistory(raw) };
+    } catch (error) {
+      if (error?.code === 'ENOENT') return { ok: true, conversations: [] };
+      throw new Error('Chat history file is unreadable or invalid. You can keep chatting; move chat-history.json out of the app data folder to recover.');
+    }
+  });
+  handle('chat-history:save', async conversations => {
+    const safe = require('./chat-history.cjs').validateHistory(conversations);
+    const file = path.join(app.getPath('userData'), 'chat-history.json');
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const temp = file + '.tmp';
+    await fs.writeFile(temp, JSON.stringify({ version: 1, conversations: safe }), { encoding: 'utf8', mode: 0o600 });
+    await fs.rename(temp, file);
+    return { ok: true, count: safe.length };
+  });
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));

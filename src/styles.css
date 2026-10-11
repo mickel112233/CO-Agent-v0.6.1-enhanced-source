@@ -368,3 +368,13 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 .attachment-chip button{display:grid;place-items:center;width:19px;height:19px;flex-shrink:0;border:0;border-radius:5px;background:transparent;color:#7e8577;font-size:16px}
 .attachment-chip button:hover{background:#f0f2ec;color:#383d34}
 .attachment-strip>small{color:#8a9183;font-size:9px}
+
+/* Persisted conversation list */
+.conversation-history{display:flex;flex-direction:column;gap:3px;min-height:0;max-height:38vh;overflow-y:auto;margin-top:3px}
+.conversation-history .nav-label{margin:17px 9px 7px}
+.history-item{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:8px 9px;border:0;border-radius:8px;background:transparent;color:#73736b;text-align:left;font-size:11px}
+.history-item svg{flex-shrink:0;opacity:.75}
+.history-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history-item:hover,.history-item.active{background:#e5e7df;color:#30332c}
+.history-empty{padding:6px 10px;color:#9a9a91;font-size:10px;line-height:1.5}
+@media(max-width:620px){.conversation-history{max-height:30vh}.conversation-history .nav-label,.history-item span,.history-empty{display:none}.history-item{justify-content:center;padding:10px 0}.history-item svg{width:16px;height:16px}}
