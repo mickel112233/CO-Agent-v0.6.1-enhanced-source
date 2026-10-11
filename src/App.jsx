@@ -93,7 +93,7 @@ export default function App() {
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Bot size={19}/></span><span>CO-Agent</span><span className="version">0.6.1</span></div>
-      <button className="new-chat" title="Start a new conversation" aria-label="Start a new conversation" onClick={() => { setSection('Chat'); setMessages([]); setNotice(''); }}><Plus size={17}/> New chat</button>
+      <button className="new-chat" title="Start a new conversation" aria-label="Start a new conversation" onClick={() => { setSection('Chat'); setMessages([]); setAttachments([]); setNotice(''); }}><Plus size={17}/> New chat</button>
       <div className="nav-label">WORKSPACE</div>
       <button className={'nav-item ' + (section === 'Chat' ? 'active' : '')} title="Chat" aria-label="Chat" aria-current={section === 'Chat' ? 'page' : undefined} onClick={() => setSection('Chat')}><MessageSquare size={17}/> Chat</button>
       <button className={'nav-item ' + (section === 'Video Studio' ? 'active' : '')} title="Video Studio" aria-label="Video Studio" aria-current={section === 'Video Studio' ? 'page' : undefined} onClick={() => setSection('Video Studio')}><Video size={17}/> Video Studio</button>
