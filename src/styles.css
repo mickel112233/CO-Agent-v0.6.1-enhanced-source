@@ -408,3 +408,7 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 .agents-checkpoint>p{color:#777d70;font-size:11px;line-height:1.6}
 .agents-checkpoint .primary-button{margin-top:4px}
 .agents-status.review{background:#fff3d8;color:#8a6420}
+
+.integration-state.optional{color:#7f806f}
+.integration-state:has(svg){white-space:nowrap}
+.integration-note{overflow-wrap:anywhere}
