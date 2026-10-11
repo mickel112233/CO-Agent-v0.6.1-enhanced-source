@@ -14,7 +14,7 @@ test('reads bounded text attachments with safe display names', async () => {
     assert.equal(result.length, 1);
     assert.equal(result[0].name, 'notes.md');
     assert.match(result[0].content, /hello/);
-    assert.equal(result[0].size, Buffer.byteLength('# Notes\\nhello'));
+    assert.equal(result[0].size, Buffer.byteLength('# Notes\nhello'));
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
 
