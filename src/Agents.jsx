@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, BrainCircuit, CheckCircle2, Circle, FileCode2, FolderOpen, GitBranch, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Wrench, XCircle } from 'lucide-react';
+import { Activity, Bot, BrainCircuit, CheckCircle2, Circle, FileCode2, FolderOpen, Gauge, GitBranch, Layers, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Wrench, XCircle } from 'lucide-react';
 
 const desktop = window.coAgent;
 const STATUS = {
@@ -31,6 +31,9 @@ export default function Agents() {
   const [terminalLog, setTerminalLog] = useState([]);
   const [terminalStatus, setTerminalStatus] = useState('idle');
   const [terminalResult, setTerminalResult] = useState(null);
+  const [contextSearch, setContextSearch] = useState('');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [showAllAgents, setShowAllAgents] = useState(false);
   const terminalReceivedOutput = useRef(false);
 
   const refreshFiles = useCallback(async () => {
@@ -81,7 +84,12 @@ export default function Agents() {
     } catch {}
   }, [goal, workflow, results, selectedPaths, selectedExternalSkills]);
 
-  const doneCount = useMemo(() => (workflow?.pipeline || []).filter(step => step.status === 'done').length, [workflow]);
+  const pipeline = workflow?.pipeline || [];
+  const doneCount = useMemo(() => pipeline.filter(step => step.status === 'done').length, [pipeline]);
+  const runningCount = useMemo(() => pipeline.filter(step => step.status === 'running').length, [pipeline]);
+  const filteredFiles = useMemo(() => files.filter(file => file.path.toLowerCase().includes(contextSearch.trim().toLowerCase())), [files, contextSearch]);
+  const filteredAgents = useMemo(() => agentCatalog.agents.filter(agent => (agent.name + ' ' + agent.purpose).toLowerCase().includes(catalogSearch.trim().toLowerCase())), [agentCatalog.agents, catalogSearch]);
+  const filteredSkills = useMemo(() => agentCatalog.skills.filter(skill => (skill.name + ' ' + skill.category + ' ' + skill.description).toLowerCase().includes(catalogSearch.trim().toLowerCase())), [agentCatalog.skills, catalogSearch]);
   const chooseWorkspace = async () => {
     setBusy('workspace'); setNotice('');
     try {
@@ -188,8 +196,16 @@ export default function Agents() {
 
   return <section className="agents-view">
     <div className="agents-heading">
-      <div><p className="eyebrow">ORCHESTRATION · HARNESS · TOOLING</p><h1>Agent workspace</h1><p className="subhead">Plan a task, delegate specialist steps, inspect proposed changes, and run real project tests and builds with approval.</p></div>
+      <div><p className="eyebrow"><span className="agents-live-dot"/> YOUR AI ENGINEERING STUDIO</p><h1>Build with <span className="agents-heading-dot">CO-Agent.</span></h1><p className="subhead">Turn a goal into a reviewable workflow. Coordinate local AI specialists, inspect every proposed change, and verify real project builds.</p></div>
       <div className="agents-heading-mark"><BrainCircuit size={26}/><span>Local-first harness</span></div>
+    </div>
+
+    <div className="agents-metrics" aria-label="Workspace overview">
+      <div className="agents-metric"><span className="agents-metric-icon"><Layers size={16}/></span><div><strong>{pipeline.length}</strong><small>Workflow steps</small></div></div>
+      <div className="agents-metric"><span className="agents-metric-icon good"><CheckCircle2 size={16}/></span><div><strong>{doneCount}</strong><small>Completed</small></div></div>
+      <div className="agents-metric"><span className={'agents-metric-icon ' + (runningCount ? 'active' : '')}><Activity size={16}/></span><div><strong>{runningCount}</strong><small>Running now</small></div></div>
+      <div className="agents-metric"><span className="agents-metric-icon"><Gauge size={16}/></span><div><strong>{agentCatalog.agents.length}</strong><small>Specialists</small></div></div>
+      <div className="agents-metrics-tail"><span className="agents-live-dot"/> {workspaceRoot ? 'Workspace connected' : 'Choose a workspace to begin'}</div>
     </div>
 
     <div className="agents-safety"><ShieldCheck size={19}/><div><strong>You stay in control</strong><p>Agents propose plans and file changes. Applying files and running terminal commands require separate native confirmation. Model output is untrusted; nothing runs automatically.</p></div></div>
@@ -203,9 +219,15 @@ export default function Agents() {
     <div className="agents-grid">
       <div className="agents-main-column">
         <form className="agents-plan-card" onSubmit={createPlan}>
-          <div className="agents-card-heading"><span className="agents-icon"><Sparkles size={17}/></span><div><h2>Task brief</h2><p>Describe the outcome. The lead planner will build a dependency-aware pipeline.</p></div></div>
-          <textarea value={goal} onChange={event => setGoal(event.target.value)} placeholder="What should the agent team accomplish?" rows={4} maxLength={5000}/>
-          <div className="agents-plan-controls"><label>Local model<select value={model} onChange={event => setModel(event.target.value)}><option value="">Choose model</option>{models.map(item => <option key={item.name || item.model} value={item.name || item.model}>{item.name || item.model}</option>)}</select></label><button className="primary-button" disabled={!goal.trim() || !!busy || !model}><Sparkles size={14}/>{busy === 'plan' ? 'Planning…' : 'Create workflow'}</button></div>
+          <div className="agents-card-heading"><span className="agents-icon"><Sparkles size={17}/></span><div><h2>What are we building today?</h2><p>Start with a task or use a focused brief. The planner turns it into reviewable steps.</p></div><span className="agents-step-chip">PLAN · BUILD · VERIFY</span></div>
+          <div className="agents-prompt-chips" aria-label="Task starters">
+            <button type="button" onClick={() => setGoal('Inspect this project for bugs, reproduce likely failures, fix the root causes, and run relevant tests.')}> <ShieldCheck size={13}/> Find &amp; fix bugs</button>
+            <button type="button" onClick={() => setGoal('Audit the current interface and improve usability, accessibility, responsiveness, and visual consistency without breaking existing behavior.')}> <Sparkles size={13}/> Upgrade UI/UX</button>
+            <button type="button" onClick={() => setGoal('Profile the main code paths, identify measurable performance bottlenecks, make safe improvements, and run regression tests.')}> <Activity size={13}/> Improve performance</button>
+          </div>
+          <textarea value={goal} onChange={event => setGoal(event.target.value)} placeholder="Describe the outcome you want… Be specific about what ‘done’ looks like." rows={5} maxLength={5000} aria-label="Task brief" />
+          <div className="agents-prompt-foot"><span>{goal.length.toLocaleString()} / 5,000 characters</span><button type="button" className="text-link" disabled={!goal} onClick={() => setGoal('')}>Clear brief</button></div>
+          <div className="agents-plan-controls"><label><span className="agents-field-label">Planning model</span><select value={model} onChange={event => setModel(event.target.value)}><option value="">Choose model</option>{models.map(item => <option key={item.name || item.model} value={item.name || item.model}>{item.name || item.model}</option>)}</select></label><button className="primary-button agents-create-button" disabled={!goal.trim() || !!busy || !model}><Sparkles size={14}/>{busy === 'plan' ? 'Planning workflow…' : 'Create workflow'}<span aria-hidden="true">→</span></button></div>
           {!models.length && <p className="agents-inline-warning">Ollama is not available or no models are installed. Connect Ollama and choose a model in Models & settings.</p>}
         </form>
 
