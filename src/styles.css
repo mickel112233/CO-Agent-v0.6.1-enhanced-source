@@ -412,3 +412,7 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 .integration-state.optional{color:#7f806f}
 .integration-state:has(svg){white-space:nowrap}
 .integration-note{overflow-wrap:anywhere}
+
+/* Timeline undo and redo */
+.timeline-history-button{margin:0;padding:8px 10px;white-space:nowrap}
+.timeline-history-button:disabled{opacity:.42}

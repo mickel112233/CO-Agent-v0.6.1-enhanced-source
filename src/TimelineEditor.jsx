@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Film, Plus, Save, FolderOpen, Scissors, Trash2, ArrowLeft, ArrowRight, Music2, Image, Type, Video, Download, Clock3, Layers3 } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Film, Plus, Save, FolderOpen, Scissors, Trash2, ArrowLeft, ArrowRight, Music2, Image, Type, Video, Download, Clock3, Layers3, Undo2, Redo2 } from 'lucide-react';
 
 const desktop = window.coAgent;
 const TYPES = {
@@ -13,6 +13,9 @@ const newId = () => 'clip-' + Date.now().toString(36) + '-' + Math.random().toSt
 
 export default function TimelineEditor({ onBasic }) {
   const [project, setProject] = useState(initialProject);
+  const projectRef = useRef(project);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [playhead, setPlayhead] = useState(0);
   const [assets, setAssets] = useState([]);
@@ -25,7 +28,35 @@ export default function TimelineEditor({ onBasic }) {
   const duration = Math.max(10, ...project.clips.map(clip => clip.timelineStart + clip.duration));
   const orderedClips = useMemo(() => [...project.clips].sort((a, b) => a.timelineStart - b.timelineStart), [project.clips]);
   const tracks = ['Video 1', 'Video 2', 'Audio 1', 'Titles'];
-  const updateProject = updater => setProject(old => ({ ...old, clips: updater(old.clips) }));
+  const applyProject = nextOrUpdater => {
+    const previous = projectRef.current;
+    const next = typeof nextOrUpdater === 'function' ? nextOrUpdater(previous) : nextOrUpdater;
+    if (next === previous) return;
+    setUndoStack(old => [...old, previous].slice(-50));
+    setRedoStack([]);
+    projectRef.current = next;
+    setProject(next);
+  };
+  const undo = () => {
+    if (!undoStack.length) return;
+    const previous = undoStack[undoStack.length - 1];
+    setRedoStack(old => [...old, projectRef.current].slice(-50));
+    setUndoStack(old => old.slice(0, -1));
+    projectRef.current = previous;
+    setProject(previous);
+    if (selectedId && !previous.clips.some(clip => clip.id === selectedId)) setSelectedId('');
+    setNotice('Undo applied.');
+  };
+  const redo = () => {
+    if (!redoStack.length) return;
+    const next = redoStack[redoStack.length - 1];
+    setUndoStack(old => [...old, projectRef.current].slice(-50));
+    setRedoStack(old => old.slice(0, -1));
+    projectRef.current = next;
+    setProject(next);
+    setNotice('Redo applied.');
+  };
+  const updateProject = updater => applyProject(old => ({ ...old, clips: updater(old.clips) }));
   const patchClip = (id, patch) => updateProject(clips => clips.map(clip => clip.id === id ? { ...clip, ...patch } : clip));
 
   async function importAssets() {
@@ -83,7 +114,7 @@ export default function TimelineEditor({ onBasic }) {
       if (!picked?.length) return;
       const result = await desktop.studio.loadProject({ path: picked[0] });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Project load failed.');
-      setProject(result.project); setSelectedId(result.project.clips[0]?.id || ''); setAssets(old => [...new Set([...old, ...result.project.clips.filter(c => c.file).map(c => c.file)])]);
+      applyProject(result.project); setSelectedId(result.project.clips[0]?.id || ''); setAssets(old => [...new Set([...old, ...result.project.clips.filter(c => c.file).map(c => c.file)])]);
       setNotice('Loaded ' + result.project.title + ' (' + result.project.clips.length + ' clips).');
     } catch (error) { setNotice(error.message || String(error)); }
     finally { setBusy(''); }
@@ -104,7 +135,7 @@ export default function TimelineEditor({ onBasic }) {
 
   return <section className="timeline-editor-view">
     <div className="timeline-editor-heading"><div><p className="eyebrow">NON-LINEAR EDITING</p><h1>Video Studio</h1><p className="subhead">Arrange video, image, audio, and title clips across independent tracks. Save editable projects and render an MP4 locally with FFmpeg.</p></div><div className="timeline-heading-actions"><button className="secondary-button" onClick={onBasic}><Layers3 size={14}/> Basic tools</button><button className="secondary-button" onClick={loadProject} disabled={!!busy}><FolderOpen size={14}/> Open project</button><button className="primary-button" onClick={saveProject} disabled={!!busy}><Save size={14}/> Save project</button></div></div>
-    <div className="timeline-toolbar"><button className="secondary-button" onClick={importAssets} disabled={!!busy}><Plus size={14}/> Import media</button><label className="timeline-project-name">Project title<input value={project.title} onChange={e => setProject(old => ({ ...old, title: e.target.value }))}/></label><span className="timeline-duration"><Clock3 size={14}/> {duration.toFixed(1)}s timeline</span><span className="timeline-duration">{project.clips.length} clips</span></div>
+    <div className="timeline-toolbar"><button className="secondary-button" onClick={importAssets} disabled={!!busy}><Plus size={14}/> Import media</button><button className="secondary-button timeline-history-button" onClick={undo} disabled={!undoStack.length || !!busy} title="Undo last timeline edit"><Undo2 size={14}/> Undo</button><button className="secondary-button timeline-history-button" onClick={redo} disabled={!redoStack.length || !!busy} title="Redo timeline edit"><Redo2 size={14}/> Redo</button><label className="timeline-project-name">Project title<input value={project.title} onChange={e => applyProject(old => ({ ...old, title: e.target.value }))}/></label><span className="timeline-duration"><Clock3 size={14}/> {duration.toFixed(1)}s timeline</span><span className="timeline-duration">{project.clips.length} clips</span></div>
     <div className="timeline-workspace">
       <aside className="timeline-assets"><div className="panel-heading"><strong><FolderOpen size={15}/> Media assets</strong><span>{assets.length}</span></div>{assets.length ? assets.map(file => { const Icon = TYPES[inferType(file)]?.label === 'Audio' ? Music2 : TYPES[inferType(file)]?.label === 'Image' ? Image : Film; return <div className="timeline-asset" key={file}><Icon size={15}/><span title={file}>{baseName(file)}</span><button title="Add to timeline" onClick={() => addAsset(file)}><Plus size={14}/></button></div>; }) : <div className="timeline-asset-empty">Import video, audio, or image assets to begin.</div>}
         <div className="timeline-caption-add"><label>Title / caption<textarea value={captionText} onChange={e => setCaptionText(e.target.value)} maxLength={500}/></label><button className="secondary-button" onClick={addCaption} disabled={!captionText.trim()}><Type size={14}/> Add title at playhead</button></div>
