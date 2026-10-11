@@ -6,7 +6,8 @@ const STATUS = {
   queued: { label: 'Queued', icon: Circle },
   running: { label: 'Running', icon: LoaderCircle },
   done: { label: 'Done', icon: CheckCircle2 },
-  blocked: { label: 'Blocked', icon: XCircle }
+  blocked: { label: 'Blocked', icon: XCircle },
+  review: { label: 'Review checkpoint', icon: ShieldCheck }
 };
 const errorText = error => error?.message || String(error);
 const readSavedState = (key, fallback) => { try { const value = window.localStorage.getItem(key); return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
@@ -120,6 +121,20 @@ export default function Agents() {
     finally { setBusy(''); }
   };
 
+  const toggleCriterion = (stepId, index, checked) => {
+    setResults(old => ({ ...old, [stepId]: { ...old[stepId], reviewChecks: checked ? [...new Set([...(old[stepId]?.reviewChecks || []), index])] : (old[stepId]?.reviewChecks || []).filter(item => item !== index) } }));
+  };
+
+  const confirmCheckpoint = stepId => {
+    const step = workflow?.pipeline?.find(item => item.id === stepId);
+    if (!step || step.status !== 'review') return;
+    const checks = results[stepId]?.reviewChecks || [];
+    const criteria = step.acceptanceCriteria || [];
+    if (criteria.some((_, index) => !checks.includes(index))) { setNotice('Review and check every acceptance criterion before unlocking the next step.'); return; }
+    setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === stepId ? { ...item, status: 'done' } : item) }));
+    setNotice('Checkpoint confirmed for “' + step.title + '”. Dependent steps are now unlocked.');
+  };
+
   const runStep = async step => {
     if (!workflow || busy) return;
     const pendingDependencies = (step.dependsOn || []).filter(id => workflow.pipeline.find(item => item.id === id)?.status !== 'done');
@@ -151,10 +166,10 @@ export default function Agents() {
           return { ...file, originalContent: current?.ok ? current.content : '', isNew, originalUnavailable: !current?.ok && !isNew };
         }));
       }
-      setResults(old => ({ ...old, [step.id]: result }));
+      setResults(old => ({ ...old, [step.id]: { ...result, reviewChecks: [] } }));
       setActiveResult(step.id);
-      setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'done', result: result.summary } : item) }));
-      setNotice(step.title + ' completed. ' + (result.files?.length ? result.files.length + ' file proposal(s) await your review.' : 'No files were changed.'));
+      setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'review', result: result.summary } : item) }));
+      setNotice(step.title + ' produced a result. Review the output and check every acceptance criterion before the next dependent step can run. ' + (result.files?.length ? result.files.length + ' file proposal(s) await your review.' : 'No files were changed.'));
     } catch (error) {
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'blocked', result: errorText(error) } : item) }));
       setNotice(errorText(error));
@@ -233,7 +248,7 @@ export default function Agents() {
         </form>
 
         {workflow ? <div className="agents-pipeline-card">
-          <div className="agents-pipeline-title"><div><p className="eyebrow">ACTIVE WORKFLOW</p><h2>{workflow.title}</h2><p>{workflow.goal}</p></div><span className="agents-progress">{doneCount}/{workflow.pipeline.length} done</span></div>
+          <div className="agents-pipeline-title"><div><p className="eyebrow">ACTIVE WORKFLOW</p><h2>{workflow.title}</h2><p>{workflow.goal}</p></div><span className="agents-progress">{doneCount}/{workflow.pipeline.length} confirmed</span></div>
           <div className="agents-progress-track"><span style={{ width: (doneCount / Math.max(1, workflow.pipeline.length) * 100) + '%' }}/></div>
           <div className="agents-step-list">{workflow.pipeline.map((step, index) => {
             const status = STATUS[step.status] || STATUS.queued; const StatusIcon = status.icon;
@@ -246,6 +261,7 @@ export default function Agents() {
                 <p>{step.description}</p>
                 <div className="agents-step-meta"><span><Bot size={12}/>{step.role}</span><span><Wrench size={12}/>{step.skill}</span><span><ListChecks size={12}/>{step.acceptanceCriteria?.length || 0} criteria</span></div>
                 {step.dependsOn?.length > 0 && <small className="agents-dependencies">Depends on: {step.dependsOn.join(', ')}</small>}
+                {step.status === 'review' && result && <div className="agents-checkpoint"><strong><ShieldCheck size={14}/> Review checkpoint</strong>{step.acceptanceCriteria?.length ? <ul>{step.acceptanceCriteria.map((criterion, criterionIndex) => <li key={criterionIndex}><label><input type="checkbox" checked={(result.reviewChecks || []).includes(criterionIndex)} onChange={event => toggleCriterion(step.id, criterionIndex, event.target.checked)}/><span>{criterion}</span></label></li>)}</ul> : <p>Review the summary, findings, risks, and any proposed changes before confirming this step.</p>}<button className="primary-button" disabled={!!busy || (step.acceptanceCriteria || []).some((_, criterionIndex) => !(result.reviewChecks || []).includes(criterionIndex))} onClick={() => confirmCheckpoint(step.id)}><ShieldCheck size={13}/> Confirm checkpoint &amp; unlock next step</button></div>}
                 <div className="agents-step-actions">
                   <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
                   {result && <button className="text-link" onClick={() => setActiveResult(activeResult === step.id ? '' : step.id)}>{activeResult === step.id ? 'Hide result' : 'View result'}</button>}
@@ -264,7 +280,7 @@ export default function Agents() {
               </div>
             </article>;
           })}</div>
-          <div className="agents-pipeline-footer"><span><CheckCircle2 size={14}/>{doneCount} of {workflow.pipeline.length} steps completed</span><button className="text-link" onClick={() => {setWorkflow(null);setResults({});setActiveResult('');}}>Clear workflow</button></div>
+          <div className="agents-pipeline-footer"><span><CheckCircle2 size={14}/>{doneCount} of {workflow.pipeline.length} checkpoints confirmed</span><button className="text-link" onClick={() => {setWorkflow(null);setResults({});setActiveResult('');}}>Clear workflow</button></div>
         </div> : <div className="agents-empty-pipeline"><GitBranch size={25}/><strong>Your workflow pipeline appears here</strong><span>Create a task brief to get a plan, dependencies, specialist assignments, acceptance criteria, and step-by-step results.</span></div>}
 
         <div className="agents-terminal-card">

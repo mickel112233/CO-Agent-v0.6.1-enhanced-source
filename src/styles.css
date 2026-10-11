@@ -398,3 +398,13 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 .hardware-recommendation{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:10px 12px;border:1px solid #e4e8df;border-radius:9px;background:#fbfcf9;color:#656c5f;font-size:11px}
 .hardware-recommendation strong{color:#373d32}
 .hardware-recommendation .text-link{flex-shrink:0}
+
+/* Explicit agent execution checkpoints */
+.agents-checkpoint{margin-top:13px;padding:12px;border:1px solid #e4e8dc;border-radius:10px;background:#fafcf8}
+.agents-checkpoint>strong{display:flex;align-items:center;gap:6px;color:#46543f;font-size:11px}
+.agents-checkpoint>ul{display:flex;flex-direction:column;gap:8px;margin:10px 0;padding:0;list-style:none}
+.agents-checkpoint li label{display:flex;align-items:flex-start;gap:8px;color:#64695e;font-size:11px;line-height:1.5}
+.agents-checkpoint li input{margin:2px 0 0;accent-color:#708c60;flex-shrink:0}
+.agents-checkpoint>p{color:#777d70;font-size:11px;line-height:1.6}
+.agents-checkpoint .primary-button{margin-top:4px}
+.agents-status.review{background:#fff3d8;color:#8a6420}
