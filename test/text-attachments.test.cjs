@@ -9,7 +9,7 @@ test('reads bounded text attachments with safe display names', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-attachments-'));
   try {
     const file = path.join(dir, 'notes.md');
-    await fs.writeFile(file, '# Notes\\nhello', 'utf8');
+    await fs.writeFile(file, '# Notes\nhello', 'utf8');
     const result = await attachments.readTextAttachments([file]);
     assert.equal(result.length, 1);
     assert.equal(result[0].name, 'notes.md');
@@ -35,5 +35,5 @@ test('rejects unsupported, binary, oversized, and excessive text attachments', a
 });
 
 test('rejects control characters in selected paths', async () => {
-  await assert.rejects(() => attachments.readTextAttachments(['bad\\npath.txt']), /invalid/i);
+  await assert.rejects(() => attachments.readTextAttachments(['bad\npath.txt']), /invalid/i);
 });
