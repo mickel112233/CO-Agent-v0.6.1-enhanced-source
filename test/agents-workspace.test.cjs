@@ -89,12 +89,14 @@ test('workflow pipeline normalization maps dependencies and rejects unsafe plann
   const pipeline = agents.normalizePipeline([
     { id: 'discover', title: 'Inspect', role: 'researcher', skill: 'reviewer', dependsOn: [] },
     { id: 'implement', title: 'Implement', role: 'implementer', skill: 'implementer', dependsOn: ['discover'] },
-    { id: 'verify', title: 'Verify', role: 'tester', skill: 'test-engineer', dependsOn: ['implement', 'missing'] }
+    { id: 'verify', title: 'Verify', role: 'tester', skill: 'test-engineer', dependsOn: ['implement'] }
   ]);
   assert.deepEqual(pipeline[0].dependsOn, []);
   assert.deepEqual(pipeline[1].dependsOn, ['step-1']);
   assert.deepEqual(pipeline[2].dependsOn, ['step-2']);
   assert.throws(() => agents.normalizePipeline([{ role: 'shell', skill: 'planner' }, { role: 'tester', skill: 'test-engineer' }]), /unsupported role/i);
+  assert.throws(() => agents.normalizePipeline([{ id: 'a', role: 'planner', skill: 'planner' }, { id: 'b', role: 'tester', skill: 'test-engineer', dependsOn: ['missing'] }]), /unknown dependency/i);
+  assert.throws(() => agents.normalizePipeline([{ id: 'a', role: 'planner', skill: 'planner', dependsOn: ['b'] }, { id: 'b', role: 'tester', skill: 'test-engineer' }]), /earlier step/i);
   assert.throws(() => agents.normalizePipeline([{ role: 'planner', skill: 'planner' }]), /2–7 step workflow/i);
   assert.throws(() => agents.normalizePipeline([
     { id: 'same', role: 'planner', skill: 'planner' },

@@ -79,7 +79,15 @@ function normalizePipeline(rawPipeline){
  return rawPipeline.map((step,index)=>{
   if(!allowedRoles.has(step.role))throw new Error('Planner returned unsupported role on step '+(index+1)+'.');
   if(!allowedSkills.has(step.skill))throw new Error('Planner returned unsupported skill on step '+(index+1)+'.');
-  const dependencies=Array.isArray(step.dependsOn)?[...new Set(step.dependsOn.map(id=>sourceIdToIndex.get(String(id))).filter(depIndex=>Number.isInteger(depIndex)&&depIndex<index).map(depIndex=>'step-'+(depIndex+1)))].slice(0,6):[];
+  if(step.dependsOn != null && !Array.isArray(step.dependsOn))throw new Error('Workflow step dependencies must be an array.');
+  const requestedDependencies=Array.isArray(step.dependsOn)?[...new Set(step.dependsOn.map(String))]:[];
+  if(requestedDependencies.length>6)throw new Error('A workflow step may have at most 6 dependencies.');
+  const dependencies=requestedDependencies.map(id=>{
+   if(!sourceIdToIndex.has(id))throw new Error('Workflow step '+(index+1)+' references unknown dependency: '+id);
+   const dependencyIndex=sourceIdToIndex.get(id);
+   if(dependencyIndex>=index)throw new Error('Workflow dependencies must point to an earlier step; invalid dependency: '+id);
+   return 'step-'+(dependencyIndex+1);
+  });
   return {id:'step-'+(index+1),title:String(step.title||'Workflow step '+(index+1)).slice(0,100),role:step.role,skill:step.skill,description:String(step.description||'').slice(0,1800),deliverable:String(step.deliverable||'A concise result and next steps').slice(0,500),dependsOn:dependencies,acceptanceCriteria:Array.isArray(step.acceptanceCriteria)?step.acceptanceCriteria.slice(0,6).map(x=>String(x).slice(0,240)):[],requiresWorkspaceContext:step.requiresWorkspaceContext!==false,status:'queued',result:null};
  });
 }

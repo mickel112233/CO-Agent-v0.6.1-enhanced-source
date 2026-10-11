@@ -72,6 +72,42 @@ function run(binary, args) {
     child.on('close', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error('FFmpeg render failed (' + code + '): ' + stderr.slice(-2000))); });
   });
 }
+
+function validateExportMetadata(metadata, fileSize) {
+  if (!Number.isFinite(fileSize) || fileSize < 256) throw new Error('The export file is missing or unexpectedly small.');
+  const streams = Array.isArray(metadata?.streams) ? metadata.streams : [];
+  if (!streams.some(stream => stream?.codec_type === 'video')) throw new Error('The export contains no readable video stream.');
+  const duration = Number(metadata?.format?.duration);
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error('The export has no valid duration metadata.');
+  return { duration, hasAudio: streams.some(stream => stream?.codec_type === 'audio'), size: fileSize };
+}
+async function verifyRenderedOutput(output) {
+  const stat = await fs.stat(output).catch(() => null);
+  if (!stat?.isFile()) throw new Error('FFmpeg reported success, but the export file was not created.');
+  if (!ffprobePath) throw new Error('FFprobe is unavailable, so CO-Agent cannot verify the exported video.');
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffprobePath, ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', output], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '', settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error); else resolve(result);
+    };
+    const timer = setTimeout(() => { child.kill(); finish(new Error('Export verification timed out after 30 seconds.')); }, 30000);
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString();
+      if (stdout.length > 8 * 1024 * 1024) { child.kill(); finish(new Error('Export verification metadata exceeded the 8 MB limit.')); }
+    });
+    child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    child.on('error', error => finish(error));
+    child.on('close', code => {
+      if (code !== 0) return finish(new Error('FFprobe could not read the export: ' + stderr.slice(-1000)));
+      try { finish(null, validateExportMetadata(JSON.parse(stdout), stat.size)); }
+      catch (error) { finish(error); }
+    });
+  });
+}
 async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   const normalized = normalizeProject(project);
   const media = normalized.clips.filter(clip => clip.type !== 'caption').sort((a, b) => a.timelineStart - b.timelineStart || a.track.localeCompare(b.track));
@@ -126,6 +162,7 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   else args.push('-an');
   args.push('-movflags', '+faststart', output);
   await run(ffmpegPath, args);
-  return { ok: true, output, duration, clips: normalized.clips.length };
+  const verification = await verifyRenderedOutput(output);
+  return { ok: true, output, duration, clips: normalized.clips.length, verified: true, fileSize: verification.size, hasAudio: verification.hasAudio, verifiedDuration: verification.duration };
 }
-module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
+module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
