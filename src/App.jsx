@@ -56,7 +56,7 @@ export default function App() {
       if (result?.ok === false || result?.error) throw new Error(result.error || 'The AI request failed.');
       setMessages(old => [...old, { role: 'assistant', content: result.message || 'The model returned an empty response.' }]);
     } catch (error) {
-      const hint = chatProvider === 'ollama' ? '\\n\\nCheck that Ollama is running, a model is installed, and a model is selected in Settings.' : '\\n\\nCheck the provider, API endpoint, model name, and API key in Models & settings.';
+      const hint = chatProvider === 'ollama' ? '\n\nCheck that Ollama is running, a model is installed, and a model is selected in Settings.' : '\n\nCheck the provider, API endpoint, model name, and API key in Models & settings.';
       setMessages(old => [...old, { role: 'assistant', content: 'I could not complete that request. ' + (error.message || String(error)) + hint }]);
     } finally { setBusy(false); }
   };

@@ -14,7 +14,7 @@ function validateProvider(provider, key) {
   if (url.username || url.password || url.search || url.hash) throw new Error('API base URLs cannot contain credentials, query parameters, or fragments.');
   if (provider.protocol !== 'openai' && (typeof key !== 'string' || !key.trim())) throw new Error('An API key is required for this provider.');
   if (typeof key !== 'string' || key.length > 4096) throw new Error('API key is invalid or too long.');
-  return { ...provider, baseUrl: url.toString().replace(/\\/$/, ''), model: provider.model.trim() };
+  return { ...provider, baseUrl: url.toString().replace(/\/+$/, ''), model: provider.model.trim() };
 }
 
 async function readOnlySubagent(provider, key, agent, task, fetchImpl = fetch) {
