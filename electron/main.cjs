@@ -4,6 +4,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { isTrustedRendererUrl } = require('./security.cjs');
 const fs = require('node:fs/promises');
+const os = require('node:os');
 const ollama = require('./ollama.cjs');
 const computer = require('./computer.cjs');
 const computerUse = require('./computer-use.cjs');
@@ -88,6 +89,7 @@ function registerIpc() {
     await chatHistoryWriteQueue;
     return { ok: true, count: safe.length };
   });
+  handle('runtime:hardware-info', () => ({ ok: true, platform: process.platform, arch: process.arch, totalMemoryBytes: os.totalmem(), freeMemoryBytes: os.freemem(), logicalCpus: os.cpus().length }));
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));

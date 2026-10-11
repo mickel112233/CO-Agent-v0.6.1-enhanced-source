@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
   platform: process.platform,
   runtime: Object.freeze({
     ollamaStatus: invoke('runtime:ollama-status'),
+    hardwareInfo: invoke('runtime:hardware-info'),
     ollamaModels: invoke('runtime:ollama-models'),
     pullModel: invoke('runtime:ollama-pull'),
     onPullProgress: callback => subscribe('runtime:ollama-pull-progress', callback),
