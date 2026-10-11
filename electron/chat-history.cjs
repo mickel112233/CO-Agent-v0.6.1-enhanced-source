@@ -20,7 +20,8 @@ function validateHistory(input) {
     if (!Array.isArray(item?.messages) || item.messages.length > MAX_MESSAGES_PER_CONVERSATION) throw new Error('Chat history contains an invalid message list.');
     const messages = item.messages.map((message) => {
       if (!['user', 'assistant'].includes(message?.role) || typeof message?.content !== 'string') throw new Error('Chat history contains an invalid message.');
-      const content = message.content.slice(0, MAX_MESSAGE_CHARS);
+      if (message.content.length > MAX_MESSAGE_CHARS) throw new Error('Chat history contains a message above the 16 KB limit.');
+      const content = message.content;
       total += content.length;
       if (total > MAX_TOTAL_CHARS) throw new Error('Chat history exceeds the 2 MB text limit.');
       return { role: message.role, content };

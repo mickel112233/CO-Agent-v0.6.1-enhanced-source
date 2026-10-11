@@ -21,6 +21,7 @@ const textAttachments = require('./text-attachments.cjs');
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 const registered = new Set();
+let chatHistoryWriteQueue = Promise.resolve();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
   if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
@@ -75,10 +76,15 @@ function registerIpc() {
   handle('chat-history:save', async conversations => {
     const safe = require('./chat-history.cjs').validateHistory(conversations);
     const file = path.join(app.getPath('userData'), 'chat-history.json');
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    const temp = file + '.tmp';
-    await fs.writeFile(temp, JSON.stringify({ version: 1, conversations: safe }), { encoding: 'utf8', mode: 0o600 });
-    await fs.rename(temp, file);
+    chatHistoryWriteQueue = chatHistoryWriteQueue.catch(() => {}).then(async () => {
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      const temp = file + '.tmp-' + process.pid + '-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      try {
+        await fs.writeFile(temp, JSON.stringify({ version: 1, conversations: safe }), { encoding: 'utf8', mode: 0o600 });
+        await fs.rename(temp, file);
+      } finally { await fs.rm(temp, { force: true }).catch(() => {}); }
+    });
+    await chatHistoryWriteQueue;
     return { ok: true, count: safe.length };
   });
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
