@@ -13,6 +13,8 @@ test('workspace only resolves relative paths within selected root', async () => 
     assert.equal(workspace.safeRelativePath('src/App.jsx'), path.join('src', 'App.jsx'));
     assert.throws(() => workspace.safeRelativePath('../outside.txt'), /relative path|traversal/i);
     assert.throws(() => workspace.safeRelativePath('C:\\outside.txt'), /relative path/i);
+    assert.throws(() => workspace.safeRelativePath('src/hidden\\nconfirmation.txt'), /control characters/i);
+    assert.throws(() => workspace.safeRelativePath('src/hidden\\tfile.txt'), /control characters/i);
     assert.throws(() => workspace.safeRelativePath('.env'), /blocked/i);
     assert.throws(() => workspace.safeRelativePath('.env.development'), /blocked/i);
     assert.throws(() => workspace.safeRelativePath('private.pem'), /blocked/i);

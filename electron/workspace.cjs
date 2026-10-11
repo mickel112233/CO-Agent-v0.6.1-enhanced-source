@@ -44,7 +44,7 @@ async function setRoot(value) {
 }
 function safeRelativePath(value) {
   const input = String(value || '').replace(/\\/g, '/');
-  if (!input || input.length > 500 || input.startsWith('/') || /^[A-Za-z]:/.test(input) || input.includes('\0')) throw new Error('Use a relative path inside the selected workspace.');
+  if (!input || input.length > 500 || input.startsWith('/') || /^[A-Za-z]:/.test(input) || /[\x00-\x1f\x7f]/.test(input)) throw new Error('Use a relative path without control characters inside the selected workspace.');
   const parts = input.split('/');
   if (parts.some(part => !part || part === '.' || part === '..')) throw new Error('Path traversal is not allowed.');
   if (parts.some(part => IGNORED_DIRS.has(part) || isBlockedName(part))) throw new Error('This path is blocked from the agent workspace.');
