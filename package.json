@@ -71,10 +71,6 @@
           "**/*",
           "!**/.git/**"
         ]
-      },
-      {
-        "from": "integrations/AI-Desktop-Pet/src-tauri/target/release/AI-Desktop-Pet.exe",
-        "to": "pet/AI-Desktop-Pet.exe"
       }
     ]
   }
