@@ -55,12 +55,14 @@ test('failure can be retried only within bounded attempts', async t => {
 test('pause, resume, approval checkpoint, and cancellation are durable', async t => {
   const { file } = await fixture(t);
   const store = createStore(file);
-  const run = await store.create({ ...plan(), steps: [{ id: 'one', title: 'One' }] });
+  const run = await store.create({ ...plan(), steps: [{ id: 'one', title: 'One' }, { id: 'two', title: 'Two', dependsOn: ['one'] }] });
   await store.updateStep(run.id, 'one', 'start');
   await store.updateStep(run.id, 'one', 'awaiting-approval', { message: 'Review proposed change' });
   await assert.rejects(store.updateStep(run.id, 'one', 'complete', { result: 'done' }), /explicit user approval/i);
   await store.updateStep(run.id, 'one', 'complete', { approved: true, result: 'reviewed' });
-  await store.pause(run.id).catch(() => {});
+  await store.updateStep(run.id, 'two', 'start');
+  await store.pause(run.id);
+  await store.resume(run.id);
   assert.equal((await createStore(file).get(run.id)).steps[0].result, 'reviewed');
   const cancelled = await store.cancel(run.id);
   assert.equal(cancelled.status, 'cancelled');
