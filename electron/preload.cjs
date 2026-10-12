@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     installRepo: invoke('integrations:install-repo'),
     removeRepo: invoke('integrations:remove-repo')
   }),
+  pet: Object.freeze({ status: invoke('pet:status'), launch: invoke('pet:launch'), close: invoke('pet:close') }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
   dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), openTextFiles: invoke('dialog:open-text-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
 }));
