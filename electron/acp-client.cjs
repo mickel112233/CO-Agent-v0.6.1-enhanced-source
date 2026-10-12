@@ -9,7 +9,8 @@ const DEFAULT_TIMEOUT = 30000;
 
 function normalizeArgs(args) {
   if (args == null) args = [];
-  if (!Array.isArray(args) || args.length > 20 || args.some(arg => typeof arg !== 'string' || arg.length > 500 || arg.includes('\0'))) throw new Error('ACP executable arguments must be an array of at most 20 strings, each under 500 characters.');
+  if (!Array.isArray(args) || args.length > 20 || args.some(arg => typeof arg !== 'string' || arg.length > 16000 || arg.includes('\0'))) throw new Error('ACP executable arguments must be an array of at most 20 strings, each under 16,000 characters.');
+  if (args.reduce((total, arg) => total + Buffer.byteLength(arg, 'utf8'), 0) > 32000) throw new Error('Total ACP executable arguments cannot exceed 32 KB.');
   return args.slice();
 }
 function safeText(value, max = 2000) {
