@@ -31,3 +31,12 @@ npm run dev
 ```
 
 The app must not be described as fully restored or tested until the original modules are present and these checks pass.
+
+
+## 2026-10-12 implementation pass
+
+- Video Studio opens directly into the advanced timeline. The old “Basic tools” navigation is replaced by “Media tools”; no basic editing mode is presented.
+- The timeline editing area is redesigned as a natural-language creative assistant with example prompts and an explicit review/apply checkpoint. Proposed actions remain constrained and validated against the current project before application.
+- Empty planner action lists are now treated as a clarification response instead of an invalid plan.
+- LuxTTS is listed as an optional integration alongside the existing Piper compatibility entry. The LuxTTS setup/runtime still needs to be wired into the integration installer before claiming it is one-click.
+- Still outstanding: supplied pet archive asset integration and default packaged pet build, first-run Ollama/model/LuxTTS onboarding and re-entry on missing dependencies, repo-drop scanning/approval flow, and expanded automated UI/E2E verification. Do not describe those as complete.
