@@ -117,3 +117,14 @@ test('FFmpeg runner emits parsed progress and aborts a running child process', a
   controller.abort();
   await assert.rejects(pending, /cancelled by user/i);
 });
+
+
+test('accessibility targets require an exact window and unique semantic control identity', () => {
+  assert.deepEqual(computerUse.normalizeAccessibleTarget({
+    windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button'
+  }), { windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button' });
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ name: 'Display' }), /exact title/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings' }), /exact name or Automation ID/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', name: 'Display', controlType: 'Button' }), /control type is invalid/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', automationId: 'x'.repeat(301) }), /Automation ID/i);
+});
