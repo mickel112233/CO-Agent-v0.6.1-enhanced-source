@@ -194,10 +194,10 @@ function registerIpc() {
   handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
-  handle('pet:status', () => petRuntime.status());
+  handle('pet:status', () => petRuntime.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
   handle('pet:launch', async () => {
     if (!await confirmComputerAction('Launch the CO-Agent desktop pet?', 'This starts the separately built AI-Desktop-Pet desktop application. It receives no chat history or API keys from CO-Agent.')) throw new Error('Desktop pet launch cancelled by user.');
-    return petRuntime.launch();
+    return petRuntime.launch({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath });
   });
   handle('pet:close', () => petRuntime.stop());
   handle('luxtts:status', () => luxTTS.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
