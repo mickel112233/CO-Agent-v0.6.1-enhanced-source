@@ -11,6 +11,7 @@ const computerUse = require('./computer-use.cjs');
 const studio = require('./studio.cjs');
 const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
+const petRuntime = require('./pet-runtime.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const agentOrchestrator = require('./agent-orchestrator.cjs');
 const workspace = require('./workspace.cjs');
@@ -192,6 +193,12 @@ function registerIpc() {
   handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
+  handle('pet:status', () => petRuntime.status());
+  handle('pet:launch', async () => {
+    if (!await confirmComputerAction('Launch the CO-Agent desktop pet?', 'This starts the separately built AI-Desktop-Pet desktop application. It receives no chat history or API keys from CO-Agent.')) throw new Error('Desktop pet launch cancelled by user.');
+    return petRuntime.launch();
+  });
+  handle('pet:close', () => petRuntime.stop());
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-text-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
