@@ -129,7 +129,7 @@ export default function TimelineEditor({ onBasic }) {
         }
         if (action.type === 'add_caption') {
           const text = String(action.text || '').trim().slice(0, 500), start = Number(action.start), duration = Number(action.duration ?? 3);
-          if (!text || !Number.isFinite(start) || start < 0 || !Number.isFinite(duration) || duration <= 0 || duration > 600) throw new Error('The plan contains an invalid caption.');
+          if (!text || !Number.isFinite(start) || start < 0 || start > 86400 || !Number.isFinite(duration) || duration <= 0 || duration > 600) throw new Error('The plan contains an invalid caption.');
           return { type: action.type, text, start, duration };
         }
         const clip = projectRef.current.clips.find(item => item.id === action.clipId);
@@ -137,18 +137,20 @@ export default function TimelineEditor({ onBasic }) {
         if (action.type === 'move_clip') {
           const start = Number(action.start), track = String(action.track || '');
           if (!Number.isFinite(start) || start < 0 || start > 86400 || !tracksAllowed.includes(track)) throw new Error('The plan contains an invalid clip move.');
-          if (clip.type === 'audio' && !track.startsWith('Audio')) throw new Error('Audio clips can only move to audio tracks.');
+          if (clip.type === 'audio' && track !== 'Audio 1') throw new Error('Audio clips can only move to the Audio 1 track.');
           if (clip.type === 'caption' && track !== 'Titles') throw new Error('Title clips must remain on the Titles track.');
-          if (['video','image'].includes(clip.type) && track.startsWith('Audio')) throw new Error('Visual clips cannot move to audio tracks.');
+          if (['video','image'].includes(clip.type) && !['Video 1', 'Video 2'].includes(track)) throw new Error('Video and image clips can only move to video tracks.');
           return { type: action.type, clipId: clip.id, start, track };
         }
         if (action.type === 'set_duration') {
           const duration = Number(action.duration);
           if (!Number.isFinite(duration) || duration <= 0 || duration > 86400) throw new Error('The plan contains an invalid duration.');
+          if (clip.type === 'caption' && duration > 600) throw new Error('Title duration cannot exceed 600 seconds.');
           return { type: action.type, clipId: clip.id, duration };
         }
         if (action.type === 'set_source_start') {
           const sourceStart = Number(action.sourceStart);
+          if (clip.type === 'caption') throw new Error('Title clips do not have a media source to trim.');
           if (!Number.isFinite(sourceStart) || sourceStart < 0 || sourceStart > 86400) throw new Error('The plan contains an invalid source trim.');
           return { type: action.type, clipId: clip.id, sourceStart };
         }
@@ -160,12 +162,24 @@ export default function TimelineEditor({ onBasic }) {
         }
         throw new Error('Unsupported timeline action: ' + String(action.type));
       });
+      const removedIds = new Set(safe.filter(action => action.type === 'remove_clip').map(action => action.clipId));
+      if (safe.some(action => action.clipId && removedIds.has(action.clipId) && action.type !== 'remove_clip')) throw new Error('The plan edits a clip after removing it. Ask for a simpler plan and try again.');
+      const splitIds = safe.filter(action => action.type === 'split_clip').map(action => action.clipId);
+      if (new Set(splitIds).size !== splitIds.length) throw new Error('The plan splits the same clip more than once; review a simpler plan.');
       setEditPlan({ actions: safe, summary: String(parsed.summary || 'Review the proposed timeline edits below.').slice(0, 500) });
     } catch (error) { setNotice('Could not plan timeline edits: ' + (error.message || String(error))); }
     finally { setPlanningEdit(false); }
   }
   function applyTimelineEditPlan() {
     if (!editPlan) return;
+    // The timeline may have changed while the user reviewed the proposal. Refuse stale plans.
+    const currentIds = new Set(projectRef.current.clips.map(clip => clip.id));
+    const referencedIds = editPlan.actions.filter(action => action.clipId).map(action => action.clipId);
+    if (referencedIds.some(id => !currentIds.has(id))) {
+      setEditPlan(null);
+      setNotice('Timeline changed while the plan was open. The stale plan was discarded; generate a fresh plan.');
+      return;
+    }
     const idMap = new Map();
     const actions = editPlan.actions;
     updateProject(clips => {
