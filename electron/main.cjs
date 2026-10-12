@@ -208,6 +208,7 @@ function registerIpc() {
     });
   });
   handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
+  handle('luxtts:cancel', requestId => luxTTS.cancel(requestId));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-text-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
