@@ -27,7 +27,8 @@ test('pet status reports source-only state instead of pretending it is installed
 
 test('pet launcher uses an explicit executable, no shell, and prevents duplicate launches', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-pet-'));
-  const exe = path.join(dir, 'AI-Desktop-Pet.exe');
+  const exe = path.join(dir, 'pet', 'AI-Desktop-Pet.exe');
+  await fs.mkdir(path.dirname(exe), { recursive: true });
   await fs.writeFile(exe, 'test executable placeholder');
   const fake = new EventEmitter();
   fake.exitCode = null;
