@@ -84,3 +84,16 @@ test('media path validation rejects control characters and invalid values', () =
   assert.throws(() => studio.validateMediaPath(''), /required/i);
   assert.doesNotThrow(() => studio.validateMediaPath('clip.mp4'));
 });
+
+test('FFmpeg progress parser bounds progress and reports time accurately', () => {
+  assert.deepEqual(timeline.parseFfmpegProgress({ out_time: '00:00:05.000000', progress: 'continue' }, 10), {
+    seconds: 5, percent: 50, status: 'Rendering video…'
+  });
+  assert.equal(timeline.parseFfmpegProgress({ out_time_ms: '20000000', progress: 'continue' }, 10).percent, 99);
+  assert.equal(timeline.parseFfmpegProgress({ out_time: '00:00:10.000000', progress: 'end' }, 10).status, 'Finalizing export…');
+});
+
+test('export validation requires expected audio streams when audio clips were rendered', () => {
+  assert.throws(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }] }, 2048, 4, true), /missing its expected audio stream/i);
+  assert.doesNotThrow(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }, { codec_type: 'audio' }] }, 2048, 4, true));
+});

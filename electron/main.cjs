@@ -218,7 +218,8 @@ function registerIpc() {
   handle('studio:concat', args => studio.concat(args?.inputs, args?.outputDir, args?.filename));
   handle('studio:save-project', args => timeline.saveProject(args?.path, args?.project));
   handle('studio:load-project', args => timeline.loadProject(args?.path));
-  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename));
+  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename, { requestId: args?.requestId, onProgress: progress => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('studio:render-progress', { requestId: args?.requestId, ...progress }); } }));
+  handle('studio:cancel-render', requestId => timeline.cancelRender(requestId));
   handle('studio:ocr-status', () => ocr.getStatus());
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());

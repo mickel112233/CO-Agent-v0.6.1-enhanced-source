@@ -12,6 +12,7 @@ const MAX_CLIPS = 120;
 const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 const MAX_DURATION = 60 * 60;
 const TYPES = new Set(['video', 'audio', 'image', 'caption']);
+const activeRenders = new Map();
 function number(value, label, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < min || n > max) throw new Error(label + ' must be between ' + min + ' and ' + max + '.');
@@ -61,19 +62,55 @@ async function loadProject(filePath) {
 function escapeDrawtext(text) {
   return String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/%/g, '\\%').replace(/,/g, '\\,').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
 }
-function run(binary, args) {
+function parseFfmpegProgress(values, duration) {
+  const match = String(values.out_time || '').match(/^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)$/);
+  let seconds = match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : Number(values.out_time_ms) / 1000000;
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const total = Number(duration);
+  return { seconds, percent: Number.isFinite(total) && total > 0 ? Math.max(0, Math.min(99, Math.floor(seconds / total * 100))) : null, status: values.progress === 'end' ? 'Finalizing export…' : 'Rendering video…' };
+}
+function run(binary, args, options = {}) {
   if (!binary) return Promise.reject(new Error('FFmpeg is unavailable.'));
+  if (options.signal?.aborted) return Promise.reject(Object.assign(new Error('Timeline render cancelled by user.'), { name: 'AbortError', code: 'CANCELLED' }));
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-    let stderr = '';
-    const timer = setTimeout(() => { child.kill(); reject(new Error('Timeline render timed out after 30 minutes.')); }, 30 * 60 * 1000);
+    const child = spawn(binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '', buffer = '', values = {}, settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); options.signal?.removeEventListener('abort', abort);
+      if (error) reject(error); else resolve(result);
+    };
+    const abort = () => {
+      try { child.kill(); } catch {}
+      finish(Object.assign(new Error('Timeline render cancelled by user.'), { name: 'AbortError', code: 'CANCELLED' }));
+    };
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch {}
+      finish(new Error('Timeline render timed out after 30 minutes.'));
+    }, 30 * 60 * 1000);
+    options.signal?.addEventListener('abort', abort, { once: true });
+    child.stdout.on('data', chunk => {
+      buffer += chunk.toString();
+      if (buffer.length > 128 * 1024) buffer = buffer.slice(-64 * 1024);
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).trim(); buffer = buffer.slice(newline + 1);
+        const separator = line.indexOf('=');
+        if (separator < 1) continue;
+        values[line.slice(0, separator)] = line.slice(separator + 1);
+        if (line.startsWith('progress=')) {
+          try { options.onProgress?.(parseFfmpegProgress(values, options.duration)); } catch {}
+          values = {};
+        }
+      }
+    });
     child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-10000); });
-    child.on('error', error => { clearTimeout(timer); reject(error); });
-    child.on('close', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error('FFmpeg render failed (' + code + '): ' + stderr.slice(-2000))); });
+    child.on('error', error => finish(error));
+    child.on('close', code => code === 0 ? finish(null) : finish(new Error('FFmpeg render failed (' + code + '): ' + stderr.slice(-2000))));
   });
 }
 
-function validateExportMetadata(metadata, fileSize, expectedDuration) {
+function validateExportMetadata(metadata, fileSize, expectedDuration, expectedAudio = false) {
   if (!Number.isFinite(fileSize) || fileSize < 256) throw new Error('The export file is missing or unexpectedly small.');
   const streams = Array.isArray(metadata?.streams) ? metadata.streams : [];
   if (!streams.some(stream => stream?.codec_type === 'video')) throw new Error('The export contains no readable video stream.');
@@ -85,9 +122,11 @@ function validateExportMetadata(metadata, fileSize, expectedDuration) {
       throw new Error('The export appears truncated: expected about ' + expectedDuration.toFixed(2) + ' seconds, but FFprobe found ' + duration.toFixed(2) + ' seconds. Check source media and audio/video filters, then export again.');
     }
   }
-  return { duration, hasAudio: streams.some(stream => stream?.codec_type === 'audio'), size: fileSize };
+  const hasAudio = streams.some(stream => stream?.codec_type === 'audio');
+  if (expectedAudio && !hasAudio) throw new Error('The export is missing its expected audio stream. Check audio source files and export filters, then render again.');
+  return { duration, hasAudio, size: fileSize };
 }
-async function verifyRenderedOutput(output, expectedDuration) {
+async function verifyRenderedOutput(output, expectedDuration, expectedAudio = false) {
   const stat = await fs.stat(output).catch(() => null);
   if (!stat?.isFile()) throw new Error('FFmpeg reported success, but the export file was not created.');
   if (!ffprobePath) throw new Error('FFprobe is unavailable, so CO-Agent cannot verify the exported video.');
@@ -109,12 +148,12 @@ async function verifyRenderedOutput(output, expectedDuration) {
     child.on('error', error => finish(error));
     child.on('close', code => {
       if (code !== 0) return finish(new Error('FFprobe could not read the export: ' + stderr.slice(-1000)));
-      try { finish(null, validateExportMetadata(JSON.parse(stdout), stat.size, expectedDuration)); }
+      try { finish(null, validateExportMetadata(JSON.parse(stdout), stat.size, expectedDuration, expectedAudio)); }
       catch (error) { finish(error); }
     });
   });
 }
-async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
+async function render(project, outputDir, filename = 'co-agent-timeline.mp4', options = {}) {
   const normalized = normalizeProject(project);
   const media = normalized.clips.filter(clip => clip.type !== 'caption').sort((a, b) => a.timelineStart - b.timelineStart || a.track.localeCompare(b.track));
   for (const clip of media) await fs.access(clip.file);
@@ -122,6 +161,11 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   if (duration > MAX_DURATION) throw new Error('Project duration cannot exceed one hour.');
   const dir = await ensureDir(outputDir);
   const output = path.join(dir, safeFilename(filename, 'co-agent-timeline.mp4'));
+  const requestId = String(options.requestId || ('render-' + process.pid + '-' + Date.now()));
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)) throw new Error('Render request ID is invalid.');
+  if (activeRenders.has(requestId)) throw new Error('A render with this request ID is already running.');
+  const controller = new AbortController();
+  const tempOutput = path.join(dir, '.co-agent-render-' + requestId + '.mp4');
   const args = ['-y', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=30:d=' + duration];
   const clipInputIndex = new Map();
   for (const clip of media) {
@@ -166,9 +210,23 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   args.push('-t', String(duration), '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20');
   if (hasAudio) args.push('-c:a', 'aac', '-b:a', '192k');
   else args.push('-an');
-  args.push('-movflags', '+faststart', output);
-  await run(ffmpegPath, args);
-  const verification = await verifyRenderedOutput(output, duration);
-  return { ok: true, output, duration, clips: normalized.clips.length, verified: true, fileSize: verification.size, hasAudio: verification.hasAudio, verifiedDuration: verification.duration };
+  args.push('-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', tempOutput);
+  activeRenders.set(requestId, controller);
+  try {
+    await fs.rm(tempOutput, { force: true });
+    options.onProgress?.({ percent: 0, seconds: 0, status: 'Starting FFmpeg…' });
+    await run(ffmpegPath, args, { signal: controller.signal, onProgress: options.onProgress, duration });
+    const verification = await verifyRenderedOutput(tempOutput, duration, hasAudio);
+    await fs.rename(tempOutput, output);
+    options.onProgress?.({ percent: 100, seconds: verification.duration, status: 'Export verified' });
+    return { ok: true, requestId, output, duration, clips: normalized.clips.length, verified: true, fileSize: verification.size, hasAudio: verification.hasAudio, verifiedDuration: verification.duration };
+  } catch (error) { await fs.rm(tempOutput, { force: true }).catch(() => {}); throw error; }
+  finally { activeRenders.delete(requestId); }
 }
-module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
+function cancelRender(requestId) {
+  const controller = activeRenders.get(String(requestId || ''));
+  if (!controller) return { ok: true, cancelled: false };
+  controller.abort();
+  return { ok: true, cancelled: true };
+}
+module.exports = { normalizeProject, saveProject, loadProject, render, cancelRender, parseFfmpegProgress, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
