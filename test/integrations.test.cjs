@@ -50,3 +50,27 @@ test('installed repository skill text is only returned from managed imported rep
     assert.equal(capped.length, 0);
   } finally { await fs.rm(userData, { recursive: true, force: true }); }
 });
+
+test('repository skill reader ignores symlinked skill files', async (t) => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-skill-link-'));
+  const root = path.join(userData, 'extensions', 'linked-skill');
+  const outside = path.join(userData, 'outside.md');
+  await fs.mkdir(root, { recursive: true });
+  try {
+    await fs.writeFile(outside, '# Do not read\nprivate text');
+    await fs.writeFile(path.join(root, '.co-agent-source.json'), JSON.stringify({ url: 'https://github.com/example/linked-skill' }));
+    try {
+      await fs.symlink(outside, path.join(root, 'SKILL.md'), 'file');
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) {
+        t.skip('This environment does not permit creating symlinks.');
+        return;
+      }
+      throw error;
+    }
+    const result = await integrations.getSkillContents(['linked-skill'], userData);
+    assert.equal(result.length, 0);
+  } finally {
+    await fs.rm(userData, { recursive: true, force: true });
+  }
+});
