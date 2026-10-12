@@ -71,6 +71,10 @@
           "**/*",
           "!**/.git/**"
         ]
+      },
+      {
+        "from": "scripts/luxtts-worker.py",
+        "to": "scripts/luxtts-worker.py"
       }
     ]
   }
