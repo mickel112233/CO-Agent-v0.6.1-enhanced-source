@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-const EXE_NAME = 'AI-Desktop-Pet.exe';
+const EXE_NAME = 'convai-desktop-pet.exe';
 let child = null;
 let runningPath = '';
 
@@ -30,7 +30,7 @@ async function status(options = {}) {
 async function launch(options = {}) {
   if (child && child.exitCode === null) return { ok: true, alreadyRunning: true, executable: runningPath };
   const executable = await locatePetExecutable(options);
-  if (!executable) throw new Error('Desktop pet is not built yet. Build integrations/AI-Desktop-Pet with its documented Tauri 2 Windows toolchain, then package AI-Desktop-Pet.exe into resources/pet/.');
+  if (!executable) throw new Error('Desktop pet is not built yet. Build integrations/AI-Desktop-Pet with its documented Tauri 2 Windows toolchain, then place convai-desktop-pet.exe into resources/pet/ or the CO-Agent user-data runtime/pet folder.');
   const spawnProcess = options.spawn || spawn;
   return new Promise((resolve, reject) => {
     let settled = false;
