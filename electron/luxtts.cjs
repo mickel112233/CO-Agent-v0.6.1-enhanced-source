@@ -83,4 +83,43 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
   });
 }
-module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate };
+
+function runSetupCommand(file, args, options, onProgress) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...options });
+    let stderr = '', stdout = '', settled = false;
+    const timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS setup command timed out.')); }, 30 * 60 * 1000);
+    function finish(error, result) {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      error ? reject(error) : resolve(result);
+    }
+    proc.stdout.on('data', data => { const value = data.toString(); stdout = (stdout + value).slice(-12000); if (onProgress) onProgress(value.slice(-2000)); });
+    proc.stderr.on('data', data => { const value = data.toString(); stderr = (stderr + value).slice(-12000); if (onProgress) onProgress(value.slice(-2000)); });
+    proc.once('error', error => finish(error));
+    proc.once('close', code => code === 0 ? finish(null, { stdout, stderr }) : finish(new Error((stderr || stdout || 'Setup command failed with exit code ' + code).slice(-2000))));
+  });
+}
+async function setup({ pythonPath = '' } = {}, options = {}, onProgress = () => {}) {
+  const paths = runtimePaths(options);
+  const source = await firstDirectory(paths.sourceCandidates);
+  if (!source) throw new Error('Pinned LuxTTS source was not found. Reinstall CO-Agent with submodules, or restore third_party/LuxTTS.');
+  const requirements = path.join(source, 'requirements.txt');
+  if (!(await fs.stat(requirements).catch(() => null))?.isFile()) throw new Error('LuxTTS requirements.txt is missing from the source checkout.');
+  const userDataPath = options.userDataPath || path.join(os.homedir(), '.co-agent');
+  const venv = path.join(userDataPath, 'runtime', 'luxtts', 'venv');
+  const venvPython = path.join(venv, process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
+  const bootstrap = String(pythonPath || (process.platform === 'win32' ? 'py' : 'python3'));
+  const bootstrapArgs = !pythonPath && process.platform === 'win32' ? ['-3.11'] : [];
+  await fs.mkdir(path.dirname(venv), { recursive: true });
+  onProgress({ stage: 'venv', message: 'Creating managed Python environment…' });
+  await runSetupCommand(bootstrap, [...bootstrapArgs, '-m', 'venv', venv], {}, chunk => onProgress({ stage: 'venv', message: chunk }));
+  onProgress({ stage: 'dependencies', message: 'Installing LuxTTS dependencies. This can take a while and may download several gigabytes…' });
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {}, chunk => onProgress({ stage: 'dependencies', message: chunk }));
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source }, chunk => onProgress({ stage: 'dependencies', message: chunk }));
+  const result = await status({ ...options, userDataPath });
+  if (!result.installed) throw new Error('LuxTTS setup finished but runtime verification failed: ' + result.message);
+  return { ok: true, python: result.python, source: result.source, message: 'LuxTTS Python environment installed and verified. Model weights are downloaded on first generation.' };
+}
+
+module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup };
