@@ -7,12 +7,12 @@
 
 **Overall: 5.4/10 — a promising local-first desktop foundation, not yet a leading autonomous agent.**
 
-The strongest differentiator is the combination of local Ollama chat, a Windows-native computer-use approval surface, workspace file proposals, and a real FFmpeg timeline MVP in one desktop app. The biggest limitation is that these are separate, shallow workflows: agent steps are user-started, computer use is one approved action at a time, chat does not stream, and the video editor lacks many expected editing tools. The app should compete on privacy, understandable approvals, and creator/developer workflow integration—not on autonomy or breadth yet.
+The strongest differentiator is the combination of local Ollama chat, a Windows-native computer-use approval surface, workspace file proposals, and a real FFmpeg timeline MVP in one desktop app. The biggest limitation is that these are separate, shallow workflows: agent steps are user-started, computer use is one approved action at a time, chat now streams with cancellation and partial-response recovery, and the video editor lacks many expected editing tools. The app should compete on privacy, understandable approvals, and creator/developer workflow integration—not on autonomy or breadth yet.
 
 | Dimension | Score / 10 | Weight | Evidence and reasoning |
 |---|---:|---:|---|
 | Local-first privacy and control | 8.0 | 15% | Ollama runs locally; selected workspace context is bounded; skills are treated as untrusted; writes and desktop input require approval. Optional API providers necessarily send conversation text to the chosen provider. |
-| Chat and model flexibility | 7.0 | 12% | Ollama plus OpenAI-compatible, Anthropic, and Gemini API paths; provider requests now preserve user/assistant turn roles. Ollama responses are non-streaming; no built-in model installation or provider key vault. |
+| Chat and model flexibility | 7.0 | 12% | Ollama plus OpenAI-compatible, Anthropic, and Gemini API paths; provider requests now preserve user/assistant turn roles. Streaming local Ollama and API chat now preserves partial output on interruption; no built-in model installation or provider key vault. |
 | Agent planning and execution | 4.0 | 20% | Dependency-aware plans, specialist roles, review/test steps, bounded delegation primitives, and user-approved file proposals exist. Each workflow step is user-started; durable approved-plan run history, dependency checkpoints, pause/resume/cancel, approval checkpoints, and bounded retries are now implemented. No autonomous loop, parallel workers, patch-based edits, or automatic recovery loop. |
 | Desktop computer use | 4.5 | 12% | Windows screenshot, accessibility-window inspection, optional OCR, bounded plans, and approval-gated click/type/key actions. Not a continuous autonomous observe-act-verify loop; no semantic element actions or robust post-action verification. |
 | Video and creative workflows | 4.0 | 10% | Real multi-track timeline MVP, project save/load, captions/titles, FFmpeg export, and export-duration validation. Missing undo/redo, transitions, keyframes, effects, waveforms, audio routing, proxies, color grading, transcription, and render cancellation/progress. |
@@ -50,7 +50,7 @@ These are capability comparisons from public project/documentation pages, not a 
 
 ### P0 — make current features dependable
 
-1. **Streaming chat for local and API providers:** incremental rendering, Stop, bounded buffers, cancellation propagation, and partial-response error recovery.
+1. **Streaming chat for local and API providers:** incremental rendering, Stop, bounded buffers, cancellation propagation, and partial-response error recovery (implementation and regression tests added; validate fresh CI before treating as released).
 2. **Agent run state machine:** persist approved plans and step transitions, pause/resume/cancel, bounded retries, dependency checkpoints, and a capped event log. The run store is implemented; wire the Agents UI to it and validate crash recovery next.
 3. **Outcome verification:** every file operation should report changed paths and test results; computer actions should capture a fresh observation and check whether the intended state changed.
 4. **Security audit trail:** show exactly which files/context go to a provider, which process command runs, what permissions are requested, and why an action needs approval.
