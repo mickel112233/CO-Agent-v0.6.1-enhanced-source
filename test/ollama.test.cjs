@@ -68,3 +68,21 @@ test('model pull supports cancellation while the progress stream is open', async
     await assert.rejects(pending, /cancelled/i);
   });
 });
+
+
+test('model pull times out when Ollama never responds', async () => {
+  await withServer((req, res) => {
+    if (req.url === '/api/pull') {
+      // Deliberately never send headers or a body; the client must time out.
+      req.on('close', () => { if (!res.destroyed) res.destroy(); });
+      return;
+    }
+    res.statusCode = 404;
+    res.end();
+  }, async base => {
+    await assert.rejects(
+      pullOllamaModel('qwen3.5:2b', () => {}, base, fetch, { timeoutMs: 1000 }),
+      /timed out/i
+    );
+  });
+});
