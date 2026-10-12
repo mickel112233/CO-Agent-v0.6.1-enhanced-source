@@ -7,10 +7,11 @@ const EXE_NAME = 'AI-Desktop-Pet.exe';
 let child = null;
 let runningPath = '';
 
-function candidates({ resourcesPath = process.resourcesPath, appPath = process.cwd(), platform = process.platform } = {}) {
+function candidates({ resourcesPath = process.resourcesPath, appPath = process.cwd(), userDataPath = '', platform = process.platform } = {}) {
   if (platform !== 'win32') return [];
   const result = [];
   if (resourcesPath) result.push(path.join(resourcesPath, 'pet', EXE_NAME));
+  if (userDataPath) result.push(path.join(userDataPath, 'runtime', 'pet', EXE_NAME));
   result.push(path.join(appPath, 'integrations', 'AI-Desktop-Pet', 'src-tauri', 'target', 'release', EXE_NAME));
   result.push(path.join(appPath, 'runtime', 'pet', EXE_NAME));
   return [...new Set(result.map(value => path.resolve(value)))];
