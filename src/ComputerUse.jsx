@@ -62,7 +62,9 @@ export default function ComputerUse() {
     const payload = action.type === 'click' ? { x: Math.round(action.x * (current.bounds?.width || current.width) / current.width), y: Math.round(action.y * (current.bounds?.height || current.height) / current.height), displayId: current.displayId } : action.type === 'type' ? { text: action.text } : { key: action.key };
     const summary = action.type === 'click' ? 'Click at screenshot coordinates ' + action.x + ', ' + action.y : action.type === 'type' ? 'Type suggested text: ' + action.text : 'Press suggested key: ' + action.key;
     const success = await perform(action.type, payload, summary + '. Reason: ' + action.reason);
-    if (success) { setPlan(old => old.filter(item => item.id !== action.id)); setNotice('Approved step executed. Capture the screen and re-plan if the UI changed.'); }
+    // The desktop may have changed after this action, so never keep executing
+    // coordinates from a plan grounded in the previous screenshot.
+    if (success) setPlan([]);
   }
 
   async function inspect() {
@@ -84,7 +86,24 @@ export default function ComputerUse() {
       const result = await method({ ...payload, approved: true });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Action failed.');
       setLastAction(description);
-      setNotice('Action sent. Capture the screen again to verify the result.');
+      // Re-observe after every input. A successful SendInput call proves only
+      // that input was dispatched; the new capture is evidence for the user
+      // to inspect, not a claim that the intended task succeeded.
+      await new Promise(resolve => setTimeout(resolve, 650));
+      const after = await desktop?.computerUse?.captureScreen();
+      if (!Array.isArray(after) || after.length === 0) {
+        setNotice('Action was sent, but CO-Agent could not recapture the desktop. Inspect the screen manually before continuing.');
+        return true;
+      }
+      const previousDisplayId = current?.displayId;
+      const afterIndex = Math.max(0, after.findIndex(item => item.displayId === previousDisplayId));
+      const observed = after[afterIndex] || after[0];
+      const changed = !!current && observed.dataUrl !== current.dataUrl;
+      setScreens(after);
+      setScreenIndex(afterIndex);
+      setNotice(changed
+        ? 'Fresh screenshot captured; visible pixels changed. Review the updated screen to confirm the intended result before planning another action.'
+        : 'Fresh screenshot captured, but no visible change was detected. Check the focused app and target before trying again.');
       return true;
     } catch (error) { setNotice(error.message || String(error)); }
     finally { setBusy(''); }
