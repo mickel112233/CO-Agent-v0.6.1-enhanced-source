@@ -119,3 +119,13 @@ test('built-in agent harness provides multiple specialist roles and skills', () 
   assert.deepEqual(extended[1].dependsOn, ['step-1']);
   assert.deepEqual(agents.parseJson('{"ok":true}'), { ok: true });
 });
+
+
+test('agent file proposals require grounded context and enforce workspace safety limits', () => {
+  assert.deepEqual(agents.validateFileProposals([], []), []);
+  assert.throws(() => agents.validateFileProposals([{ path: 'src/app.js', content: 'proposed' }], []), /without selected workspace context/i);
+  assert.deepEqual(agents.validateFileProposals([{ path: 'src/app.js', content: 'proposed' }], [{ path: 'src/app.js', content: 'existing' }]), [{ path: 'src/app.js', content: 'proposed' }]);
+  assert.throws(() => agents.validateFileProposals([{ path: '../outside.js', content: 'unsafe' }], [{ path: 'README.md', content: 'context' }]), /relative path|traversal/i);
+  assert.throws(() => agents.validateFileProposals([{ path: '.env', content: 'SECRET=x' }], [{ path: 'README.md', content: 'context' }]), /blocked/i);
+  assert.throws(() => agents.validateFileProposals([{ path: 'large.txt', content: 'x'.repeat(workspace.MAX_FILE_BYTES + 1) }], [{ path: 'README.md', content: 'context' }]), /120 KB/i);
+});
