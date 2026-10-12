@@ -169,7 +169,13 @@ function createStore(filePath, options = {}) {
       } else if (action === 'complete') {
         if (step.status !== 'running' && step.status !== 'awaiting-approval') throw new Error('Only a running or approved step can be completed.');
         if (step.status === 'awaiting-approval' && payload.approved !== true) throw new Error('Explicit user approval is required to complete this gated step.');
-        step.status = 'completed'; step.result = cleanText(payload.result, MAX_RESULT_CHARS); step.error = '';
+        if (step.acceptanceCriteria.length) {
+          const checks = Array.isArray(payload.acceptanceChecks) ? [...new Set(payload.acceptanceChecks.filter(index => Number.isInteger(index) && index >= 0 && index < step.acceptanceCriteria.length))] : [];
+          if (checks.length !== step.acceptanceCriteria.length) throw new Error('Every acceptance criterion must be explicitly reviewed before completing this step.');
+        }
+        const resultText = cleanText(payload.result, MAX_RESULT_CHARS).trim();
+        if (!resultText) throw new Error('A step needs a recorded result before it can be completed.');
+        step.status = 'completed'; step.result = resultText; step.error = '';
         event(run, 'step-completed', cleanText(payload.message || 'Step marked complete; verify the deliverable before continuing.', 800), step.id);
         if (run.steps.every(item => item.status === 'completed')) { run.status = 'completed'; run.currentStepId = null; event(run, 'run-completed', 'All workflow steps are marked complete.'); }
         else { run.status = 'ready'; run.currentStepId = null; }

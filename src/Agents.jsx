@@ -175,7 +175,7 @@ export default function Agents() {
     const checks = results[stepId]?.reviewChecks || [];
     const criteria = step.acceptanceCriteria || [];
     if (criteria.some((_, index) => !checks.includes(index))) { setNotice('Review and check every acceptance criterion before unlocking the next step.'); return; }
-    try { await syncRunStep(stepId, 'complete', { approved: true, result: JSON.stringify(results[stepId] || {}).slice(0, 5000), message: 'Acceptance criteria reviewed and confirmed by the user.' }); }
+    try { await syncRunStep(stepId, 'complete', { approved: true, acceptanceChecks: checks, result: JSON.stringify(results[stepId] || {}).slice(0, 5000), message: 'Acceptance criteria reviewed and confirmed by the user.' }); }
     catch (error) { setNotice(errorText(error)); return; }
     setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === stepId ? { ...item, status: 'done' } : item) }));
     setNotice('Checkpoint confirmed for “' + step.title + '”. Dependent steps are now unlocked.');

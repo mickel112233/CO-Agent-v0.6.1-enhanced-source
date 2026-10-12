@@ -118,3 +118,21 @@ test('startup recovery retries if persisting recovery state fails once', async t
   assert.equal(recovered[0].steps[0].status, 'failed');
   assert.ok(recovered[0].events.some(event => event.type === 'run-recovered'));
 });
+
+
+test('completion requires a non-empty result and every declared acceptance criterion', async t => {
+  const { file } = await fixture(t);
+  const store = createStore(file);
+  const run = await store.create({ ...plan(), steps: [{
+    id: 'verify', title: 'Verify', acceptanceCriteria: ['Build passes', 'Smoke test passes']
+  }] });
+  await store.updateStep(run.id, 'verify', 'start');
+  await assert.rejects(store.updateStep(run.id, 'verify', 'complete', { result: 'ok' }), /every acceptance criterion/i);
+  await assert.rejects(store.updateStep(run.id, 'verify', 'complete', { acceptanceChecks: [0, 1], result: '   ' }), /recorded result/i);
+  await assert.rejects(store.updateStep(run.id, 'verify', 'complete', { acceptanceChecks: [0, 0], result: 'ok' }), /every acceptance criterion/i);
+  const completed = await store.updateStep(run.id, 'verify', 'complete', {
+    acceptanceChecks: [0, 1], result: 'Build passed; smoke test passed.'
+  });
+  assert.equal(completed.status, 'completed');
+  assert.equal(completed.steps[0].status, 'completed');
+});
