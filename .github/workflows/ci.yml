@@ -29,6 +29,25 @@ jobs:
         run: npm test
       - name: Build renderer
         run: npm run build
+      - name: Set up Rust toolchain for desktop pet
+        if: runner.os == 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install desktop pet frontend dependencies
+        if: runner.os == 'Windows'
+        run: npm ci --prefix integrations/AI-Desktop-Pet
+      - name: Build desktop pet frontend
+        if: runner.os == 'Windows'
+        run: npm run build --prefix integrations/AI-Desktop-Pet
+      - name: Build desktop pet Windows executable
+        if: runner.os == 'Windows'
+        run: cargo build --release --manifest-path integrations/AI-Desktop-Pet/src-tauri/Cargo.toml
+      - name: Verify desktop pet executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $pet = 'integrations/AI-Desktop-Pet/src-tauri/target/release/convai-desktop-pet.exe'
+          if (-not (Test-Path $pet -PathType Leaf)) { throw "Desktop pet executable was not built: $pet" }
+          Get-Item $pet | Format-Table Name, Length
       - name: Package Windows installer and ZIP
         if: runner.os == 'Windows'
         run: npx electron-builder --win nsis zip --x64 --publish never
