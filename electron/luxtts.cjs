@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process');
 const MODEL_ID = 'YatharthS/LuxTTS';
 const MAX_TEXT_LENGTH = 12000;
 const MAX_TIMEOUT_MS = 15 * 60 * 1000;
+const activeJobs = new Map();
 function runtimePaths({ appPath = process.cwd(), userDataPath = path.join(os.homedir(), '.co-agent'), resourcesPath = process.resourcesPath, platform = process.platform } = {}) {
   const pythonName = platform === 'win32' ? 'python.exe' : 'python';
   const sourceCandidates = [
@@ -47,7 +48,7 @@ async function status(options = {}) {
       : 'LuxTTS is not provisioned yet. CO-Agent needs its managed Python environment, pinned LuxTTS source, and worker script.'
   };
 }
-async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed = 1, timeoutMs = MAX_TIMEOUT_MS } = {}, options = {}) {
+async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed = 1, timeoutMs = MAX_TIMEOUT_MS, requestId = '' } = {}, options = {}) {
   const input = String(text || '').trim();
   if (!input) throw new Error('Enter text to synthesize.');
   if (input.length > MAX_TEXT_LENGTH) throw new Error('LuxTTS text exceeds the 12,000 character limit.');
@@ -63,10 +64,14 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   await fs.mkdir(path.dirname(output), { recursive: true });
   const runtime = await status(options);
   if (!runtime.installed) throw new Error(runtime.message);
+  const jobId = String(requestId || '');
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS request ID is missing or invalid.');
+  if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
   return new Promise((resolve, reject) => {
     const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', settled = false, timer;
-    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
+    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
+    activeJobs.set(jobId, proc);
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
     proc.stdout.on('data', chunk => { stdout = (stdout + chunk.toString()).slice(-100000); });
     proc.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8000); });
@@ -82,6 +87,14 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     });
     proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
   });
+}
+
+function cancel(requestId) {
+  const id = String(requestId || '');
+  const proc = activeJobs.get(id);
+  if (!proc) return { ok: true, cancelled: false };
+  try { proc.kill(); return { ok: true, cancelled: true }; }
+  catch (error) { return { ok: false, cancelled: false, error: String(error.message || error) }; }
 }
 
 function runSetupCommand(file, args, options, onProgress) {
@@ -122,4 +135,4 @@ async function setup({ pythonPath = '' } = {}, options = {}, onProgress = () => 
   return { ok: true, python: result.python, source: result.source, message: 'LuxTTS Python environment installed and verified. Model weights are downloaded on first generation.' };
 }
 
-module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup };
+module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup, cancel };
