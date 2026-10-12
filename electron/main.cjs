@@ -29,6 +29,7 @@ const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
 const activeAcpRuns = new Map();
+const activeAgentSteps = new Map();
 const activeModelPulls = new Map();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
@@ -105,7 +106,18 @@ function registerIpc() {
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));
-  handle('agents:run-step', payload => agentOrchestrator.runWorkflowStep(payload));
+  handle('agents:run-step', async payload => {
+    const requestId = String(payload?.requestId || ('agent-step-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)));
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId) || activeAgentSteps.has(requestId)) throw new Error('Agent step request ID is invalid or already active.');
+    const controller = new AbortController(); activeAgentSteps.set(requestId, controller);
+    try { return await agentOrchestrator.runWorkflowStep({ ...payload, signal: controller.signal }); }
+    finally { activeAgentSteps.delete(requestId); }
+  });
+  handle('agents:cancel-step', requestId => {
+    const controller = activeAgentSteps.get(String(requestId || ''));
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort(); return { ok: true, cancelled: true };
+  });
   let workflowRunStore;
   const runs = () => workflowRunStore || (workflowRunStore = executionStore.createStore(path.join(app.getPath('userData'), 'workflow-runs.json')));
   handle('agents:runs:list', async () => ({ ok: true, runs: await (await runs()).list() }));

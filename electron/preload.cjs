@@ -10,7 +10,7 @@ const subscribe = (channel, callback) => {
 contextBridge.exposeInMainWorld('coAgent', Object.freeze({
   app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),
   chatHistory: Object.freeze({ load: invoke('chat-history:load'), save: invoke('chat-history:save') }),
-  agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step'), listRuns: invoke('agents:runs:list'), createRun: invoke('agents:runs:create'), updateRunStep: invoke('agents:runs:update-step'), pauseRun: invoke('agents:runs:pause'), resumeRun: invoke('agents:runs:resume'), cancelRun: invoke('agents:runs:cancel') }),
+  agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step'), cancelStep: invoke('agents:cancel-step'), listRuns: invoke('agents:runs:list'), createRun: invoke('agents:runs:create'), updateRunStep: invoke('agents:runs:update-step'), pauseRun: invoke('agents:runs:pause'), resumeRun: invoke('agents:runs:resume'), cancelRun: invoke('agents:runs:cancel') }),
   workspace: Object.freeze({ getRoot: invoke('workspace:get-root'), chooseRoot: invoke('workspace:choose-root'), listFiles: invoke('workspace:list-files'), readFile: invoke('workspace:read-file'), previewChanges: invoke('workspace:preview-changes'), applyChanges: invoke('workspace:apply-changes') }),
   terminal: Object.freeze({ listCommands: invoke('terminal:list-commands'), runCommand: invoke('terminal:run-command'), cancelCommand: invoke('terminal:cancel-command'), onOutput: callback => subscribe('terminal:output', callback) }),
   platform: process.platform,

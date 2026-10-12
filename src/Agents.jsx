@@ -23,6 +23,8 @@ export default function Agents() {
   const [importedRepos, setImportedRepos] = useState([]);
   const [selectedExternalSkills, setSelectedExternalSkills] = useState(() => readSavedState('co-agent:agent-external-skills', []));
   const [workflow, setWorkflow] = useState(() => readSavedState('co-agent:agent-workflow', null));
+  const [activeRun, setActiveRun] = useState(null);
+  const activeStepRequestRef = useRef('');
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [agentCatalog, setAgentCatalog] = useState({ agents: [], skills: [] });
@@ -52,18 +54,22 @@ export default function Agents() {
     let unsubscribe = () => {};
     (async () => {
       try {
-        const [runtime, catalog, commandList, rootResult, repoResult] = await Promise.all([
+        const [runtime, catalog, commandList, rootResult, repoResult, runResult] = await Promise.all([
           desktop?.runtime?.ollamaStatus?.(),
           desktop?.agents?.list?.(),
           desktop?.terminal?.listCommands?.(),
           desktop?.workspace?.getRoot?.(),
-          desktop?.integrations?.listRepos?.()
+          desktop?.integrations?.listRepos?.(),
+          desktop?.agents?.listRuns?.()
         ]);
         setModels(runtime?.models || []);
         setModel(runtime?.models?.[0]?.name || runtime?.models?.[0]?.model || '');
         setAgentCatalog({ agents: catalog?.agents || [], skills: catalog?.skills || [] });
         setCommands(commandList?.commands || []);
         setImportedRepos(Array.isArray(repoResult) ? repoResult.filter(item => item.hasSkill) : []);
+        const persistedRuns = Array.isArray(runResult?.runs) ? runResult.runs : [];
+        const matchingRun = persistedRuns.find(item => item.goal === workflow?.goal && !['completed', 'cancelled'].includes(item.status));
+        if (matchingRun) setActiveRun(matchingRun);
         setWorkspaceRoot(rootResult?.root || '');
         if (rootResult?.root) await refreshFiles();
       } catch (error) { setNotice(errorText(error)); }
@@ -115,8 +121,46 @@ export default function Agents() {
     try {
       const result = await desktop.agents.planWorkflow({ goal: goal.trim(), model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Workflow planning failed.');
-      setWorkflow(result);
+      setWorkflow(result); setActiveRun(null);
       setNotice('Created ' + result.pipeline.length + ' steps using ' + result.model + '. Nothing has been changed or executed yet.');
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setBusy(''); }
+  };
+
+  const syncRunStep = async (stepId, action, payload = {}) => {
+    if (!activeRun || activeRun.goal !== workflow?.goal || !desktop?.agents?.updateRunStep) return null;
+    const response = await desktop.agents.updateRunStep({ runId: activeRun.id, stepId, action, ...payload });
+    if (response?.ok === false || response?.error) throw new Error(response.error || 'Could not update saved workflow progress.');
+    setActiveRun(response.run);
+    return response.run;
+  };
+
+  const approvePlan = async () => {
+    if (!workflow || activeRun || busy) return;
+    setBusy('approve-plan'); setNotice('Saving the reviewed plan and its dependency checkpoints…');
+    try {
+      const response = await desktop.agents.createRun({
+        approved: true, title: workflow.title, goal: workflow.goal,
+        steps: workflow.pipeline.map(step => ({ id: step.id, title: step.title, role: step.role, skill: step.skill, description: step.description, deliverable: step.deliverable, dependsOn: step.dependsOn || [], acceptanceCriteria: step.acceptanceCriteria || [] }))
+      });
+      if (response?.ok === false || response?.error) throw new Error(response.error || 'Could not save the approved plan.');
+      setActiveRun(response.run);
+      setNotice('Plan approved and saved. Each step still requires your explicit start and checkpoint review.');
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setBusy(''); }
+  };
+
+  const controlRun = async action => {
+    if (!activeRun || (busy && action !== 'cancel')) return;
+    setBusy('run-control');
+    try {
+      if (action === 'cancel' && activeStepRequestRef.current) await desktop.agents.cancelStep(activeStepRequestRef.current);
+      const response = action === 'pause' ? await desktop.agents.pauseRun(activeRun.id)
+        : action === 'resume' ? await desktop.agents.resumeRun(activeRun.id)
+        : await desktop.agents.cancelRun(activeRun.id);
+      if (response?.ok === false || response?.error) throw new Error(response.error || 'Workflow control failed.');
+      setActiveRun(response.run);
+      setNotice('Saved workflow ' + (action === 'cancel' ? 'cancelled' : action === 'pause' ? 'paused' : 'resumed') + '.');
     } catch (error) { setNotice(errorText(error)); }
     finally { setBusy(''); }
   };
@@ -125,12 +169,14 @@ export default function Agents() {
     setResults(old => ({ ...old, [stepId]: { ...old[stepId], reviewChecks: checked ? [...new Set([...(old[stepId]?.reviewChecks || []), index])] : (old[stepId]?.reviewChecks || []).filter(item => item !== index) } }));
   };
 
-  const confirmCheckpoint = stepId => {
+  const confirmCheckpoint = async stepId => {
     const step = workflow?.pipeline?.find(item => item.id === stepId);
     if (!step || step.status !== 'review') return;
     const checks = results[stepId]?.reviewChecks || [];
     const criteria = step.acceptanceCriteria || [];
     if (criteria.some((_, index) => !checks.includes(index))) { setNotice('Review and check every acceptance criterion before unlocking the next step.'); return; }
+    try { await syncRunStep(stepId, 'complete', { approved: true, result: JSON.stringify(results[stepId] || {}).slice(0, 5000), message: 'Acceptance criteria reviewed and confirmed by the user.' }); }
+    catch (error) { setNotice(errorText(error)); return; }
     setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === stepId ? { ...item, status: 'done' } : item) }));
     setNotice('Checkpoint confirmed for “' + step.title + '”. Dependent steps are now unlocked.');
   };
@@ -139,6 +185,10 @@ export default function Agents() {
     if (!workflow || busy) return;
     const pendingDependencies = (step.dependsOn || []).filter(id => workflow.pipeline.find(item => item.id === id)?.status !== 'done');
     if (pendingDependencies.length) { setNotice('Complete the prerequisite steps first.'); return; }
+    try {
+      const savedStep = activeRun?.goal === workflow.goal ? activeRun.steps.find(item => item.id === step.id) : null;
+      if (savedStep && ['queued', 'failed'].includes(savedStep.status)) await syncRunStep(step.id, 'start');
+    } catch (error) { setNotice(errorText(error)); return; }
     setBusy(step.id); setNotice('Running ' + step.role + ' agent with the ' + step.skill + ' skill…');
     setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'running' } : item) }));
     try {
@@ -157,8 +207,11 @@ export default function Agents() {
         if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');
         externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];
       }
-      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
+      const requestId = 'agent-step-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+      activeStepRequestRef.current = requestId;
+      const result = await desktop.agents.runStep({ requestId, goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Agent step failed.');
+      if (activeRun?.goal === workflow.goal) await syncRunStep(step.id, 'awaiting-approval', { message: 'Agent output is ready for user review.' });
       if (result.files?.length) {
         result.files = await Promise.all(result.files.map(async file => {
           const current = workspaceRoot ? await desktop.workspace.readFile(file.path) : { ok: false, error: 'No workspace selected.' };
@@ -171,9 +224,10 @@ export default function Agents() {
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'review', result: result.summary } : item) }));
       setNotice(step.title + ' produced a result. Review the output and check every acceptance criterion before the next dependent step can run. ' + (result.files?.length ? result.files.length + ' file proposal(s) await your review.' : 'No files were changed.'));
     } catch (error) {
+      if (activeRun?.goal === workflow.goal) { try { await syncRunStep(step.id, 'fail', { error: errorText(error) }); } catch {} }
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'blocked', result: errorText(error) } : item) }));
       setNotice(errorText(error));
-    } finally { setBusy(''); }
+    } finally { activeStepRequestRef.current = ''; setBusy(''); }
   };
 
   const applyProposals = async stepId => {
@@ -247,6 +301,8 @@ export default function Agents() {
           {!models.length && <p className="agents-inline-warning">Ollama is not available or no models are installed. Connect Ollama and choose a model in Models & settings.</p>}
         </form>
 
+        {workflow && !activeRun && <div className="agents-pipeline-card"><div className="agents-card-heading"><span className="agents-icon"><ShieldCheck size={17}/></span><div><h2>Approve and save this plan</h2><p>Persist the reviewed plan, dependency graph, checkpoints, and event history. This does not start any step.</p></div></div><button className="primary-button" disabled={!!busy} onClick={approvePlan}><ShieldCheck size={14}/>{busy === 'approve-plan' ? 'Saving plan…' : 'Approve plan & save progress'}</button></div>}
+        {activeRun && <div className="agents-pipeline-card"><div className="agents-pipeline-title"><div><p className="eyebrow">DURABLE EXECUTION LOG</p><h2>{activeRun.title}</h2><p>Saved status: <strong>{activeRun.status}</strong> · {activeRun.steps.filter(step => step.status === 'completed').length}/{activeRun.steps.length} completed</p></div><span className="agents-progress">{activeRun.events.length} events</span></div><div className="agents-step-actions">{['ready','running'].includes(activeRun.status) && <button className="secondary-button" disabled={!!busy} onClick={() => controlRun('pause')}>Pause</button>}{activeRun.status === 'paused' && <button className="secondary-button" disabled={!!busy} onClick={() => controlRun('resume')}>Resume</button>}{!['completed','cancelled'].includes(activeRun.status) && <button className="secondary-button" disabled={busy === 'run-control'} onClick={() => controlRun('cancel')}>Cancel run</button>}</div><details><summary>Recent execution events</summary><ol>{activeRun.events.slice(-12).reverse().map((event, index) => <li key={event.at + event.type + index}><strong>{event.type}</strong> — {event.message} <small>{event.at}</small></li>)}</ol></details></div>}
         {workflow ? <div className="agents-pipeline-card">
           <div className="agents-pipeline-title"><div><p className="eyebrow">ACTIVE WORKFLOW</p><h2>{workflow.title}</h2><p>{workflow.goal}</p></div><span className="agents-progress">{doneCount}/{workflow.pipeline.length} confirmed</span></div>
           <div className="agents-progress-track"><span style={{ width: (doneCount / Math.max(1, workflow.pipeline.length) * 100) + '%' }}/></div>
@@ -263,7 +319,7 @@ export default function Agents() {
                 {step.dependsOn?.length > 0 && <small className="agents-dependencies">Depends on: {step.dependsOn.join(', ')}</small>}
                 {step.status === 'review' && result && <div className="agents-checkpoint"><strong><ShieldCheck size={14}/> Review checkpoint</strong>{step.acceptanceCriteria?.length ? <ul>{step.acceptanceCriteria.map((criterion, criterionIndex) => <li key={criterionIndex}><label><input type="checkbox" checked={(result.reviewChecks || []).includes(criterionIndex)} onChange={event => toggleCriterion(step.id, criterionIndex, event.target.checked)}/><span>{criterion}</span></label></li>)}</ul> : <p>Review the summary, findings, risks, and any proposed changes before confirming this step.</p>}<button className="primary-button" disabled={!!busy || (step.acceptanceCriteria || []).some((_, criterionIndex) => !(result.reviewChecks || []).includes(criterionIndex))} onClick={() => confirmCheckpoint(step.id)}><ShieldCheck size={13}/> Confirm checkpoint &amp; unlock next step</button></div>}
                 <div className="agents-step-actions">
-                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0 || (activeRun?.goal === workflow.goal && activeRun.steps.find(saved => saved.id === step.id)?.status === 'completed')} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
+                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0 || (activeRun?.goal === workflow.goal && activeRun.steps?.find(saved => saved.id === step.id)?.status === 'completed')} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
                   {result && <button className="text-link" onClick={() => setActiveResult(activeResult === step.id ? '' : step.id)}>{activeResult === step.id ? 'Hide result' : 'View result'}</button>}
                   {blockedBy.length > 0 && <small>Finish dependencies first</small>}
                 </div>
