@@ -153,6 +153,7 @@ function createStore(filePath, options = {}) {
       const run = data.runs.find(item => item.id === String(id));
       if (!run) throw new Error('Workflow run was not found.');
       if (run.status === 'cancelled' || run.status === 'completed') throw new Error('This workflow run is already ' + run.status + '.');
+      if (run.status === 'paused') throw new Error('This workflow is paused; stale step results are discarded until the run is resumed.');
       const step = run.steps.find(item => item.id === String(stepId));
       if (!step) throw new Error('Workflow step was not found.');
       const at = now();
@@ -194,7 +195,15 @@ function createStore(filePath, options = {}) {
       const run = data.runs.find(item => item.id === String(id));
       if (!run) throw new Error('Workflow run was not found.');
       if (run.status !== 'running' && run.status !== 'ready') throw new Error('Only a ready or running workflow can be paused.');
-      run.status = 'paused'; event(run, 'run-paused', 'Workflow paused by the user.'); return run;
+      const activeStep = run.steps.find(step => step.id === run.currentStepId && step.status === 'running');
+      if (activeStep) {
+        activeStep.status = 'failed';
+        activeStep.error = 'The active request was interrupted by a pause. Resume the workflow and retry this step after reviewing any partial side effects.';
+        activeStep.updatedAt = now();
+        event(run, 'step-interrupted-by-pause', activeStep.error, activeStep.id);
+      }
+      run.status = 'paused'; run.currentStepId = null;
+      event(run, 'run-paused', 'Workflow paused. Any active step was interrupted and must be retried after resume; late results are rejected.'); return run;
     }),
     resume: id => mutate(data => {
       const run = data.runs.find(item => item.id === String(id));
