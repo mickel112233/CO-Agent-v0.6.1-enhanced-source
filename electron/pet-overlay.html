@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CO-Agent Pet</title>
+<style>
+:root{color-scheme:light;font-family:Segoe UI,system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:transparent;color:#23251f;user-select:none}
+.pet{border:1px solid #e4e6df;background:rgba(250,251,247,.97);border-radius:22px;box-shadow:0 12px 38px #0002;padding:12px;display:grid;gap:8px}
+.top{display:flex;align-items:center;gap:9px;cursor:move;-webkit-app-region:drag}.avatar{width:42px;height:42px;border-radius:15px;background:#dce8d2;display:grid;place-items:center;font-size:25px}.heading{font-weight:750;font-size:13px}.status{font-size:11px;color:#72786c;margin-top:2px}.close{margin-left:auto;border:0;background:transparent;font-size:18px;cursor:pointer;-webkit-app-region:no-drag}
+form{display:flex;gap:6px}input{min-width:0;flex:1;border:1px solid #e1e3db;border-radius:12px;padding:10px;background:white;font:inherit;font-size:12px;outline-color:#8ba77b}button.send{border:0;border-radius:11px;background:#30352c;color:white;padding:0 12px;font-weight:650;cursor:pointer}.hint{font-size:10px;color:#8a8d83}
+</style></head>
+<body><section class="pet">
+<div class="top"><div class="avatar" aria-hidden="true">🐾</div><div><div class="heading">CO-Agent companion</div><div class="status" id="status">Ready when you are</div></div><button class="close" id="close" title="Hide companion" aria-label="Hide companion">×</button></div>
+<form id="form"><input id="message" maxlength="4000" placeholder="Tell me what to do…" autocomplete="off" aria-label="Message CO-Agent"><button class="send" type="submit">Send</button></form>
+<div class="hint">Tasks are handled in CO-Agent chat; approvals stay in the main app.</div>
+</section><script>
+const statusEl=document.getElementById('status'), form=document.getElementById('form'), input=document.getElementById('message');
+form.addEventListener('submit',event=>{event.preventDefault();const text=input.value.trim();if(!text)return;window.coAgentPet.sendMessage(text);statusEl.textContent='Sent to CO-Agent…';input.value='';});
+document.getElementById('close').addEventListener('click',()=>window.coAgentPet.close());
+window.coAgentPet.onStatus(text=>{statusEl.textContent=text||'Ready when you are';});
+</script></body></html>
