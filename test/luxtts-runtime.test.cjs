@@ -32,3 +32,8 @@ test('LuxTTS refuses nonexistent reference audio before launching worker', async
     await assert.rejects(() => lux.generate({ text: 'hello', referenceAudio: path.join(dir, 'missing.wav'), outputPath: path.join(dir, 'out.wav') }, { appPath: dir, resourcesPath: path.join(dir, 'resources'), userDataPath: path.join(dir, 'data') }), /existing regular file/);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('LuxTTS cancellation is safe for unknown or already-finished jobs', () => {
+  assert.deepEqual(lux.cancel('missing-job'), { ok: true, cancelled: false });
+  assert.deepEqual(lux.cancel(''), { ok: true, cancelled: false });
+});
