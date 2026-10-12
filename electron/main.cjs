@@ -244,6 +244,24 @@ function registerIpc() {
   handle('computer:open-path', filePath => computer.openPath(filePath));
   handle('computer-use:capture-screen', () => computerUse.captureScreen());
   handle('computer-use:inspect-accessibility', () => computerUse.inspectAccessibility());
+  handle('computer-use:invoke-control', async payload => {
+    const target = computerUse.normalizeAccessibleTarget(payload || {});
+    const label = target.automationId ? 'Automation ID ' + target.automationId : 'control “' + target.name + '”';
+    const detail = 'Invoke the exact visible control ' + label + ' in window “' + target.windowTitle + '” using Windows UI Automation. CO-Agent will not fall back to screen coordinates if the target is ambiguous or unsupported.';
+    if (!await confirmComputerAction('Allow semantic UI control invocation?', detail)) {
+      await recordAudit('computer.invoke-control', 'denied', { controlType: target.controlType }, target.windowTitle + ' / ' + label);
+      throw new Error('Accessibility control invocation cancelled by user.');
+    }
+    await recordAudit('computer.invoke-control', 'approved', { controlType: target.controlType }, target.windowTitle + ' / ' + label);
+    try {
+      const result = await computerUse.invokeAccessibleControl({ ...target, approved: true });
+      await recordAudit('computer.invoke-control', 'completed', { controlType: target.controlType }, target.windowTitle + ' / ' + label);
+      return result;
+    } catch (error) {
+      await recordAudit('computer.invoke-control', 'failed', { controlType: target.controlType, errorType: error.name || 'Error' }, target.windowTitle + ' / ' + label);
+      throw error;
+    }
+  });
   handle('computer-use:read-screen-text', async payload => {
     if (!await confirmComputerAction('Read text visible on your desktop?', 'This uses local Tesseract OCR on the selected screen capture. The image is processed on this computer.')) throw new Error('Screen OCR cancelled by user.');
     return computerUse.readScreenText({ ...payload, approved: true });
