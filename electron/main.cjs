@@ -198,6 +198,7 @@ function registerIpc() {
     return computerUse.readScreenText({ ...payload, approved: true });
   });
   handle('computer-use:plan-actions', payload => computerUse.planActions(payload));
+  handle('computer-use:verify-outcome', payload => computerUse.verifyActionOutcome(payload));
   handle('computer-use:click', async payload => {
     if (!await confirmComputerAction('Allow one mouse click?', 'Click once at screenshot coordinates ' + Number(payload?.x) + ', ' + Number(payload?.y) + '. Review the desktop before allowing.')) throw new Error('Click cancelled by user.');
     return computerUse.click({ ...payload, approved: true });
