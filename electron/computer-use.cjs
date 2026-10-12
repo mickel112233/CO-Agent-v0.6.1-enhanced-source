@@ -164,9 +164,15 @@ Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new($x,$y)
 $down = New-Object COInput+INPUT; $down.type=0; $down.mi.dwFlags=0x0002
 $up = New-Object COInput+INPUT; $up.type=0; $up.mi.dwFlags=0x0004
-[void][COInput]::SendInput(1,@($down),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
-Start-Sleep -Milliseconds 40
-[void][COInput]::SendInput(1,@($up),[Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT'))
+$size = [Runtime.InteropServices.Marshal]::SizeOf([type]'COInput+INPUT')
+$downSent = [COInput]::SendInput(1,@($down),$size)
+if ($downSent -ne 1) { throw 'Windows rejected the mouse button-down input.' }
+try {
+  Start-Sleep -Milliseconds 40
+} finally {
+  $upSent = [COInput]::SendInput(1,@($up),$size)
+  if ($upSent -ne 1) { throw 'Windows rejected the mouse button-up input; check whether the mouse button remains held.' }
+}
 `.replace('__X__', String(absoluteX)).replace('__Y__', String(absoluteY));
   await powershell(script);
   return { ok: true, action: 'click', x, y, displayId: String(display.id) };
@@ -191,8 +197,10 @@ foreach ($ch in $text.ToCharArray()) {
   $down = New-Object COKeyboard+INPUT; $down.type=1; $down.ki.wScan=[uint16][char]$ch; $down.ki.dwFlags=0x0004
   $up = New-Object COKeyboard+INPUT; $up.type=1; $up.ki.wScan=[uint16][char]$ch; $up.ki.dwFlags=0x0004 -bor 0x0002
   $size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKeyboard+INPUT')
-  [void][COKeyboard]::SendInput(1,@($down),$size)
-  [void][COKeyboard]::SendInput(1,@($up),$size)
+  $downSent = [COKeyboard]::SendInput(1,@($down),$size)
+  if ($downSent -ne 1) { throw 'Windows rejected a Unicode key-down input.' }
+  $upSent = [COKeyboard]::SendInput(1,@($up),$size)
+  if ($upSent -ne 1) { throw 'Windows rejected a Unicode key-up input; text entry may be incomplete.' }
 }
 `.replace('__TEXT__', b64);
   await powershell(script);
@@ -217,7 +225,14 @@ $code=__KEY__
 $down=New-Object COKey+INPUT; $down.type=1; $down.ki.wVk=$code
 $up=New-Object COKey+INPUT; $up.type=1; $up.ki.wVk=$code; $up.ki.dwFlags=2
 $size=[Runtime.InteropServices.Marshal]::SizeOf([type]'COKey+INPUT')
-[void][COKey]::SendInput(1,@($down),$size); Start-Sleep -Milliseconds 35; [void][COKey]::SendInput(1,@($up),$size)
+$downSent = [COKey]::SendInput(1,@($down),$size)
+if ($downSent -ne 1) { throw 'Windows rejected the key-down input.' }
+try {
+  Start-Sleep -Milliseconds 35
+} finally {
+  $upSent = [COKey]::SendInput(1,@($up),$size)
+  if ($upSent -ne 1) { throw 'Windows rejected the key-up input; check whether the key remains held.' }
+}
 `.replace('__KEY__', String(code));
   await powershell(script);
   return { ok: true, action: 'key', key };
