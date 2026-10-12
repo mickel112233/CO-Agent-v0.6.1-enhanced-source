@@ -39,10 +39,11 @@ async function synthesize({ text, modelPath, outputPath, piperPath, timeoutMs = 
   return new Promise((resolve, reject) => {
     let stderr = '';
     let settled = false;
+    let timer = null;
     const finish = (error, result) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (error) reject(error);
       else resolve(result);
     };
@@ -57,7 +58,7 @@ async function synthesize({ text, modelPath, outputPath, piperPath, timeoutMs = 
       return;
     }
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       child.kill();
       finish(new Error('Piper text-to-speech timed out after 5 minutes.'));
     }, timeoutMs);
