@@ -60,8 +60,7 @@ test('model pull supports cancellation while the progress stream is open', async
     res.writeHead(200, { 'content-type': 'application/x-ndjson' });
     res.write('{"status":"downloading","total":100,"completed":1}\\n');
     started();
-    // Keep the response open until the client aborts.
-    req.on('close', () => { if (!res.destroyed) res.destroy(); });
+    // Keep the response open until the client aborts it.
   }, async base => {
     const pending = pullOllamaModel('qwen3.5:2b', () => {}, base, fetch, { signal: controller.signal, timeoutMs: 5000 });
     await requestStarted;
