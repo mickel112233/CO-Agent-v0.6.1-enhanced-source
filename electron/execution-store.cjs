@@ -68,15 +68,44 @@ function createStore(filePath, options = {}) {
   const io = options.fs || fs;
   const now = options.now || (() => new Date().toISOString());
   let queue = Promise.resolve();
+  let recoveryDone = false;
   async function read() {
+    let data;
     try {
       const stat = await io.stat(file);
       if (stat.size > 4 * 1024 * 1024) throw new Error('Execution history exceeds the 4 MB safety limit.');
-      return validateStore(JSON.parse(await io.readFile(file, 'utf8')));
+      data = validateStore(JSON.parse(await io.readFile(file, 'utf8')));
     } catch (error) {
-      if (error?.code === 'ENOENT') return { version: 1, runs: [] };
-      throw new Error('Execution history could not be read safely: ' + (error.message || String(error)));
+      if (error?.code === 'ENOENT') data = { version: 1, runs: [] };
+      else throw new Error('Execution history could not be read safely: ' + (error.message || String(error)));
     }
+    if (!recoveryDone) {
+      recoveryDone = true;
+      let changed = false;
+      for (const run of data.runs) {
+        const interrupted = run.steps.filter(step => step.status === 'running');
+        for (const step of interrupted) {
+          step.status = 'failed';
+          step.error = 'The application restarted while this step was running. Review the workspace and retry only if safe.';
+          step.updatedAt = now();
+          event(run, 'step-recovered', step.error, step.id);
+          changed = true;
+        }
+        if (run.status === 'running') {
+          run.status = interrupted.length ? 'failed' : 'ready';
+          run.currentStepId = null;
+          event(run, 'run-recovered', interrupted.length ? 'Interrupted step marked failed; inspect state before retrying.' : 'Workflow recovered after application restart.', null);
+          changed = true;
+        }
+        if (run.status === 'running' && run.steps.some(step => step.status === 'awaiting-approval')) {
+          run.status = 'ready'; run.currentStepId = null;
+          event(run, 'run-recovered', 'Saved output is awaiting user review; no actions were replayed.', null);
+          changed = true;
+        }
+      }
+      if (changed) data = await write(data);
+    }
+    return data;
   }
   async function write(data) {
     const safe = validateStore(data);
