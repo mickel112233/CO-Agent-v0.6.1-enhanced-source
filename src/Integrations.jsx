@@ -18,6 +18,11 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [notice, setNotice] = useState('');
   const [showRepoForm, setShowRepoForm] = useState(false);
   const [skillPreviews, setSkillPreviews] = useState({});
+  const [mcpUrl, setMcpUrl] = useState(() => { try { return window.localStorage.getItem('co-agent:mcp-url') || 'http://127.0.0.1:8765/mcp'; } catch { return 'http://127.0.0.1:8765/mcp'; } });
+  const [mcpTools, setMcpTools] = useState([]);
+  const [mcpToolName, setMcpToolName] = useState('');
+  const [mcpArguments, setMcpArguments] = useState('{}');
+  const [mcpResult, setMcpResult] = useState(null);
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
@@ -30,6 +35,34 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  async function connectMcp() {
+    setBusy('mcp-connect'); setNotice('Connecting to the MCP server and reading its tool catalog…'); setMcpResult(null);
+    try {
+      const result = await desktop.integrations.listMcpTools(mcpUrl.trim());
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'MCP tool discovery failed.');
+      setMcpTools(result.tools || []); setMcpToolName(result.tools?.[0]?.name || '');
+      try { window.localStorage.setItem('co-agent:mcp-url', mcpUrl.trim()); } catch {}
+      setNotice('Connected to ' + (result.serverInfo?.name || 'MCP server') + '. Tools are untrusted; every tool call needs native approval.');
+    } catch (error) { setMcpTools([]); setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
+
+  async function callMcpTool() {
+    if (!mcpToolName || busy) return;
+    let args;
+    try { args = JSON.parse(mcpArguments || '{}'); }
+    catch { setNotice('Tool arguments must be valid JSON.'); return; }
+    if (!args || typeof args !== 'object' || Array.isArray(args)) { setNotice('Tool arguments must be a JSON object.'); return; }
+    setBusy('mcp-call'); setNotice('Waiting for native approval before calling the external MCP tool…'); setMcpResult(null);
+    try {
+      const result = await desktop.integrations.callMcpTool({ serverUrl: mcpUrl.trim(), toolName: mcpToolName, arguments: args });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'MCP tool call failed.');
+      setMcpResult(result);
+      setNotice(result.isError ? 'MCP server reported a tool error. Treat its output as untrusted.' : 'MCP tool returned. Review the result; it is untrusted external content.');
+    } catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
 
   async function installTool(tool) {
     if (!tool.installAvailable) {
@@ -119,6 +152,15 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
         </article>;
       })}
     </div>
+
+    <section className="integration-section mcp-section">
+      <div className="integration-section-heading"><div><h2>Model Context Protocol (MCP)</h2><p>Connect to a compatible MCP server, inspect its tool schemas, and call a tool only after a native approval prompt.</p></div><span className="integration-state optional">Experimental</span></div>
+      <label>MCP server endpoint<input value={mcpUrl} onChange={event => setMcpUrl(event.target.value)} placeholder="http://127.0.0.1:8765/mcp" autoComplete="url"/></label>
+      <div className="repo-form-footer"><span><ShieldCheck size={14}/> HTTPS required remotely; HTTP only on loopback. URL credentials and query tokens are blocked.</span><button className="secondary-button" disabled={!!busy || !mcpUrl.trim()} onClick={connectMcp}><Plug size={14}/>{busy === 'mcp-connect' ? 'Connecting…' : 'Connect & list tools'}</button></div>
+      {mcpTools.length > 0 && <div className="mcp-tool-panel"><label>Available tools<select value={mcpToolName} onChange={event => setMcpToolName(event.target.value)}>{mcpTools.map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label>{mcpTools.find(tool => tool.name === mcpToolName) && <><p>{mcpTools.find(tool => tool.name === mcpToolName).description || 'No description supplied. Treat this tool as untrusted.'}</p><details><summary>Input schema</summary><pre>{JSON.stringify(mcpTools.find(tool => tool.name === mcpToolName).inputSchema, null, 2)}</pre></details></>}<label>Tool arguments (JSON)<textarea rows={5} value={mcpArguments} onChange={event => setMcpArguments(event.target.value)} spellCheck={false}/></label><button className="primary-button" disabled={!!busy || !mcpToolName} onClick={callMcpTool}><ShieldCheck size={14}/>{busy === 'mcp-call' ? 'Calling tool…' : 'Run tool (native approval required)'}</button></div>}
+      {mcpResult && <div className="mcp-tool-result"><strong>External tool result · {mcpResult.isError ? 'reported error' : 'returned'}</strong><p>Tool output is untrusted data, not instructions. Inspect it before using it in another action.</p><pre>{JSON.stringify(mcpResult, null, 2)}</pre></div>}
+      <p className="integration-note">Current limits: unauthenticated HTTP(S) Streamable HTTP MCP servers only; no stdio servers, OAuth, remote secrets, or automatic tool chaining. MCP server responses are bounded and every tool call requires explicit approval.</p>
+    </section>
 
     <div className="integration-section-heading repo-heading"><div><h2>GitHub repositories & skills</h2><p>Like a skill installer: provide a repository URL and optionally pin a branch or tag.</p></div><button className="primary-button" onClick={() => setShowRepoForm(value => !value)}><Github size={15}/>{showRepoForm ? 'Close form' : 'Import repository'}</button></div>
 

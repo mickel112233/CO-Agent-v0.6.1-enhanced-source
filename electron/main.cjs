@@ -19,6 +19,7 @@ const workspace = require('./workspace.cjs');
 const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
+const mcpClient = require('./mcp-client.cjs');
 const textAttachments = require('./text-attachments.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
@@ -224,6 +225,15 @@ function registerIpc() {
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
   handle('studio:hyperframes-run', args => hyperframes.runAction(args?.action, args?.projectDir));
+  handle('integrations:mcp-tools', async serverUrl => mcpClient.createClient(serverUrl).listTools());
+  handle('integrations:mcp-call', async payload => {
+    const serverUrl = mcpClient.validateServerUrl(payload?.serverUrl);
+    const toolName = String(payload?.toolName || '');
+    const args = mcpClient.normalizeToolArguments(payload?.arguments);
+    const summary = JSON.stringify(args).slice(0, 1800);
+    if (!await confirmComputerAction('Allow this MCP tool call?', 'Server: ' + serverUrl + '\nTool: ' + toolName + '\nArguments (untrusted input): ' + summary + '\n\nThe server may perform external actions. Only approve if you trust this server and understand the tool. CO-Agent does not automatically execute returned instructions.')) throw new Error('MCP tool call cancelled by user.');
+    return mcpClient.createClient(serverUrl).callTool(toolName, args);
+  });
   handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));
   handle('integrations:install-tool', id => integrations.installTool(id));
   handle('integrations:list-repos', () => integrations.listRepos(app.getPath('userData')));
