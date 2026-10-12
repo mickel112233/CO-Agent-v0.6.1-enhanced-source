@@ -45,6 +45,7 @@ These are capability comparisons from public project/documentation pages, not a 
 - OpenHands, [GitHub project](https://github.com/OpenHands/OpenHands) and [Agent Canvas](https://www.openhands.dev/product/canvas): multi-agent integrations, local/remote backends, worktrees, and automation.
 - AionUi, [project README](https://github.com/iOfficeAI/AionUi): multi-agent/CLI integration, parallel sessions, MCP management, and assistant presets.
 - Ollama, [API documentation](https://github.com/ollama/ollama/blob/main/docs/api.md): conversation-role messages and streaming chat responses.
+- MCP, [Streamable HTTP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/transports/streamable-http.mdx): required method/name headers and current transport behavior.
 
 ## Highest-value improvements, ordered by impact
 

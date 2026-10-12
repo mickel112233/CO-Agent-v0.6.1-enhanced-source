@@ -1,5 +1,7 @@
 'use strict';
 
+const CURRENT_PROTOCOL = '2026-07-28';
+const LEGACY_PROTOCOL = '2025-03-26';
 const MAX_BODY = 1024 * 1024;
 const MAX_TOOLS = 100;
 const MAX_TOOL_OUTPUT = 16000;
@@ -23,6 +25,21 @@ function normalizeTools(input) {
     return { name: tool.name, description: String(tool.description || '').slice(0, 1200), inputSchema: schema, annotations: tool.annotations && typeof tool.annotations === 'object' ? tool.annotations : {} };
   });
 }
+function extractMcpParamHeaders(schema, args, prefix = '') {
+  const headers = {};
+  for (const [key, property] of Object.entries(schema?.properties || {})) {
+    const value = args?.[key];
+    const headerName = property?.['x-mcp-header'];
+    if (headerName && value != null) {
+      if (typeof headerName !== 'string' || !/^[A-Za-z0-9-]{1,60}$/.test(headerName)) throw new Error('MCP tool schema contains an invalid x-mcp-header name.');
+      const text = String(value);
+      if (/[\r\n]/.test(text) || /[^\x20-\x7e]/.test(text) || text.length > 1000) throw new Error('MCP custom header values must be printable ASCII and no longer than 1,000 characters.');
+      headers['mcp-param-' + headerName] = text;
+    }
+    if (property?.type === 'object' && value && typeof value === 'object' && !Array.isArray(value)) Object.assign(headers, extractMcpParamHeaders(property, value, prefix + key + '.'));
+  }
+  return headers;
+}
 function normalizeToolArguments(args) {
   if (args == null) args = {};
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('MCP tool arguments must be a JSON object.');
@@ -35,14 +52,20 @@ function createClient(serverUrl, options = {}) {
   const timeoutMs = Math.max(1000, Math.min(30000, Number(options.timeoutMs) || 15000));
   let nextId = 1;
   let sessionId = '';
+  let protocolVersion = CURRENT_PROTOCOL;
+  let legacySessionMode = false;
   let initialized = false;
   let serverInfo = null;
-  async function request(method, params = {}, notification = false) {
+  let toolSchemas = new Map();
+  async function request(method, params = {}, notification = false, extraHeaders = {}) {
     const id = nextId++;
-    const payload = notification ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id, method, params };
+    const requestParams = !notification && initialized && method !== 'initialize' ? { ...params, _meta: { 'io.modelcontextprotocol/protocolVersion': protocolVersion, 'io.modelcontextprotocol/clientInfo': { name: 'CO-Agent', version: '0.6.1' }, 'io.modelcontextprotocol/clientCapabilities': {} } } : params;
+    const payload = notification ? { jsonrpc: '2.0', method, params: requestParams } : { jsonrpc: '2.0', id, method, params: requestParams };
+    const methodHeaders = { 'mcp-method': method };
+    if (method === 'tools/call' && typeof params?.name === 'string') methodHeaders['mcp-name'] = params.name;
     const response = await fetchImpl(endpoint, {
       method: 'POST', redirect: 'error',
-      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-03-26', ...(sessionId ? { 'mcp-session-id': sessionId } : {}) },
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': protocolVersion, ...methodHeaders, ...(legacySessionMode && sessionId ? { 'mcp-session-id': sessionId } : {}), ...extraHeaders },
       body: JSON.stringify(payload), signal: AbortSignal.timeout(timeoutMs)
     });
     const returnedSession = response.headers?.get?.('mcp-session-id');
@@ -66,10 +89,19 @@ function createClient(serverUrl, options = {}) {
   }
   async function initialize() {
     if (initialized) return { ok: true, serverInfo };
-    const result = await request('initialize', {
-      protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'CO-Agent', version: '0.6.1' }
-    });
+    let result;
+    try {
+      protocolVersion = CURRENT_PROTOCOL;
+      result = await request('initialize', { protocolVersion: CURRENT_PROTOCOL, capabilities: {}, clientInfo: { name: 'CO-Agent', version: '0.6.1' } });
+    } catch (error) {
+      if (!/HTTP (400|404|406|415)/i.test(error.message || '')) throw error;
+      protocolVersion = LEGACY_PROTOCOL; legacySessionMode = true;
+      result = await request('initialize', { protocolVersion: LEGACY_PROTOCOL, capabilities: {}, clientInfo: { name: 'CO-Agent', version: '0.6.1' } });
+    }
     if (!result || typeof result !== 'object') throw new Error('MCP server initialization returned no capabilities.');
+    protocolVersion = String(result.protocolVersion || protocolVersion);
+    legacySessionMode = protocolVersion !== CURRENT_PROTOCOL;
+    if (protocolVersion !== CURRENT_PROTOCOL && protocolVersion !== LEGACY_PROTOCOL) throw new Error('MCP server selected an unsupported protocol version: ' + protocolVersion);
     serverInfo = result.serverInfo && typeof result.serverInfo === 'object' ? { name: String(result.serverInfo.name || 'MCP server').slice(0, 120), version: String(result.serverInfo.version || '').slice(0, 80) } : { name: 'MCP server', version: '' };
     await request('notifications/initialized', {}, true);
     initialized = true;
@@ -81,12 +113,18 @@ function createClient(serverUrl, options = {}) {
     listTools: async () => {
       await initialize();
       const result = await request('tools/list', {});
-      return { ok: true, serverInfo, tools: normalizeTools(result?.tools) };
+      const tools = normalizeTools(result?.tools);
+      toolSchemas = new Map(tools.map(tool => [tool.name, tool.inputSchema]));
+      return { ok: true, serverInfo, tools };
     },
     callTool: async (name, args = {}) => {
       await initialize();
       if (typeof name !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(name)) throw new Error('MCP tool name is invalid.');
-      const result = await request('tools/call', { name, arguments: normalizeToolArguments(args) });
+      const safeArgs = normalizeToolArguments(args);
+      const schema = toolSchemas.get(name);
+      if (!schema) throw new Error('Only tools discovered from this MCP server can be called. Refresh the tool list and retry.');
+      const customHeaders = extractMcpParamHeaders(schema, safeArgs);
+      const result = await request('tools/call', { name, arguments: safeArgs }, false, customHeaders);
       const content = Array.isArray(result?.content) ? result.content.slice(0, 100).map(item => {
         if (!item || typeof item !== 'object') return { type: 'text', text: String(item || '').slice(0, 1000) };
         return { type: String(item.type || 'text').slice(0, 40), text: String(item.text || '').slice(0, 4000), mimeType: item.mimeType ? String(item.mimeType).slice(0, 100) : undefined };
@@ -97,4 +135,4 @@ function createClient(serverUrl, options = {}) {
     }
   });
 }
-module.exports = { createClient, validateServerUrl, normalizeTools, normalizeToolArguments, MAX_BODY, MAX_TOOLS, MAX_TOOL_OUTPUT };
+module.exports = { createClient, validateServerUrl, normalizeTools, normalizeToolArguments, extractMcpParamHeaders, CURRENT_PROTOCOL, LEGACY_PROTOCOL, MAX_BODY, MAX_TOOLS, MAX_TOOL_OUTPUT };
