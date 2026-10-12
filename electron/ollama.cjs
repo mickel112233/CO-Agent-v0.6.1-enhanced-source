@@ -1,8 +1,13 @@
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
+const DEFAULT_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 
 function normalizeBaseUrl(value = DEFAULT_OLLAMA_URL) {
-  const url = new URL(value);
+  let url;
+  try { url = new URL(value); } catch { throw new Error('Ollama base URL is invalid.'); }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Ollama URL must use HTTP or HTTPS.');
+  if (url.username || url.password || url.search || url.hash) throw new Error('Ollama base URLs cannot contain credentials, query parameters, or fragments.');
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !loopback) throw new Error('Remote Ollama endpoints must use HTTPS. Plain HTTP is allowed only for loopback services.');
   return url.toString().replace(/\/+$/, '');
 }
 function validateModelName(value) {
@@ -34,13 +39,23 @@ async function getOllamaStatus(baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAU
   }
 }
 
-async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch) {
+async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch, options = {}) {
   const name = validateModelName(model);
   const base = normalizeBaseUrl(baseUrl);
-  const response = await fetchImpl(`${base}/api/pull`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: name, stream: true })
-  });
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? Math.max(1000, Math.min(60 * 60 * 1000, options.timeoutMs)) : DEFAULT_PULL_TIMEOUT_MS;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
+  let response;
+  try {
+    response = await fetchImpl(`${base}/api/pull`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: name, stream: true }), signal
+    });
+  } catch (error) {
+    if (options.signal?.aborted) throw new Error('Model download was cancelled.');
+    if (timeoutSignal.aborted) throw new Error('Model download timed out before Ollama responded. Check Ollama and retry.');
+    throw error;
+  }
   if (!response.ok) throw await readError(response);
   if (!response.body) throw new Error('Ollama did not return a model-download progress stream.');
 
@@ -59,18 +74,31 @@ async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.e
     onProgress({ model: name, status: item.status || 'Downloading model…', digest: item.digest || '', total, completed, percent: total > 0 ? Math.min(100, Math.floor(completed / total * 100)) : null });
   };
   const reader = response.body.getReader();
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const rows = buffer.split(/\r?\n/);
-    buffer = rows.pop() || '';
-    for (const row of rows) consume(row);
+  try {
+    while (true) {
+      if (options.signal?.aborted) throw new Error('Model download was cancelled.');
+      if (timeoutSignal.aborted) throw new Error('Model download timed out. Check the Ollama connection and retry.');
+      let chunk;
+      try { chunk = await reader.read(); }
+      catch (error) {
+        if (options.signal?.aborted) throw new Error('Model download was cancelled.');
+        if (timeoutSignal.aborted) throw new Error('Model download timed out. Check the Ollama connection and retry.');
+        throw error;
+      }
+      const { value, done } = chunk;
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const rows = buffer.split(/\r?\n/);
+      buffer = rows.pop() || '';
+      for (const row of rows) consume(row);
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer);
+    if (!last || last.status !== 'success') throw new Error(last?.status || 'Ollama ended the pull before reporting success. Retry the download.');
+    return { model: name, status: 'success' };
+  } finally {
+    if (options.signal?.aborted || timeoutSignal.aborted) await reader.cancel().catch(() => {});
   }
-  buffer += decoder.decode();
-  if (buffer.trim()) consume(buffer);
-  if (!last || last.status !== 'success') throw new Error(last?.status || 'Ollama ended the pull before reporting success.');
-  return { model: name, status: 'success' };
 }
 
 async function deleteOllamaModel(model, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch) {
@@ -81,4 +109,4 @@ async function deleteOllamaModel(model, baseUrl = process.env.ATELIER_OLLAMA_URL
   return { deleted: name };
 }
 
-module.exports = { DEFAULT_OLLAMA_URL, normalizeBaseUrl, validateModelName, getOllamaStatus, pullOllamaModel, deleteOllamaModel };
+module.exports = { DEFAULT_OLLAMA_URL, DEFAULT_PULL_TIMEOUT_MS, normalizeBaseUrl, validateModelName, getOllamaStatus, pullOllamaModel, deleteOllamaModel };

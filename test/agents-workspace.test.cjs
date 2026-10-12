@@ -55,6 +55,9 @@ test('workspace lists, reads, applies approved file proposals and backs up origi
     await assert.rejects(workspace.applyChanges({ files: [{ path: 'src/app.js', content: 'new' }] }), /approval/i);
     const result = await workspace.applyChanges({ approved: true, files: [{ path: 'src/app.js', content: 'new content' }, { path: 'src/new.js', content: 'created' }] });
     assert.equal(result.ok, true);
+    assert.equal(result.applied.length, 2);
+    assert.ok(result.applied.every(item => item.verified === true && /^[a-f0-9]{64}$/.test(item.sha256)));
+    assert.equal(result.applied[0].path, 'src/app.js');
     assert.equal(await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8'), 'new content');
     assert.equal(await fs.readFile(path.join(root, 'src', 'new.js'), 'utf8'), 'created');
     assert.equal(await fs.readFile(path.join(result.backupDirectory, 'src', 'app.js'), 'utf8'), 'old content');
@@ -118,4 +121,56 @@ test('built-in agent harness provides multiple specialist roles and skills', () 
   const extended = agents.normalizePipeline([{ id: 'design', role: 'architect', skill: 'architecture' }, { id: 'operate', role: 'computer-operator', skill: 'computer-use', dependsOn: ['design'] }]);
   assert.deepEqual(extended[1].dependsOn, ['step-1']);
   assert.deepEqual(agents.parseJson('{"ok":true}'), { ok: true });
+});
+
+
+test('agent file proposals require grounded context and enforce workspace safety limits', () => {
+  assert.deepEqual(agents.validateFileProposals([], []), []);
+  assert.throws(() => agents.validateFileProposals([{ path: 'src/app.js', content: 'proposed' }], []), /without selected workspace context/i);
+  assert.deepEqual(agents.validateFileProposals([{ path: 'src/app.js', content: 'proposed' }], [{ path: 'src/app.js', content: 'existing' }]), [{ path: 'src/app.js', content: 'proposed' }]);
+  assert.throws(() => agents.validateFileProposals([{ path: '../outside.js', content: 'unsafe' }], [{ path: 'README.md', content: 'context' }]), /relative path|traversal/i);
+  assert.throws(() => agents.validateFileProposals([{ path: '.env', content: 'SECRET=x' }], [{ path: 'README.md', content: 'context' }]), /blocked/i);
+  assert.throws(() => agents.validateFileProposals([{ path: 'large.txt', content: 'x'.repeat(workspace.MAX_FILE_BYTES + 1) }], [{ path: 'README.md', content: 'context' }]), /120 KB/i);
+});
+
+
+test('workspace file previews show bounded unified diffs for edits and creates', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-preview-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, 'hello.txt'), 'alpha\nbeta\ngamma\n');
+  await workspace.setRoot(root);
+  const edited = await workspace.previewChanges({ files: [{ path: 'hello.txt', content: 'alpha\nchanged\ngamma\n' }] });
+  assert.equal(edited.files[0].unchanged, false);
+  assert.match(edited.files[0].diff, /-beta/);
+  assert.match(edited.files[0].diff, /\+changed/);
+  const created = await workspace.previewChanges({ files: [{ path: 'new.txt', content: 'new file\n' }] });
+  assert.equal(created.files[0].created, true);
+  assert.match(created.files[0].diff, /\+new file/);
+  const unchanged = await workspace.previewChanges({ files: [{ path: 'hello.txt', content: 'alpha\nbeta\ngamma\n' }] });
+  assert.equal(unchanged.files[0].unchanged, true);
+  await assert.rejects(workspace.previewChanges({ files: [{ path: '../outside.txt', content: 'no' }] }), /relative path|traversal/i);
+});
+
+
+test('approved file changes are rejected if the target changes after diff review', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-stale-preview-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, 'hello.txt'), 'original\n');
+  await workspace.setRoot(root);
+  const proposal = { path: 'hello.txt', content: 'agent version\n' };
+  const preview = (await workspace.previewChanges({ files: [proposal] })).files[0];
+  await fs.writeFile(path.join(root, 'hello.txt'), 'user edited this meanwhile\n');
+  await assert.rejects(workspace.applyChanges({ approved: true, files: [{ ...proposal, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }] }), /changed after review/i);
+  assert.equal(await fs.readFile(path.join(root, 'hello.txt'), 'utf8'), 'user edited this meanwhile\n');
+});
+
+test('approved file creation is rejected if a file appears after review', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-stale-create-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await workspace.setRoot(root);
+  const proposal = { path: 'new.txt', content: 'agent version\n' };
+  const preview = (await workspace.previewChanges({ files: [proposal] })).files[0];
+  await fs.writeFile(path.join(root, 'new.txt'), 'user file\n');
+  await assert.rejects(workspace.applyChanges({ approved: true, files: [{ ...proposal, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }] }), /changed after review/i);
+  assert.equal(await fs.readFile(path.join(root, 'new.txt'), 'utf8'), 'user file\n');
 });

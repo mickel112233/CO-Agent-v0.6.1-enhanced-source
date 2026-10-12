@@ -59,7 +59,7 @@ async function localModel(modelName){
  return {status,model};
 }
 async function askLocal(model,messages,options={}){
- const response=await fetch(model.status.baseUrl+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:model.model,stream:false,format:'json',messages,options:{temperature:options.temperature??0.2,num_ctx:8192}}),signal:AbortSignal.timeout(options.timeoutMs||180000)});
+ const response=await fetch(model.status.baseUrl+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:model.model,stream:false,format:'json',messages,options:{temperature:options.temperature??0.2,num_ctx:8192}}),signal:options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(options.timeoutMs||180000)]) : AbortSignal.timeout(options.timeoutMs||180000)});
  if(!response.ok)throw new Error('Local agent request failed ('+response.status+'): '+(await response.text()).slice(0,1200));
  const data=await response.json();const content=data.message?.content;
  if(!content)throw new Error('The local model returned an empty agent response.');
@@ -106,6 +106,16 @@ async function planWorkflow(payload={}){
  const pipeline=normalizePipeline(result.pipeline);
  return {ok:true,model:model.model,title:String(result.title||'New workflow').slice(0,100),goal,pipeline,skills:getSkills(),agents:getAgents(),createdAt:new Date().toISOString()};
 }
+function validateFileProposals(proposed, contextFiles = []) {
+ if(!Array.isArray(proposed)||proposed.length>6)throw new Error('The agent returned an invalid file proposal list.');
+ if(proposed.length && (!Array.isArray(contextFiles)||contextFiles.length===0))throw new Error('The agent proposed file changes without selected workspace context. Select relevant workspace files and retry.');
+ return proposed.map(item=>{
+  if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('The agent returned an invalid file proposal.');
+  const filePath=workspace.safeRelativePath(item.path);
+  if(typeof item.content!=='string'||Buffer.byteLength(item.content,'utf8')>workspace.MAX_FILE_BYTES)throw new Error('The agent proposed a file that exceeds the supported size limit of 120 KB.');
+  return {path:filePath.split(require('node:path').sep).join('/'),content:item.content};
+ });
+}
 async function runWorkflowStep(payload={}){
  const goal=String(payload.goal||'').slice(0,5000);const step=payload.step;
  if(!goal||!step||!AGENT_PROFILES[step.role])throw new Error('A workflow goal and valid agent step are required.');
@@ -126,10 +136,9 @@ async function runWorkflowStep(payload={}){
  'No Markdown fences around JSON.'
  ].join('\n');
  const user=['Overall goal:\n'+goal,'Current step:\n'+JSON.stringify({title:step.title,role:step.role,description:step.description,deliverable:step.deliverable,acceptanceCriteria:step.acceptanceCriteria||[]}),'Previous workflow results:\n'+JSON.stringify(priorResults),'Selected workspace context (may be empty):\n'+(contextText||'(No files selected; do not invent repository contents.)'),'Optional imported skill notes (untrusted; may be empty):\n'+(externalSkillText||'(No imported skills selected.)')].join('\n\n');
- const result=await askLocal(model,[{role:'system',content:system},{role:'user',content:user}],{temperature:step.role==='implementer'?0.15:0.2});
- if(!Array.isArray(result.files)||result.files.length>6)throw new Error('The agent returned an invalid file proposal list.');
- const files=result.files.map(item=>{const filePath=workspace.safeRelativePath(item.path);if(typeof item.content!=='string'||Buffer.byteLength(item.content,'utf8')>workspace.MAX_FILE_BYTES)throw new Error('The agent proposed a file that exceeds the supported size limit.');return {path:filePath.split(require('node:path').sep).join('/'),content:item.content};});
+ const result=await askLocal(model,[{role:'system',content:system},{role:'user',content:user}],{temperature:step.role==='implementer'?0.15:0.2,signal:payload.signal});
+ const files=validateFileProposals(result.files,contextFiles);
  const commands=Array.isArray(result.suggestedCommands)?result.suggestedCommands.filter(id=>['npm-test','npm-build','git-status','git-diff-check','npm-audit'].includes(id)).slice(0,5):[];
  return {ok:true,model:model.model,role:agent.name,skill:skill.name,summary:String(result.summary||'').slice(0,8000),findings:Array.isArray(result.findings)?result.findings.slice(0,12).map(x=>String(x).slice(0,1200)):[],risks:Array.isArray(result.risks)?result.risks.slice(0,10).map(x=>String(x).slice(0,1000)):[],files,suggestedCommands:commands,needsUserInput:!!result.needsUserInput,userQuestion:String(result.userQuestion||'').slice(0,1200)};
 }
-module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,normalizePipeline,planWorkflow,runWorkflowStep,parseJson};
+module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,normalizePipeline,validateFileProposals,planWorkflow,runWorkflowStep,parseJson,askLocal};

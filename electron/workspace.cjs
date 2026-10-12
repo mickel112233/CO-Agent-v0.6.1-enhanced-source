@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 
 const MAX_FILE_BYTES = 120_000;
 const MAX_CHANGE_BYTES = 600_000;
@@ -110,6 +110,63 @@ async function readFile(relativePath) {
   const content = await fs.readFile(target.absolute, 'utf8');
   return { ok: true, path: target.relative.split(path.sep).join('/'), content, size: stat.size };
 }
+
+function createUnifiedDiff(relativePath, before, after, maxChars = 10000) {
+  if (before === after) return { diff: 'No changes: proposed content matches the existing file.', unchanged: true, truncated: false };
+  const oldLines = before === '' ? [] : before.replace(/\r\n/g, '\n').split('\n');
+  const newLines = after === '' ? [] : after.replace(/\r\n/g, '\n').split('\n');
+  let prefix = 0;
+  while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix++;
+  let suffix = 0;
+  while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix++;
+  const contextBefore = Math.min(3, prefix);
+  const start = prefix - contextBefore;
+  const oldEnd = oldLines.length - suffix;
+  const newEnd = newLines.length - suffix;
+  const contextAfter = Math.min(3, suffix);
+  const lines = ['--- ' + (oldLines.length ? 'a/' + relativePath : '/dev/null'), '+++ b/' + relativePath];
+  const oldCount = Math.max(0, oldEnd - start) + contextAfter;
+  const newCount = Math.max(0, newEnd - start) + contextAfter;
+  const oldStart = oldLines.length ? start + 1 : 0;
+  const newStart = newLines.length ? start + 1 : 0;
+  lines.push('@@ -' + oldStart + ',' + oldCount + ' +' + newStart + ',' + newCount + ' @@');
+  for (let i = start; i < prefix; i++) lines.push(' ' + oldLines[i]);
+  for (let i = prefix; i < oldEnd; i++) lines.push('-' + oldLines[i]);
+  for (let i = prefix; i < newEnd; i++) lines.push('+' + newLines[i]);
+  for (let i = 0; i < contextAfter; i++) lines.push(' ' + oldLines[oldEnd + i]);
+  let diff = lines.join('\n');
+  const truncated = diff.length > maxChars;
+  if (truncated) diff = diff.slice(0, maxChars) + '\n[Diff preview truncated. The complete proposal remains bounded to 120 KB per file.]';
+  return { diff, unchanged: false, truncated };
+}
+async function previewChanges(payload = {}) {
+  if (!Array.isArray(payload.files) || payload.files.length < 1 || payload.files.length > MAX_FILES_PER_CHANGE) throw new Error('Preview between 1 and 12 proposed file changes at a time.');
+  let total = 0;
+  const files = [];
+  for (const item of payload.files) {
+    const target = await resolveSafe(item.path, { allowMissing: true });
+    const normalizedRelative = target.relative.split(path.sep).join('/');
+    if (normalizedRelative.startsWith('.github/workflows/')) throw new Error('Agent writes to GitHub workflow files are blocked; edit workflow security settings manually.');
+    if (typeof item.content !== 'string') throw new Error('Each file change must include complete text content.');
+    const bytes = Buffer.byteLength(item.content, 'utf8');
+    if (bytes > MAX_FILE_BYTES) throw new Error('A proposed file exceeds the 120 KB limit: ' + item.path);
+    total += bytes;
+    if (total > MAX_CHANGE_BYTES) throw new Error('The complete change set exceeds 600 KB.');
+    const existing = await fs.lstat(target.absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+    if (existing && (!existing.isFile() || existing.isSymbolicLink())) throw new Error('Only regular files can be previewed: ' + item.path);
+    let before = '';
+    if (existing) {
+      const stat = await fs.stat(target.absolute);
+      if (stat.size > MAX_FILE_BYTES) throw new Error('Existing file exceeds the 120 KB diff preview limit: ' + item.path);
+      before = await fs.readFile(target.absolute, 'utf8');
+      if (before.includes('\0')) throw new Error('Binary files cannot be previewed as text: ' + item.path);
+    }
+    const diff = !existing && item.content === '' ? { diff: '--- /dev/null\n+++ b/' + normalizedRelative + '\n@@ -0,0 +0,0 @@', unchanged: false, truncated: false } : createUnifiedDiff(normalizedRelative, before, item.content);
+    files.push({ path: normalizedRelative, created: !existing, exists: !!existing, beforeHash: existing ? createHash('sha256').update(before, 'utf8').digest('hex') : null, oldBytes: Buffer.byteLength(before, 'utf8'), newBytes: bytes, oldLines: before === '' ? 0 : before.split(/\r?\n/).length, newLines: item.content === '' ? 0 : item.content.split(/\r?\n/).length, ...diff });
+  }
+  return { ok: true, files };
+}
+
 async function applyChanges(payload = {}) {
   if (payload.approved !== true) throw new Error('File changes require explicit user approval.');
   if (!Array.isArray(payload.files) || payload.files.length < 1 || payload.files.length > MAX_FILES_PER_CHANGE) throw new Error('Approve between 1 and 12 file changes at a time.');
@@ -130,7 +187,14 @@ async function applyChanges(payload = {}) {
     if (total > MAX_CHANGE_BYTES) throw new Error('The complete change set exceeds 600 KB.');
     const existing = await fs.lstat(target.absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
     if (existing && (!existing.isFile() || existing.isSymbolicLink())) throw new Error('Only regular files can be replaced: ' + item.path);
-    prepared.push({ ...target, content: item.content, bytes, existed: !!existing });
+    if (typeof item.expectedExists === 'boolean' && item.expectedExists !== !!existing) throw new Error('File changed after review; preview it again before applying: ' + item.path);
+    let currentHash = null;
+    if (existing && typeof item.expectedBeforeHash === 'string') {
+      const currentContent = await fs.readFile(target.absolute, 'utf8');
+      currentHash = createHash('sha256').update(currentContent, 'utf8').digest('hex');
+      if (currentHash !== item.expectedBeforeHash) throw new Error('File changed after review; preview it again before applying: ' + item.path);
+    }
+    prepared.push({ ...target, content: item.content, bytes, existed: !!existing, expectedBeforeHash: item.expectedBeforeHash, expectedExists: item.expectedExists });
   }
   const backupRoot = path.join(getRoot(), '.co-agent-backups', new Date().toISOString().replace(/[:.]/g, '-'));
   const backupPaths = new Map();
@@ -147,11 +211,23 @@ async function applyChanges(payload = {}) {
       backupPaths.set(item.relative, backup);
     }
     for (const item of prepared) {
+      if (typeof item.expectedExists === 'boolean') {
+        const current = await fs.lstat(item.absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+        if (!!current !== item.expectedExists) throw new Error('File changed after review; preview it again before applying: ' + item.relative);
+        if (current && typeof item.expectedBeforeHash === 'string') {
+          const currentContent = await fs.readFile(item.absolute, 'utf8');
+          if (createHash('sha256').update(currentContent, 'utf8').digest('hex') !== item.expectedBeforeHash) throw new Error('File changed after review; preview it again before applying: ' + item.relative);
+        }
+      }
       await fs.mkdir(path.dirname(item.absolute), { recursive: true });
       // Track before writing: a failed write can still truncate/create a partial file.
       attempted.push(item);
       await fs.writeFile(item.absolute, item.content, { encoding: 'utf8', flag: item.existed ? 'w' : 'wx' });
-      applied.push({ path: item.relative.split(path.sep).join('/'), bytes: item.bytes, created: !item.existed });
+      const written = await fs.readFile(item.absolute, 'utf8');
+      const expectedHash = createHash('sha256').update(item.content, 'utf8').digest('hex');
+      const actualHash = createHash('sha256').update(written, 'utf8').digest('hex');
+      if (actualHash !== expectedHash) throw new Error('Post-write verification failed for ' + item.relative + '; the file contents do not match the approved proposal.');
+      applied.push({ path: item.relative.split(path.sep).join('/'), bytes: item.bytes, created: !item.existed, sha256: actualHash, verified: true });
     }
   } catch (error) {
     const rollbackErrors = [];
@@ -227,4 +303,4 @@ function cancelCommand() {
   try { activeProcess.kill(); return { ok: true, runId }; }
   catch (error) { return { ok: false, error: error.message || String(error) }; }
 }
-module.exports = { setRoot, getRoot, listFiles, readFile, applyChanges, safeRelativePath, commandList, runCommand, cancelCommand, MAX_FILE_BYTES, MAX_CHANGE_BYTES, MAX_FILES_PER_CHANGE };
+module.exports = { setRoot, getRoot, listFiles, readFile, previewChanges, createUnifiedDiff, applyChanges, safeRelativePath, commandList, runCommand, cancelCommand, MAX_FILE_BYTES, MAX_CHANGE_BYTES, MAX_FILES_PER_CHANGE };

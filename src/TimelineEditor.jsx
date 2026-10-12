@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Film, Plus, Save, FolderOpen, Scissors, Trash2, ArrowLeft, ArrowRight, Music2, Image, Type, Video, Download, Clock3, Layers3, Undo2, Redo2 } from 'lucide-react';
 
 const desktop = window.coAgent;
@@ -22,8 +22,16 @@ export default function TimelineEditor({ onBasic }) {
   const [captionText, setCaptionText] = useState('Your title here');
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
+  const [renderProgress, setRenderProgress] = useState(null);
+  const renderRequestIdRef = useRef('');
   const [outputDir, setOutputDir] = useState('');
   const [filename, setFilename] = useState('co-agent-timeline.mp4');
+  useEffect(() => {
+    const unsubscribe = desktop?.studio?.onRenderProgress?.(event => {
+      if (event?.requestId && event.requestId === renderRequestIdRef.current) setRenderProgress(event);
+    });
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
   const selected = project.clips.find(clip => clip.id === selectedId) || null;
   const duration = Math.max(10, ...project.clips.map(clip => clip.timelineStart + clip.duration));
   const orderedClips = useMemo(() => [...project.clips].sort((a, b) => a.timelineStart - b.timelineStart), [project.clips]);
@@ -120,22 +128,38 @@ export default function TimelineEditor({ onBasic }) {
     finally { setBusy(''); }
   }
   async function exportTimeline() {
+    if (busy) return;
+    const requestId = 'render-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    renderRequestIdRef.current = requestId;
+    setRenderProgress({ requestId, percent: 0, seconds: 0, status: 'Preparing export…' });
     setBusy('render'); setNotice('');
     try {
       let dir = outputDir;
       if (!dir) { dir = await desktop.dialog.chooseDirectory(); if (!dir) return; setOutputDir(dir); }
-      const result = await desktop.studio.renderTimeline({ project, outputDir: dir, filename });
+      const result = await desktop.studio.renderTimeline({ project, outputDir: dir, filename, requestId });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Render failed.');
-      setNotice('Render complete: ' + result.output + ' (' + result.duration.toFixed(1) + ' sec).');
-    } catch (error) { setNotice(error.message || String(error)); }
-    finally { setBusy(''); }
+      setRenderProgress({ requestId, percent: 100, seconds: result.verifiedDuration || result.duration, status: 'Export verified' });
+      setNotice('Render complete and verified: ' + result.output + ' (' + result.duration.toFixed(1) + ' sec).');
+    } catch (error) {
+      setNotice((error.message || String(error)) + (/cancelled/i.test(error.message || '') ? ' Partial output was removed; any previous export was preserved.' : ''));
+    } finally { setBusy(''); renderRequestIdRef.current = ''; }
   }
+  async function cancelExport() {
+    const id = renderRequestIdRef.current;
+    if (!id) return;
+    try {
+      const result = await desktop.studio.cancelRender(id);
+      setNotice(result?.cancelled ? 'Render cancellation requested. Waiting for FFmpeg to stop safely…' : 'No active render was found.');
+    } catch (error) { setNotice(error.message || String(error)); }
+  }
+
   const previewUrl = selected?.file ? (selected.file.startsWith('file:') ? selected.file : 'file://' + selected.file.replace(/\\/g, '/')) : '';
   const PreviewIcon = selected?.type === 'audio' ? Music2 : selected?.type === 'image' ? Image : Film;
 
   return <section className="timeline-editor-view">
     <div className="timeline-editor-heading"><div><p className="eyebrow">NON-LINEAR EDITING</p><h1>Video Studio</h1><p className="subhead">Arrange video, image, audio, and title clips across independent tracks. Save editable projects and render an MP4 locally with FFmpeg.</p></div><div className="timeline-heading-actions"><button className="secondary-button" onClick={onBasic}><Layers3 size={14}/> Basic tools</button><button className="secondary-button" onClick={loadProject} disabled={!!busy}><FolderOpen size={14}/> Open project</button><button className="primary-button" onClick={saveProject} disabled={!!busy}><Save size={14}/> Save project</button></div></div>
     <div className="timeline-toolbar"><button className="secondary-button" onClick={importAssets} disabled={!!busy}><Plus size={14}/> Import media</button><button className="secondary-button timeline-history-button" onClick={undo} disabled={!undoStack.length || !!busy} title="Undo last timeline edit"><Undo2 size={14}/> Undo</button><button className="secondary-button timeline-history-button" onClick={redo} disabled={!redoStack.length || !!busy} title="Redo timeline edit"><Redo2 size={14}/> Redo</button><label className="timeline-project-name">Project title<input value={project.title} onChange={e => { const title = e.target.value; const next = { ...projectRef.current, title }; projectRef.current = next; setProject(next); setUndoStack(old => old.map(item => ({ ...item, title }))); setRedoStack(old => old.map(item => ({ ...item, title }))); }}/></label><span className="timeline-duration"><Clock3 size={14}/> {duration.toFixed(1)}s timeline</span><span className="timeline-duration">{project.clips.length} clips</span></div>
+    {busy === 'render' && <div className="timeline-render-progress" role="status" aria-live="polite"><div className="panel-heading"><strong>{renderProgress?.status || 'Rendering…'}</strong><span>{renderProgress?.percent == null ? 'Preparing' : renderProgress.percent + '%'}</span></div><progress max="100" value={renderProgress?.percent ?? 0} aria-label="Video export progress"/><small>{Number(renderProgress?.seconds || 0).toFixed(1)} seconds rendered. FFprobe verifies the output before it replaces the final file.</small><button className="secondary-button" onClick={cancelExport}>Cancel render</button></div>}
     <div className="timeline-workspace">
       <aside className="timeline-assets"><div className="panel-heading"><strong><FolderOpen size={15}/> Media assets</strong><span>{assets.length}</span></div>{assets.length ? assets.map(file => { const Icon = TYPES[inferType(file)]?.label === 'Audio' ? Music2 : TYPES[inferType(file)]?.label === 'Image' ? Image : Film; return <div className="timeline-asset" key={file}><Icon size={15}/><span title={file}>{baseName(file)}</span><button title="Add to timeline" onClick={() => addAsset(file)}><Plus size={14}/></button></div>; }) : <div className="timeline-asset-empty">Import video, audio, or image assets to begin.</div>}
         <div className="timeline-caption-add"><label>Title / caption<textarea value={captionText} onChange={e => setCaptionText(e.target.value)} maxLength={500}/></label><button className="secondary-button" onClick={addCaption} disabled={!captionText.trim()}><Type size={14}/> Add title at playhead</button></div>

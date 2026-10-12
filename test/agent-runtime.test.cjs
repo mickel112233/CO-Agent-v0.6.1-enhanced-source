@@ -87,3 +87,67 @@ test('API provider configuration validates model, key, and secure endpoint', () 
   assert.throws(() => validateProvider({ protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: '' }, 'key'), /model name/i);
   assert.doesNotThrow(() => validateProvider({ protocol: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local-model' }, ''));
 });
+
+
+test('API chat preserves user and assistant message roles instead of flattening history', async () => {
+  const { chatWithProvider } = require('../electron/agent-runtime.cjs');
+  let captured;
+  const result = await chatWithProvider(
+    { protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'test-model' },
+    'test-key',
+    [{ role: 'user', content: 'My name is Sam.' }, { role: 'assistant', content: 'Nice to meet you, Sam.' }, { role: 'user', content: 'What is my name?' }],
+    async (url, init) => {
+      captured = { url, body: JSON.parse(init.body), headers: init.headers };
+      return jsonResponse({ choices: [{ message: { content: 'Your name is Sam.' } }] });
+    }
+  );
+  assert.equal(result.message, 'Your name is Sam.');
+  assert.equal(captured.url, 'https://api.openai.com/v1/chat/completions');
+  assert.deepEqual(captured.body.messages.slice(1).map(message => message.role), ['user', 'assistant', 'user']);
+  assert.equal(captured.body.messages[1].content, 'My name is Sam.');
+  assert.equal(captured.headers.authorization, 'Bearer test-key');
+});
+
+test('API chat maps assistant history to Gemini model role and keeps system guidance separate', async () => {
+  const { chatWithProvider } = require('../electron/agent-runtime.cjs');
+  let captured;
+  const result = await chatWithProvider(
+    { protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-test' },
+    'secret',
+    [{ role: 'user', content: 'First turn' }, { role: 'assistant', content: 'Prior answer' }, { role: 'user', content: 'Follow up' }],
+    async (url, init) => {
+      captured = { url, body: JSON.parse(init.body) };
+      return jsonResponse({ candidates: [{ content: { parts: [{ text: 'Answer' }] } }] });
+    }
+  );
+  assert.equal(result.message, 'Answer');
+  assert.match(captured.url, /models\/gemini-test:generateContent\?key=secret$/);
+  assert.deepEqual(captured.body.contents.map(item => item.role), ['user', 'model', 'user']);
+  assert.match(captured.body.systemInstruction.parts[0].text, /CO-Agent/);
+});
+
+test('API chat uses Anthropic system field and rejects malformed or oversized histories', async () => {
+  const { chatWithProvider } = require('../electron/agent-runtime.cjs');
+  let captured;
+  const result = await chatWithProvider(
+    { protocol: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-test' },
+    'test-key',
+    [{ role: 'user', content: 'Hello' }, { role: 'assistant', content: 'Hi' }],
+    async (url, init) => {
+      captured = { url, body: JSON.parse(init.body) };
+      return jsonResponse({ content: [{ type: 'text', text: 'Next response' }] });
+    }
+  );
+  assert.equal(result.message, 'Next response');
+  assert.equal(captured.url, 'https://api.anthropic.com/v1/messages');
+  assert.match(captured.body.system, /CO-Agent/);
+  assert.deepEqual(captured.body.messages.map(item => item.role), ['user', 'assistant']);
+  await assert.rejects(chatWithProvider(
+    { protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'test-model' }, 'key',
+    [{ role: 'system', content: 'not allowed from renderer' }], async () => jsonResponse({ choices: [] })
+  ), /unsupported role/i);
+  await assert.rejects(chatWithProvider(
+    { protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'test-model' }, 'key',
+    Array.from({ length: 41 }, () => ({ role: 'user', content: 'x' })), async () => jsonResponse({ choices: [] })
+  ), /between 1 and 40 messages/i);
+});

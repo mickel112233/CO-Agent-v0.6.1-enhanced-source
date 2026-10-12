@@ -18,6 +18,7 @@ export default function ComputerUse() {
   const [screenText, setScreenText] = useState('');
   const [task, setTask] = useState('');
   const [plan, setPlan] = useState([]);
+  const [verification, setVerification] = useState(null);
 
   const capture = useCallback(async () => {
     setBusy('capture'); setNotice('');
@@ -67,6 +68,43 @@ export default function ComputerUse() {
     if (success) setPlan([]);
   }
 
+  async function invokeControl(item) {
+    if (!current || !item?.windowName || (!item.name && !item.automationId)) return;
+    const before = current;
+    const description = 'Invoke ' + (item.name || item.automationId) + ' in ' + item.windowName;
+    setBusy('invoke-control'); setNotice('Waiting for native Windows approval…'); setVerification(null);
+    try {
+      const result = await desktop?.computerUse?.invokeControl({
+        windowTitle: item.windowName, name: item.name || '', automationId: item.automationId || '',
+        controlType: item.type || ''
+      });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Accessibility control invocation failed.');
+      const after = await desktop?.computerUse?.captureScreen();
+      if (!Array.isArray(after) || !after.length) {
+        setNotice('Windows invoked the selected control, but CO-Agent could not recapture the desktop. Inspect it manually.');
+        return;
+      }
+      const afterIndex = Math.max(0, after.findIndex(screen => screen.displayId === before.displayId));
+      const observed = after[afterIndex] || after[0];
+      setScreens(after); setScreenIndex(afterIndex); setLastAction(description);
+      try {
+        const checked = await desktop?.computerUse?.verifyOutcome({
+          task: description + '. Verify only the visible result of this control invocation.',
+          action: 'Windows UI Automation Invoke pattern; exact window and control identity checked',
+          beforeImageBase64: String(before.dataUrl || '').split(',')[1] || '',
+          afterImageBase64: String(observed.dataUrl || '').split(',')[1] || '',
+          beforeText: screenText.slice(0, 3000), afterText: '', model: undefined
+        });
+        if (checked?.ok === false || checked?.error) throw new Error(checked.error || 'Visual verification failed.');
+        setVerification(checked);
+        setNotice('Semantic control invoked. Verification: ' + checked.status + ' (' + Math.round(checked.confidence * 100) + '% model confidence). ' + checked.evidence + ' Inspect the updated screenshot before continuing.');
+      } catch (error) {
+        setNotice('Semantic control invoked and a fresh screenshot was captured, but automated verification was unavailable: ' + (error.message || String(error)) + '. Inspect the screenshot manually.');
+      }
+    } catch (error) { setNotice(error.message || String(error)); }
+    finally { setBusy(''); }
+  }
+
   async function inspect() {
     setBusy('inspect'); setNotice('');
     try {
@@ -80,7 +118,8 @@ export default function ComputerUse() {
   }
 
   async function perform(action, payload, description) {
-    setBusy(action); setNotice('');
+    setBusy(action); setNotice(''); setVerification(null);
+    const before = current;
     try {
       const method = action === 'click' ? desktop.computerUse.click : action === 'type' ? desktop.computerUse.typeText : desktop.computerUse.pressKey;
       const result = await method({ ...payload, approved: true });
@@ -98,12 +137,24 @@ export default function ComputerUse() {
       const previousDisplayId = current?.displayId;
       const afterIndex = Math.max(0, after.findIndex(item => item.displayId === previousDisplayId));
       const observed = after[afterIndex] || after[0];
-      const changed = !!current && observed.dataUrl !== current.dataUrl;
+      const changed = !!before && observed.dataUrl !== before.dataUrl;
       setScreens(after);
       setScreenIndex(afterIndex);
-      setNotice(changed
-        ? 'Fresh screenshot captured; visible pixels changed. Review the updated screen to confirm the intended result before planning another action.'
-        : 'Fresh screenshot captured, but no visible change was detected. Check the focused app and target before trying again.');
+      try {
+        const beforeBase64 = String(before?.dataUrl || '').split(',')[1] || '';
+        const afterBase64 = String(observed.dataUrl || '').split(',')[1] || '';
+        const checked = await desktop?.computerUse?.verifyOutcome({
+          task: task.trim() || 'Assess the visible result of this approved desktop action.',
+          action: description, beforeImageBase64: beforeBase64, afterImageBase64: afterBase64,
+          beforeText: screenText.slice(0, 3000), afterText: '', model: undefined
+        });
+        if (checked?.ok === false || checked?.error) throw new Error(checked.error || 'Verification failed.');
+        setVerification(checked);
+        const assessment = checked.status === 'verified' ? 'The local model thinks the goal may be achieved' : checked.status === 'not_verified' ? 'The local model did not find evidence that the goal was achieved' : 'The local model could not determine whether the goal was achieved';
+        setNotice(assessment + ' (' + Math.round(checked.confidence * 100) + '% confidence). ' + checked.evidence + ' Inspect the screenshot before continuing.');
+      } catch (error) {
+        setNotice('Fresh screenshot captured (' + (changed ? 'visible pixels changed' : 'no visible change detected') + '), but automated verification was unavailable: ' + (error.message || String(error)) + ' Inspect the screenshot manually.');
+      }
       return true;
     } catch (error) { setNotice(error.message || String(error)); }
     finally { setBusy(''); }
@@ -117,6 +168,7 @@ export default function ComputerUse() {
     </div>
     <div className="computer-safety"><ShieldCheck size={20}/><div><strong>Approval required for every action</strong><p>Local Ollama receives the captured screenshot and optional OCR to propose a short grounded plan. It cannot execute automatically. A native Windows confirmation dialog is shown for every input action. Review each action and capture again to verify the result.</p></div></div>
     <div className="computer-planner"><label>What should CO-Agent do?<textarea value={task} onChange={e => setTask(e.target.value)} maxLength={2000} placeholder="Example: open the settings page and find the display scaling option…"/></label><button className="primary-button" onClick={planTask} disabled={!current || !task.trim() || !!busy}><Sparkles size={14}/>{busy === 'plan' ? 'Planning locally…' : 'Plan with local model'}</button><small>Uses the selected local Ollama model with the actual captured screenshot and optional OCR. Review every coordinate and action. Each input still needs a separate Windows confirmation. Never use it for passwords, purchases, deleting files, or sending/submitting content.</small>{plan.length > 0 && <div className="computer-plan-list"><div className="computer-plan-heading"><strong>Suggested steps · {plan.length}</strong><button className="text-link" onClick={() => setPlan([])}>Discard plan</button></div>{plan.map(action => <article key={action.id} className="computer-plan-step"><div><strong>{action.id}. {action.type === 'click' ? 'Click ' + action.x + ', ' + action.y : action.type === 'type' ? 'Type text' : 'Press ' + action.key}</strong><p>{action.reason}</p>{action.type === 'type' && <code>{action.text}</code>}</div><button className="secondary-button" disabled={!!busy} onClick={() => runPlanned(action)}><Play size={13}/> Approve step</button></article>)}</div>}</div>
+    {verification && <div className="computer-safety"><ShieldCheck size={19}/><div><strong>Local outcome assessment: {verification.status.replace('_', ' ')}</strong><p>{verification.evidence}</p><p>Confidence: {Math.round(verification.confidence * 100)}%. {verification.disclaimer}</p><p>Suggested safe next step: {verification.nextStep}</p></div></div>}
     <div className="computer-use-grid">
       <div className="computer-screen-card">
         <div className="panel-heading"><strong><Monitor size={16}/> Desktop capture</strong><div className="computer-panel-actions"><span>{current ? current.width + ' × ' + current.height : 'No capture'}</span><button className="secondary-button" onClick={readText} disabled={!current || !!busy}><ScanSearch size={13}/>{busy === 'ocr' ? 'Reading…' : 'Read screen text'}</button></div></div>
@@ -132,7 +184,7 @@ export default function ComputerUse() {
         <div className="panel-heading"><strong><ScanSearch size={16}/> Windows accessibility</strong><button className="tool-button" title="Inspect windows" onClick={inspect} disabled={!!busy}><RefreshCw size={14}/></button></div>
         <p className="computer-help">Read top-level window names and basic UI Automation properties from Windows. This helps identify the app you intend to control; it does not inspect private content in the background.</p>
         <button className="secondary-button" onClick={inspect} disabled={!!busy}><Eye size={14}/>{busy === 'inspect' ? 'Inspecting…' : 'Inspect accessible windows'}</button>
-        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Window'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}{accessibilityControls.length > 0 && <div className="computer-window-list computer-control-list"><strong className="computer-control-heading">Visible interactive controls · {accessibilityControls.length}</strong>{accessibilityControls.slice(0, 80).map((item, i) => <div key={i}><strong>{item.name || item.type || 'Unnamed control'}</strong><small>{item.type || 'Control'} · {item.enabled ? 'enabled' : 'disabled'} · {item.x},{item.y} · {item.width}×{item.height}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div>}
+        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Window'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}{accessibilityControls.length > 0 && <div className="computer-window-list computer-control-list"><strong className="computer-control-heading">Visible interactive controls · {accessibilityControls.length}</strong>{accessibilityControls.slice(0, 80).map((item, i) => <div key={i}><strong>{item.name || item.type || 'Unnamed control'}</strong><small>{item.windowName ? item.windowName + ' · ' : ''}{item.type || 'Control'} · {item.enabled ? 'enabled' : 'disabled'} · {item.x},{item.y} · {item.width}×{item.height}{item.automationId ? ' · ID ' + item.automationId : ''}</small><button className="tool-button" disabled={!!busy || !item.enabled || !item.windowName} onClick={() => invokeControl(item)} title="Invoke this exact control through Windows UI Automation">Invoke control</button></div>)}</div>}
       </div>
     </div>
     {lastAction && <p className="computer-last-action"><CheckCircle2 size={15}/> Last approved action: {lastAction}</p>}

@@ -12,6 +12,7 @@
     "dist:linux": "npm run build && electron-builder --linux AppImage",
     "dist:win": "npm run build && electron-builder --win nsis",
     "dist:mac": "npm run build && electron-builder --mac dmg",
+    "verify:release": "node scripts/verify-release.cjs",
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
@@ -47,20 +48,10 @@
       "output": "release"
     },
     "linux": {
-      "target": [
-        "AppImage"
-      ],
+      "target": ["AppImage"],
       "category": "Development"
     },
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ]
-    }
+    "win": { "target": ["nsis"] },
+    "mac": { "target": ["dmg"] }
   }
 }

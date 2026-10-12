@@ -51,6 +51,8 @@ test('export verification rejects missing video streams and invalid duration met
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '0' }, streams: [{ codec_type: 'video' }] }, 2048), /duration/i);
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '12' }, streams: [{ codec_type: 'audio' }] }, 2048), /video stream/i);
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '12' }, streams: [{ codec_type: 'video' }] }, 20), /small/i);
+  assert.throws(() => timeline.validateExportMetadata({ format: { duration: '4.1' }, streams: [{ codec_type: 'video' }] }, 2048, 10), /truncated/i);
+  assert.doesNotThrow(() => timeline.validateExportMetadata({ format: { duration: '9.8' }, streams: [{ codec_type: 'video' }] }, 2048, 10));
 });
 
 test('caption filter escaping handles common filter syntax characters', () => {
@@ -81,4 +83,55 @@ test('media path validation rejects control characters and invalid values', () =
   assert.throws(() => studio.validateMediaPath('clip.mp4\tfile'), /control characters/i);
   assert.throws(() => studio.validateMediaPath(''), /required/i);
   assert.doesNotThrow(() => studio.validateMediaPath('clip.mp4'));
+});
+
+test('FFmpeg progress parser bounds progress and reports time accurately', () => {
+  assert.deepEqual(timeline.parseFfmpegProgress({ out_time: '00:00:05.000000', progress: 'continue' }, 10), {
+    seconds: 5, percent: 50, status: 'Rendering video…'
+  });
+  assert.equal(timeline.parseFfmpegProgress({ out_time_ms: '20000000', progress: 'continue' }, 10).percent, 99);
+  assert.equal(timeline.parseFfmpegProgress({ out_time: '00:00:10.000000', progress: 'end' }, 10).status, 'Finalizing export…');
+});
+
+test('export validation requires expected audio streams when audio clips were rendered', () => {
+  assert.throws(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }] }, 2048, 4, true), /missing its expected audio stream/i);
+  assert.doesNotThrow(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }, { codec_type: 'audio' }] }, 2048, 4, true));
+});
+
+
+test('FFmpeg runner emits parsed progress and aborts a running child process', async () => {
+  const { EventEmitter } = require('node:events');
+  let child;
+  const progress = [];
+  const controller = new AbortController();
+  const fakeSpawn = () => {
+    child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => { setImmediate(() => child.emit('close', null)); return true; };
+    return child;
+  };
+  const pending = timeline.run('fake-ffmpeg', [], { signal: controller.signal, spawn: fakeSpawn, duration: 10, onProgress: value => progress.push(value) });
+  child.stdout.emit('data', Buffer.from('out_time=00:00:05.000000\nprogress=continue\n'));
+  assert.equal(progress[0].percent, 50);
+  controller.abort();
+  await assert.rejects(pending, /cancelled by user/i);
+});
+
+
+test('accessibility targets require an exact window and unique semantic control identity', () => {
+  assert.deepEqual(computerUse.normalizeAccessibleTarget({
+    windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button'
+  }), { windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button' });
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ name: 'Display' }), /exact title/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings' }), /exact name or Automation ID/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', name: 'Display', controlType: 'Button' }), /control type is invalid/i);
+  assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', automationId: 'x'.repeat(301) }), /Automation ID/i);
+});
+
+
+test('semantic UI Automation refuses unapproved invocation before platform access', async () => {
+  await assert.rejects(computerUse.invokeAccessibleControl({
+    windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button'
+  }), /explicit user approval/i);
 });

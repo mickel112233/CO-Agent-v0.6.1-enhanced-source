@@ -12,7 +12,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 [![Release](https://img.shields.io/github/v/release/mickel112233/CO-Agent-v0.6.1-enhanced-source?display_name=tag)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
 [![Version](https://img.shields.io/badge/app-0.6.1-informational)](package.json)
 
-**[Quick start](#-quick-start) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
+**[Quick start](#-quick-start) · [Capability scorecard](CAPABILITY-SCORECARD.md) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
 
 </div>
 
@@ -26,6 +26,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | Capability | Available now | Boundary / requirement |
 |---|---|---|
 | Local AI chat | Chat through Ollama and select installed models | Ollama must be installed and running; responses currently do not stream |
+| Optional API chat | OpenAI-compatible, Anthropic, and Gemini endpoints with multi-turn role-preserving history | User supplies credentials; API messages are sent to the selected provider; responses currently do not stream |
 | Multi-agent workflows | Local-model task planner, sixteen specialist roles, dependency-aware pipeline, reviewer/tester steps, structured results, and twenty-six built-in skills | Each step is started by the user; local Ollama required; agent file proposals require separate approval |
 | Workspace file tools | Select a project folder, browse/read context files, preview model-proposed full-file changes, and back up existing files before applying | Only selected files are sent to the local model; path traversal, symlinks, common secret files, and protected build/dependency folders are blocked |
 | In-app terminal | Run project tests, renderer build, Git status/diff check, and dependency audit with live output | Fixed command presets only; native confirmation each run; project scripts still execute with your user permissions |

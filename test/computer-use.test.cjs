@@ -33,3 +33,14 @@ test('computer-use native input requires an explicit approval flag', () => {
   assert.throws(() => assertApproved({}), /explicit user approval/i);
   assert.doesNotThrow(() => assertApproved({ approved: true }));
 });
+
+test('computer-use outcome verification normalizes evidence and rejects overconfident invalid output', () => {
+  const { normalizeVerification } = require('../electron/computer-use.cjs');
+  assert.deepEqual(normalizeVerification({ status: 'verified', confidence: 0.876, evidence: 'A success banner is visible.', nextStep: 'Inspect manually.' }), {
+    status: 'verified', confidence: 0.88, evidence: 'A success banner is visible.', nextStep: 'Inspect manually.'
+  });
+  assert.equal(normalizeVerification({ status: 'uncertain', confidence: 0.2 }).status, 'uncertain');
+  assert.throws(() => normalizeVerification({ status: 'done', confidence: 1 }), /unsupported status/i);
+  assert.throws(() => normalizeVerification({ status: 'verified', confidence: 1.2 }), /confidence/i);
+  assert.throws(() => normalizeVerification({ status: 'verified', confidence: 'high' }), /confidence/i);
+});
