@@ -112,7 +112,7 @@ function validateFileProposals(proposed, contextFiles = []) {
  return proposed.map(item=>{
   if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('The agent returned an invalid file proposal.');
   const filePath=workspace.safeRelativePath(item.path);
-  if(typeof item.content!=='string'||Buffer.byteLength(item.content,'utf8')>workspace.MAX_FILE_BYTES)throw new Error('The agent proposed a file that exceeds the supported size limit.');
+  if(typeof item.content!=='string'||Buffer.byteLength(item.content,'utf8')>workspace.MAX_FILE_BYTES)throw new Error('The agent proposed a file that exceeds the supported size limit of 120 KB.');
   return {path:filePath.split(require('node:path').sep).join('/'),content:item.content};
  });
 }
