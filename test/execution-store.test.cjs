@@ -61,7 +61,6 @@ test('pause, resume, approval checkpoint, and cancellation are durable', async t
   await assert.rejects(store.updateStep(run.id, 'one', 'complete', { result: 'done' }), /explicit user approval/i);
   await store.updateStep(run.id, 'one', 'complete', { approved: true, result: 'reviewed' });
   await store.pause(run.id).catch(() => {});
-  const second = await store.createStore?.(file);
   assert.equal((await createStore(file).get(run.id)).steps[0].result, 'reviewed');
   const cancelled = await store.cancel(run.id);
   assert.equal(cancelled.status, 'cancelled');

@@ -98,7 +98,8 @@ function registerIpc() {
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));
   handle('agents:run-step', payload => agentOrchestrator.runWorkflowStep(payload));
-  const runs = () => executionStore.createStore(path.join(app.getPath('userData'), 'workflow-runs.json'));
+  let workflowRunStore;
+  const runs = () => workflowRunStore || (workflowRunStore = executionStore.createStore(path.join(app.getPath('userData'), 'workflow-runs.json')));
   handle('agents:runs:list', async () => ({ ok: true, runs: await (await runs()).list() }));
   handle('agents:runs:create', async payload => ({ ok: true, run: await (await runs()).create(payload) }));
   handle('agents:runs:update-step', async payload => ({ ok: true, run: await (await runs()).updateStep(payload?.runId, payload?.stepId, payload?.action, payload || {}) }));

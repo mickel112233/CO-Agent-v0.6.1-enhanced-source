@@ -12,7 +12,7 @@ const RUN_STATUSES = new Set(['ready', 'running', 'paused', 'completed', 'failed
 const STEP_STATUSES = new Set(['queued', 'running', 'awaiting-approval', 'completed', 'failed', 'cancelled']);
 
 function cleanText(value, max, fallback = '') {
-  return String(value ?? fallback).replace(/[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]/g, '').slice(0, max);
+  return String(value ?? fallback).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, max);
 }
 function normalizeSteps(input) {
   if (!Array.isArray(input) || input.length < 1 || input.length > MAX_STEPS) throw new Error('A run must contain between 1 and ' + MAX_STEPS + ' steps.');
