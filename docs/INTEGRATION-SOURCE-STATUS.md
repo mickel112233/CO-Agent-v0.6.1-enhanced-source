@@ -26,7 +26,7 @@ git submodule update --init --recursive
 
 ### Desktop pet
 - Build the Tauri overlay on supported Windows machines and test its transparent window, click-through behavior, drag/drop, DPI scaling, and multiple monitors.
-- The Electron bridge now discovers, launches, tracks, and closes the upstream executable through trusted IPC; it requires an explicit native approval before launch. The executable is not built automatically, and the upstream app has not yet been adapted into a CO-Agent-controlled overlay.
+- The Electron bridge now discovers, launches, tracks, and closes the upstream executable through trusted IPC; it requires an explicit native approval before launch. Windows CI now builds and bundles the upstream executable via the pinned Tauri source. Local packaging can omit it when the executable is absent. The upstream app has not yet been adapted into a CO-Agent-controlled overlay.
 - Route pet chat and computer actions through CO-Agent's existing runtime/approval flow; currently only launching the separate pet app is bridged, not the pet's chat/actions.
 - Include required built artifacts/assets in packaging and verify clean-install behavior.
 - Run overlay regression tests and a Windows packaged-app smoke test.
