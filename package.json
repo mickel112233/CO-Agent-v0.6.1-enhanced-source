@@ -12,7 +12,8 @@
     "dist:linux": "npm run build && electron-builder --linux AppImage",
     "dist:win": "npm run build && electron-builder --win nsis",
     "dist:mac": "npm run build && electron-builder --mac dmg",
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1 test/*.test.cjs",
+    "build:pet:win": "npm ci --prefix integrations/AI-Desktop-Pet && npm run build --prefix integrations/AI-Desktop-Pet && cargo build --release --manifest-path integrations/AI-Desktop-Pet/src-tauri/Cargo.toml"
   },
   "dependencies": {
     "ffmpeg-static": "^5.3.0",
@@ -41,7 +42,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json"
+      "package.json",
+      "scripts/**/*"
     ],
     "directories": {
       "output": "release"
@@ -61,6 +63,21 @@
       "target": [
         "dmg"
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "third_party/LuxTTS",
+        "to": "luxtts/LuxTTS",
+        "filter": [
+          "**/*",
+          "!**/.git/**"
+        ]
+      },
+      {
+        "from": "scripts/luxtts-worker.py",
+        "to": "scripts/luxtts-worker.py"
+      }
+    ],
+    "afterPack": "scripts/after-pack.cjs"
   }
 }

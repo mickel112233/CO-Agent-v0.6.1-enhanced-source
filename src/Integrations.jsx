@@ -18,11 +18,19 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [notice, setNotice] = useState('');
   const [showRepoForm, setShowRepoForm] = useState(false);
   const [skillPreviews, setSkillPreviews] = useState({});
+  const [petStatus, setPetStatus] = useState(null);
+  const [luxStatus, setLuxStatus] = useState(null);
+  const [voiceText, setVoiceText] = useState('Hello! This is a local voice generation test from CO-Agent.');
+  const [referenceAudio, setReferenceAudio] = useState('');
+  const [voiceOutput, setVoiceOutput] = useState('');
+  const [luxProgress, setLuxProgress] = useState(null);
+  const [activeLuxRequest, setActiveLuxRequest] = useState('');
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
     try {
-      const [toolStatus, installed] = await Promise.all([desktop.integrations.status(), desktop.integrations.listRepos()]);
+      const [toolStatus, installed, pet, lux] = await Promise.all([desktop.integrations.status(), desktop.integrations.listRepos(), desktop.pet.status(), desktop.luxTTS.status()]);
+      setPetStatus(pet); setLuxStatus(lux);
       if (toolStatus?.error) throw new Error(toolStatus.error);
       setStatus(toolStatus); setRepos(Array.isArray(installed) ? installed : []);
     } catch (error) { setNotice(formatError(error)); }
@@ -30,6 +38,60 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const unsubscribeSetup = desktop?.luxTTS?.onSetupProgress?.(progress => setLuxProgress(progress));
+    const unsubscribeGeneration = desktop?.luxTTS?.onGenerationProgress?.(progress => {
+      if (!activeLuxRequest || progress?.requestId === activeLuxRequest) setLuxProgress(progress);
+    });
+    return () => {
+      if (typeof unsubscribeSetup === 'function') unsubscribeSetup();
+      if (typeof unsubscribeGeneration === 'function') unsubscribeGeneration();
+    };
+  }, [activeLuxRequest]);
+
+  async function launchPet() {
+    setBusy('pet'); setNotice('');
+    try { const result = await desktop.pet.launch(); if (result?.ok === false || result?.error) throw new Error(result.error || 'Pet launch failed.'); setNotice(result.alreadyRunning ? 'Desktop pet is already running.' : 'Desktop pet launched.'); setPetStatus(await desktop.pet.status()); }
+    catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
+  async function closePet() {
+    setBusy('pet');
+    try { const result = await desktop.pet.close(); if (result?.ok === false || result?.error) throw new Error(result.error || 'Pet close failed.'); setNotice(result.stopped ? 'Desktop pet closed.' : 'CO-Agent has no tracked pet process to close.'); setPetStatus(await desktop.pet.status()); }
+    catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
+  async function setupLuxTTS() {
+    setBusy('luxtts-setup'); setNotice('Preparing managed LuxTTS Python environment…'); setLuxProgress({ stage: 'starting', message: 'Starting setup. Dependencies may take a long time to download.' });
+    try { const result = await desktop.luxTTS.setup(); if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS setup failed.'); setNotice(result.message || 'LuxTTS setup completed.'); setLuxStatus(await desktop.luxTTS.status()); }
+    catch (error) { setNotice('LuxTTS setup failed: ' + formatError(error)); }
+    finally { setBusy(''); setLuxProgress(null); }
+  }
+  async function pickReferenceAudio() {
+    try { const files = await desktop.dialog.openFiles({ multiple: false, filters: [{ name: 'Reference audio', extensions: ['wav','mp3','flac','m4a','ogg'] }] }); if (files?.[0]) setReferenceAudio(files[0]); }
+    catch (error) { setNotice(formatError(error)); }
+  }
+  async function generateLuxVoice() {
+    if (!referenceAudio) { setNotice('Choose a reference audio file first. LuxTTS uses it to condition the generated voice.'); return; }
+    setBusy('luxtts-generate'); setLuxProgress({ stage: 'starting', message: 'Starting local voice generation…' }); setNotice('Generating speech locally. The first run may download model weights.');
+    try {
+      let output = voiceOutput.trim();
+      if (!output) { output = await desktop.dialog.saveFile({ defaultPath: 'co-agent-speech.wav' }); if (!output) return; setVoiceOutput(output); }
+      const requestId = 'luxtts-' + Date.now().toString(36);
+      setActiveLuxRequest(requestId);
+      const result = await desktop.luxTTS.generate({ text: voiceText, referenceAudio, outputPath: output, numSteps: 4, speed: 1, requestId });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS generation failed.');
+      setNotice('Speech created: ' + result.output + ' (' + Math.round(result.bytes / 1024) + ' KB, 48 kHz).');
+    } catch (error) { setNotice('LuxTTS generation failed: ' + formatError(error)); }
+    finally { setBusy(''); setActiveLuxRequest(''); setLuxProgress(null); }
+  }
+
+  async function cancelLuxVoice() {
+    if (!activeLuxRequest) return;
+    try { const result = await desktop.luxTTS.cancel(activeLuxRequest); setNotice(result?.cancelled ? 'LuxTTS cancellation requested.' : 'LuxTTS job is no longer running.'); }
+    catch (error) { setNotice(formatError(error)); }
+  }
 
   async function installTool(tool) {
     if (!tool.installAvailable) {
@@ -100,6 +162,30 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     </div>
 
     <div className="integration-banner"><div className="integration-banner-icon"><ShieldCheck size={21}/></div><div><strong>Optional by design. Review before you trust.</strong><p>Chat works without these extras. OCR, video rendering, and voice add capabilities when you need them. Imported repositories are not executed automatically.</p></div></div>
+
+    <div className="integration-section-heading"><div><h2>Desktop pet & local voice</h2><p>Optional companion overlay and local voice cloning. Setup is explicit and may download substantial dependencies.</p></div></div>
+    <div className="integration-cards">
+      <article className="integration-card">
+        <div className="integration-card-top"><span className="integration-icon"><Sparkles size={20}/></span><span className={'integration-state ' + (petStatus?.running ? 'ready' : 'optional')}>{petStatus?.running ? 'Running' : petStatus?.installed ? 'Ready' : 'Source only'}</span></div>
+        <h3>CO-Agent desktop pet</h3><p>Launch the separate Tauri desktop companion through an approved native process bridge.</p>
+        <div className="integration-card-meta"><span>{petStatus?.installed ? 'Windows executable detected' : 'Tauri 2 executable not packaged'}</span></div>
+        <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy || !petStatus?.installed} onClick={launchPet}>{busy === 'pet' ? 'Working…' : petStatus?.running ? 'Launch / focus' : 'Launch pet'}</button><button className="text-link" disabled={!!busy || !petStatus?.running} onClick={closePet}>Close tracked process</button></div>
+        {!petStatus?.installed && <p className="integration-note">{petStatus?.message || 'Build and package convai-desktop-pet.exe before launching.'}</p>}
+      </article>
+      <article className="integration-card luxtts-card">
+        <div className="integration-card-top"><span className="integration-icon"><Volume2 size={20}/></span><span className={'integration-state ' + (luxStatus?.installed ? 'ready' : 'optional')}>{luxStatus?.installed ? 'Runtime ready' : 'Setup required'}</span></div>
+        <h3>LuxTTS local voice</h3><p>Generate 48 kHz speech using a reference voice audio file. The model weights are fetched on first generation.</p>
+        <div className="integration-card-meta"><span>Local Python environment · no API key</span><span>{luxStatus?.pythonAvailable ? 'Python ready' : 'Python not provisioned'}</span></div>
+        {!luxStatus?.installed ? <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy} onClick={setupLuxTTS}>{busy === 'luxtts-setup' ? 'Installing dependencies…' : 'Set up LuxTTS'}</button><span className="integration-note">Setup installs dependencies in an isolated environment and may download several GB.</span></div> :
+          <div className="luxtts-form">
+            <label>Text to speak<textarea value={voiceText} maxLength={12000} onChange={event => setVoiceText(event.target.value)} rows={3}/></label>
+            <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy} onClick={pickReferenceAudio}>Choose reference audio</button><span className="integration-note">{referenceAudio || 'Use a reference clip of at least 3 seconds.'}</span></div>
+            <label>Output WAV path (optional)<input value={voiceOutput} onChange={event => setVoiceOutput(event.target.value)} placeholder="Choose a save location when generating"/></label>
+            <div className="integration-card-actions"><button className="primary-button" disabled={!!busy || !voiceText.trim() || !referenceAudio} onClick={generateLuxVoice}>{busy === 'luxtts-generate' ? 'Generating…' : 'Generate local speech'}</button>{busy === 'luxtts-generate' && <><button className="secondary-button" onClick={cancelLuxVoice}>Cancel generation</button><span className="integration-note">{luxProgress?.message || 'Generating local audio…'}</span></>}</div>
+          </div>}
+        {busy === 'luxtts-setup' && <p className="integration-note">{luxProgress?.message || 'Setting up Python environment…'}</p>}
+      </article>
+    </div>
 
     <div className="integration-section-heading"><div><h2>Local tools</h2><p>Install only the capabilities you want. Core CO-Agent stays lightweight.</p></div><span className="section-count">{status?.tools?.filter(t => t.installed).length || 0} ready</span></div>
     <div className="integration-cards">

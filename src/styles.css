@@ -416,3 +416,20 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 /* Timeline undo and redo */
 .timeline-history-button{margin:0;padding:8px 10px;white-space:nowrap}
 .timeline-history-button:disabled{opacity:.42}
+
+
+/* Reviewable AI timeline edits */
+.timeline-ai-edit-panel{margin:0 0 15px;padding:14px 15px;border:1px solid #e0e5da;border-radius:12px;background:#fbfcf9}
+.timeline-ai-edit-panel>p{margin:8px 0 11px;color:#7a7f73;font-size:11px;line-height:1.55}
+.timeline-ai-edit-controls{display:flex;align-items:stretch;gap:9px}
+.timeline-ai-edit-controls textarea{flex:1;min-width:0;resize:vertical;padding:10px 11px;border:1px solid #dfe3d9;border-radius:9px;background:#fff;color:#30332c;font:inherit;font-size:12px;line-height:1.5}
+.timeline-ai-edit-controls .primary-button{align-self:flex-end;white-space:nowrap}
+.timeline-ai-plan{margin-top:12px;padding:12px;border:1px solid #dce6d5;border-radius:10px;background:#fff}
+.timeline-ai-plan>div:first-child{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;color:#3f4a38;font-size:11px}
+.timeline-ai-plan>div:first-child span{white-space:nowrap;color:#798271}
+.timeline-ai-plan ol{display:flex;flex-direction:column;gap:6px;margin:10px 0 13px;padding-left:20px;color:#5e6558;font-size:11px;line-height:1.5}
+.timeline-ai-plan-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.luxtts-form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.luxtts-form label{display:flex;flex-direction:column;gap:6px;color:#73786c;font-size:10px;font-weight:650}
+.luxtts-form textarea,.luxtts-form input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #dfe3d9;border-radius:8px;background:#fff;color:#30332c;font:inherit;font-size:11px}
+@media(max-width:620px){.timeline-ai-edit-controls{flex-direction:column}.timeline-ai-edit-controls .primary-button{align-self:stretch}.timeline-ai-plan>div:first-child{flex-direction:column;gap:4px}.timeline-ai-plan-actions>*{flex:1}.luxtts-form .integration-card-actions{align-items:flex-start;flex-direction:column}}

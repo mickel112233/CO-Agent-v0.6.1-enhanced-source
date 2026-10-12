@@ -1,0 +1,6 @@
+[submodule "integrations/AI-Desktop-Pet"]
+	path = integrations/AI-Desktop-Pet
+	url = https://github.com/AkshitIreddy/AI-Desktop-Pet.git
+[submodule "third_party/LuxTTS"]
+	path = third_party/LuxTTS
+	url = https://github.com/ysharma3501/LuxTTS.git

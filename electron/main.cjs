@@ -11,6 +11,8 @@ const computerUse = require('./computer-use.cjs');
 const studio = require('./studio.cjs');
 const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
+const petRuntime = require('./pet-runtime.cjs');
+const luxTTS = require('./luxtts.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const agentOrchestrator = require('./agent-orchestrator.cjs');
 const workspace = require('./workspace.cjs');
@@ -192,6 +194,23 @@ function registerIpc() {
   handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
+  handle('pet:status', () => petRuntime.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
+  handle('pet:launch', async () => {
+    if (!await confirmComputerAction('Launch the CO-Agent desktop pet?', 'This starts the separately built AI-Desktop-Pet desktop application. It receives no chat history or API keys from CO-Agent.')) throw new Error('Desktop pet launch cancelled by user.');
+    return petRuntime.launch({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath });
+  });
+  handle('pet:close', () => petRuntime.stop());
+  handle('luxtts:status', () => luxTTS.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
+  handle('luxtts:setup', async args => {
+    if (!await confirmComputerAction('Install LuxTTS local voice runtime?', 'This creates an isolated Python environment and installs LuxTTS dependencies. It may download several gigabytes and can take a long time. No API key is required.')) throw new Error('LuxTTS setup cancelled by user.');
+    return luxTTS.setup(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }, progress => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:setup-progress', progress);
+    });
+  });
+  handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }, progress => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:generation-progress', progress);
+  }));
+  handle('luxtts:cancel', requestId => luxTTS.cancel(requestId));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-text-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -248,4 +267,5 @@ app.whenReady().then(async () => {
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
+app.on('before-quit', () => { petRuntime.stop(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
