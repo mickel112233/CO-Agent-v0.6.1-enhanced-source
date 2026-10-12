@@ -48,7 +48,7 @@ async function status(options = {}) {
       : 'LuxTTS is not provisioned yet. CO-Agent needs its managed Python environment, pinned LuxTTS source, and worker script.'
   };
 }
-async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed = 1, timeoutMs = MAX_TIMEOUT_MS, requestId = '' } = {}, options = {}) {
+async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed = 1, timeoutMs = MAX_TIMEOUT_MS, requestId = '' } = {}, options = {}, onProgress = () => {}) {
   const input = String(text || '').trim();
   if (!input) throw new Error('Enter text to synthesize.');
   if (input.length > MAX_TEXT_LENGTH) throw new Error('LuxTTS text exceeds the 12,000 character limit.');
@@ -69,11 +69,15 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
   return new Promise((resolve, reject) => {
     const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
-    let stdout = '', stderr = '', settled = false, timer;
+    let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
     activeJobs.set(jobId, proc);
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
-    proc.stdout.on('data', chunk => { stdout = (stdout + chunk.toString()).slice(-100000); });
+    proc.stdout.on('data', chunk => {
+      const value = chunk.toString(); stdout = (stdout + value).slice(-100000); lineBuffer += value;
+      const lines = lineBuffer.split(/\\r?\\n/); lineBuffer = lines.pop() || '';
+      for (const line of lines) { try { const event = JSON.parse(line); if (event?.stage) onProgress({ requestId: jobId, ...event }); } catch {} }
+    });
     proc.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8000); });
     proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
     proc.once('close', async code => {
