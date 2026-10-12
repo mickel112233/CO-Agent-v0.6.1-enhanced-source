@@ -136,3 +136,28 @@ test('completion requires a non-empty result and every declared acceptance crite
   assert.equal(completed.status, 'completed');
   assert.equal(completed.steps[0].status, 'completed');
 });
+
+
+test('pausing an active step invalidates its request and requires retry after resume', async t => {
+  const { file } = await fixture(t);
+  const store = createStore(file);
+  const run = await store.create({ ...plan(), steps: [{ id: 'active', title: 'Active request', acceptanceCriteria: ['Result is verified'] }] });
+  await store.updateStep(run.id, 'active', 'start');
+  const paused = await store.pause(run.id);
+  assert.equal(paused.status, 'paused');
+  assert.equal(paused.currentStepId, null);
+  assert.equal(paused.steps[0].status, 'failed');
+  assert.match(paused.steps[0].error, /interrupted by a pause/i);
+  await assert.rejects(store.updateStep(run.id, 'active', 'complete', {
+    result: 'Late result from the aborted request', acceptanceChecks: [0]
+  }), /workflow is paused.*stale step results/i);
+  await store.resume(run.id);
+  const resumed = await store.get(run.id);
+  assert.equal(resumed.status, 'ready');
+  assert.equal(resumed.steps[0].status, 'failed');
+  await store.updateStep(run.id, 'active', 'start');
+  const completed = await store.updateStep(run.id, 'active', 'complete', {
+    result: 'Verified after retry', acceptanceChecks: [0]
+  });
+  assert.equal(completed.status, 'completed');
+});
