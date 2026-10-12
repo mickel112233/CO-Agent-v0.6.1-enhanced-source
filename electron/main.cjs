@@ -24,6 +24,7 @@ let mainWindow;
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
+const activeModelPulls = new Map();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
   if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
@@ -128,9 +129,25 @@ function registerIpc() {
     const status = await ollama.getOllamaStatus();
     return { available: status.available, models: status.models || [], error: status.error || null };
   });
-  handle('runtime:ollama-pull', model => ollama.pullOllamaModel(model, progress => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('runtime:ollama-pull-progress', progress);
-  }));
+  handle('runtime:ollama-pull', async payload => {
+    const model = typeof payload === 'string' ? payload : payload?.model;
+    const requestId = String(typeof payload === 'object' && payload?.requestId || ('pull-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)));
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)) throw new Error('Model download request ID is invalid.');
+    if (activeModelPulls.has(requestId)) throw new Error('A model download with this ID is already running.');
+    const controller = new AbortController();
+    activeModelPulls.set(requestId, controller);
+    try {
+      return await ollama.pullOllamaModel(model, progress => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('runtime:ollama-pull-progress', { ...progress, requestId });
+      }, undefined, fetch, { signal: controller.signal });
+    } finally { activeModelPulls.delete(requestId); }
+  });
+  handle('runtime:ollama-pull-cancel', requestId => {
+    const controller = activeModelPulls.get(String(requestId || ''));
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort();
+    return { ok: true, cancelled: true };
+  });
   handle('runtime:ollama-delete', model => ollama.deleteOllamaModel(model));
   handle('runtime:chat-cancel', requestId => {
     const controller = activeChatRequests.get(String(requestId || ''));
