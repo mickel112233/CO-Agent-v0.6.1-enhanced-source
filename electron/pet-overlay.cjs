@@ -28,6 +28,7 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
     win.webContents.on('will-navigate', event => event.preventDefault());
     win.webContents.on('ipc-message', (_event, channel, payload) => {
       if (channel === 'pet:message' && typeof payload === 'string' && payload.trim()) onMessage?.(payload.trim().slice(0, 4000));
+      if (channel === 'pet:close') hide();
     });
     win.on('closed', () => { win = null; onClose?.(); });
     win.loadFile(path.join(__dirname, 'pet-overlay.html')).then(() => { if (win && !win.isDestroyed()) win.showInactive(); }).catch(() => {});
