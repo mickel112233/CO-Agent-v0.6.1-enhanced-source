@@ -124,7 +124,7 @@ foreach ($window in $windows) {
         $label = $current.Name
         $rect = $current.BoundingRectangle
         if (($label -or $type -match 'Button|Edit|ComboBox|TabItem|CheckBox|ListItem|MenuItem|Hyperlink|RadioButton') -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
-          $controls += [pscustomobject]@{ name=$label; type=$type; automationId=$current.AutomationId; className=$current.ClassName; enabled=$current.IsEnabled; x=[int]$rect.X; y=[int]$rect.Y; width=[int]$rect.Width; height=[int]$rect.Height }
+          $controls += [pscustomobject]@{ windowName=$name; name=$label; type=$type; automationId=$current.AutomationId; className=$current.ClassName; enabled=$current.IsEnabled; x=[int]$rect.X; y=[int]$rect.Y; width=[int]$rect.Width; height=[int]$rect.Height }
         }
       } catch {}
     }
@@ -140,6 +140,62 @@ ConvertTo-Json -InputObject ([pscustomobject]@{ windows=@($items | Select-Object
     windows: Array.isArray(result.windows) ? result.windows.slice(0, 150) : result.windows ? [result.windows] : [],
     controls: Array.isArray(result.controls) ? result.controls.slice(0, 400) : result.controls ? [result.controls] : []
   };
+}
+function normalizeAccessibleTarget(payload = {}) {
+  const windowTitle = String(payload.windowTitle || '').trim();
+  const name = String(payload.name || '').trim();
+  const automationId = String(payload.automationId || '').trim();
+  const controlType = String(payload.controlType || '').trim();
+  if (!windowTitle || windowTitle.length > 300) throw new Error('Choose a specific visible window by its exact title.');
+  if ((!name && !automationId) || name.length > 300 || automationId.length > 300) throw new Error('Choose a control by exact name or Automation ID.');
+  if (controlType && !/^ControlType\.[A-Za-z]+$/.test(controlType)) throw new Error('The selected accessibility control type is invalid.');
+  return { windowTitle, name, automationId, controlType };
+}
+async function invokeAccessibleControl(payload = {}) {
+  assertApproved(payload); assertWindows();
+  const target = normalizeAccessibleTarget(payload);
+  const encoded = value => Buffer.from(value, 'utf8').toString('base64');
+  const script = String.raw\`
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$windowName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__WINDOW__'))
+$targetName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__NAME__'))
+$targetId = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__ID__'))
+$targetType = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__TYPE__'))
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+$matches = @()
+foreach ($candidate in $windows) { try { if ($candidate.Current.Name -ceq $windowName) { $matches += $candidate } } catch {} }
+if ($matches.Count -ne 1) { throw "The exact target window was not unique ($($matches.Count) matches). Refresh accessibility inspection and choose a specific window." }
+$window = $matches[0]
+$elements = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+$targets = @()
+foreach ($element in $elements) {
+  try {
+    $current = $element.Current
+    if ($current.IsOffscreen -or -not $current.IsEnabled) { continue }
+    if ($targetId) { if ($current.AutomationId -cne $targetId) { continue } }
+    else { if ($current.Name -cne $targetName) { continue } }
+    if ($targetType -and $current.ControlType.ProgrammaticName -cne $targetType) { continue }
+    $targets += $element
+  } catch {}
+}
+if ($targets.Count -ne 1) { throw "The exact enabled visible control was not unique ($($targets.Count) matches). No action was taken." }
+$target = $targets[0]
+try {
+  $pattern = $null
+  if (-not $target.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    throw "This control does not expose the UI Automation Invoke pattern. No coordinate fallback was attempted."
+  }
+  $pattern.Invoke()
+} catch { throw "UI Automation did not invoke the selected control: $($_.Exception.Message)" }
+$current = $target.Current
+ConvertTo-Json -InputObject ([pscustomobject]@{ ok=$true; window=$windowName; name=$current.Name; automationId=$current.AutomationId; controlType=$current.ControlType.ProgrammaticName }) -Compress
+\`.replace('__WINDOW__', encoded(target.windowTitle)).replace('__NAME__', encoded(target.name)).replace('__ID__', encoded(target.automationId)).replace('__TYPE__', encoded(target.controlType));
+  const { stdout } = await powershell(script, 15000);
+  let result;
+  try { result = JSON.parse(stdout.trim() || '{}'); } catch { throw new Error('Windows UI Automation returned an unreadable invocation result.'); }
+  return { ok: true, action: 'invoke', target: { windowTitle: result.window, name: result.name, automationId: result.automationId, controlType: result.controlType } };
 }
 async function click(payload = {}) {
   assertApproved(payload); assertWindows();
@@ -288,4 +344,4 @@ async function verifyActionOutcome(payload = {}) {
   return { ok: true, model, ...normalizeVerification(parsed), disclaimer: 'This is a model assessment, not proof. Inspect the screenshot before continuing.' };
 }
 
-module.exports = { captureScreen, readScreenText, planActions, inspectAccessibility, click, typeText, pressKey, KEY_CODES, assertApproved, validatePlanActions, normalizeVerification, verifyActionOutcome };
+module.exports = { captureScreen, readScreenText, planActions, inspectAccessibility, invokeAccessibleControl, normalizeAccessibleTarget, click, typeText, pressKey, KEY_CODES, assertApproved, validatePlanActions, normalizeVerification, verifyActionOutcome };
