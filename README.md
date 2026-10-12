@@ -12,7 +12,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 [![Release](https://img.shields.io/github/v/release/mickel112233/CO-Agent-v0.6.1-enhanced-source?display_name=tag)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
 [![Version](https://img.shields.io/badge/app-0.6.1-informational)](package.json)
 
-**[Quick start](#-quick-start) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
+**[Quick start](#-quick-start) · [Capability scorecard](CAPABILITY-SCORECARD.md) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
 
 </div>
 
