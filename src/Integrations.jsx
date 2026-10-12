@@ -40,9 +40,15 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    const unsubscribe = desktop?.luxTTS?.onSetupProgress?.(progress => setLuxProgress(progress));
-    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
-  }, []);
+    const unsubscribeSetup = desktop?.luxTTS?.onSetupProgress?.(progress => setLuxProgress(progress));
+    const unsubscribeGeneration = desktop?.luxTTS?.onGenerationProgress?.(progress => {
+      if (!activeLuxRequest || progress?.requestId === activeLuxRequest) setLuxProgress(progress);
+    });
+    return () => {
+      if (typeof unsubscribeSetup === 'function') unsubscribeSetup();
+      if (typeof unsubscribeGeneration === 'function') unsubscribeGeneration();
+    };
+  }, [activeLuxRequest]);
 
   async function launchPet() {
     setBusy('pet'); setNotice('');
@@ -68,7 +74,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   }
   async function generateLuxVoice() {
     if (!referenceAudio) { setNotice('Choose a reference audio file first. LuxTTS uses it to condition the generated voice.'); return; }
-    setBusy('luxtts-generate'); setNotice('Generating speech locally. The first run may download model weights.');
+    setBusy('luxtts-generate'); setLuxProgress({ stage: 'starting', message: 'Starting local voice generation…' }); setNotice('Generating speech locally. The first run may download model weights.');
     try {
       let output = voiceOutput.trim();
       if (!output) { output = await desktop.dialog.saveFile({ defaultPath: 'co-agent-speech.wav' }); if (!output) return; setVoiceOutput(output); }
@@ -78,7 +84,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
       if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS generation failed.');
       setNotice('Speech created: ' + result.output + ' (' + Math.round(result.bytes / 1024) + ' KB, 48 kHz).');
     } catch (error) { setNotice('LuxTTS generation failed: ' + formatError(error)); }
-    finally { setBusy(''); setActiveLuxRequest(''); }
+    finally { setBusy(''); setActiveLuxRequest(''); setLuxProgress(null); }
   }
 
   async function cancelLuxVoice() {
@@ -175,7 +181,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
             <label>Text to speak<textarea value={voiceText} maxLength={12000} onChange={event => setVoiceText(event.target.value)} rows={3}/></label>
             <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy} onClick={pickReferenceAudio}>Choose reference audio</button><span className="integration-note">{referenceAudio || 'Use a reference clip of at least 3 seconds.'}</span></div>
             <label>Output WAV path (optional)<input value={voiceOutput} onChange={event => setVoiceOutput(event.target.value)} placeholder="Choose a save location when generating"/></label>
-            <div className="integration-card-actions"><button className="primary-button" disabled={!!busy || !voiceText.trim() || !referenceAudio} onClick={generateLuxVoice}>{busy === 'luxtts-generate' ? 'Generating…' : 'Generate local speech'}</button>{busy === 'luxtts-generate' && <button className="secondary-button" onClick={cancelLuxVoice}>Cancel generation</button>}</div>
+            <div className="integration-card-actions"><button className="primary-button" disabled={!!busy || !voiceText.trim() || !referenceAudio} onClick={generateLuxVoice}>{busy === 'luxtts-generate' ? 'Generating…' : 'Generate local speech'}</button>{busy === 'luxtts-generate' && <><button className="secondary-button" onClick={cancelLuxVoice}>Cancel generation</button><span className="integration-note">{luxProgress?.message || 'Generating local audio…'}</span></>}</div>
           </div>}
         {busy === 'luxtts-setup' && <p className="integration-note">{luxProgress?.message || 'Setting up Python environment…'}</p>}
       </article>
