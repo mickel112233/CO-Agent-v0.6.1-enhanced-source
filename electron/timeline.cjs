@@ -73,15 +73,21 @@ function run(binary, args) {
   });
 }
 
-function validateExportMetadata(metadata, fileSize) {
+function validateExportMetadata(metadata, fileSize, expectedDuration) {
   if (!Number.isFinite(fileSize) || fileSize < 256) throw new Error('The export file is missing or unexpectedly small.');
   const streams = Array.isArray(metadata?.streams) ? metadata.streams : [];
   if (!streams.some(stream => stream?.codec_type === 'video')) throw new Error('The export contains no readable video stream.');
   const duration = Number(metadata?.format?.duration);
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('The export has no valid duration metadata.');
+  if (Number.isFinite(expectedDuration) && expectedDuration > 0) {
+    const tolerance = Math.max(0.25, expectedDuration * 0.02);
+    if (duration < expectedDuration - tolerance) {
+      throw new Error('The export appears truncated: expected about ' + expectedDuration.toFixed(2) + ' seconds, but FFprobe found ' + duration.toFixed(2) + ' seconds. Check source media and audio/video filters, then export again.');
+    }
+  }
   return { duration, hasAudio: streams.some(stream => stream?.codec_type === 'audio'), size: fileSize };
 }
-async function verifyRenderedOutput(output) {
+async function verifyRenderedOutput(output, expectedDuration) {
   const stat = await fs.stat(output).catch(() => null);
   if (!stat?.isFile()) throw new Error('FFmpeg reported success, but the export file was not created.');
   if (!ffprobePath) throw new Error('FFprobe is unavailable, so CO-Agent cannot verify the exported video.');
@@ -103,7 +109,7 @@ async function verifyRenderedOutput(output) {
     child.on('error', error => finish(error));
     child.on('close', code => {
       if (code !== 0) return finish(new Error('FFprobe could not read the export: ' + stderr.slice(-1000)));
-      try { finish(null, validateExportMetadata(JSON.parse(stdout), stat.size)); }
+      try { finish(null, validateExportMetadata(JSON.parse(stdout), stat.size, expectedDuration)); }
       catch (error) { finish(error); }
     });
   });
@@ -162,7 +168,7 @@ async function render(project, outputDir, filename = 'co-agent-timeline.mp4') {
   else args.push('-an');
   args.push('-movflags', '+faststart', output);
   await run(ffmpegPath, args);
-  const verification = await verifyRenderedOutput(output);
+  const verification = await verifyRenderedOutput(output, duration);
   return { ok: true, output, duration, clips: normalized.clips.length, verified: true, fileSize: verification.size, hasAudio: verification.hasAudio, verifiedDuration: verification.duration };
 }
 module.exports = { normalizeProject, saveProject, loadProject, render, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
