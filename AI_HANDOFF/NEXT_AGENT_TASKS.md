@@ -2,7 +2,9 @@
 
 Implement in small reviewable commits, in this order.
 
-## 1. Pet asset and license audit
+## 1. Pet asset and license audit — next
+The Electron overlay shell and chat text bridge now exist on the integration branch. Still import and audit the supplied pet assets; replace the fallback paw with a licensed, default pet and add asset attribution.
+
 - Inventory all assets and source files from the supplied pet project.
 - Record license and attribution requirements.
 - Identify default pet asset and confirm it can be redistributed.
