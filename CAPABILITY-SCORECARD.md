@@ -13,7 +13,7 @@ The strongest differentiator is the combination of local Ollama chat, a Windows-
 |---|---:|---:|---|
 | Local-first privacy and control | 8.0 | 15% | Ollama runs locally; selected workspace context is bounded; skills are treated as untrusted; writes and desktop input require approval. Optional API providers necessarily send conversation text to the chosen provider. |
 | Chat and model flexibility | 7.0 | 12% | Ollama plus OpenAI-compatible, Anthropic, and Gemini API paths; provider requests now preserve user/assistant turn roles. Ollama responses are non-streaming; no built-in model installation or provider key vault. |
-| Agent planning and execution | 4.0 | 20% | Dependency-aware plans, specialist roles, review/test steps, bounded delegation primitives, and user-approved file proposals exist. Each workflow step is user-started; no autonomous loop, durable run history, parallel workers, patch-based edits, or automatic recovery loop. |
+| Agent planning and execution | 4.0 | 20% | Dependency-aware plans, specialist roles, review/test steps, bounded delegation primitives, and user-approved file proposals exist. Each workflow step is user-started; durable approved-plan run history, dependency checkpoints, pause/resume/cancel, approval checkpoints, and bounded retries are now implemented. No autonomous loop, parallel workers, patch-based edits, or automatic recovery loop. |
 | Desktop computer use | 4.5 | 12% | Windows screenshot, accessibility-window inspection, optional OCR, bounded plans, and approval-gated click/type/key actions. Not a continuous autonomous observe-act-verify loop; no semantic element actions or robust post-action verification. |
 | Video and creative workflows | 4.0 | 10% | Real multi-track timeline MVP, project save/load, captions/titles, FFmpeg export, and export-duration validation. Missing undo/redo, transitions, keyframes, effects, waveforms, audio routing, proxies, color grading, transcription, and render cancellation/progress. |
 | Integrations and extensibility | 3.0 | 10% | Public GitHub repository/skill import, optional OCR/Hyperframes/Piper, and a fixed developer-terminal preset list. No general MCP client, broad app connectors, or unified ACP agent adapters are implemented in this reconstruction. |
@@ -21,7 +21,7 @@ The strongest differentiator is the combination of local Ollama chat, a Windows-
 | Reliability and testability | 6.0 | 8% | Node regression suite, Windows/Ubuntu test and renderer-build CI, Windows installer packaging, artifact checks, and export-duration tests. No real-device end-to-end suite, coverage threshold, signed installer, or broad media fixture matrix. |
 | UX, setup, and accessibility | 5.0 | 3% | Functional desktop UI with recent chats, model settings, studio, agents, and computer use. Setup still depends on external Ollama/runtime configuration; streaming and polished progress/recovery are incomplete. |
 
-**Weighted score:** approximately **5.4/10**. Weighting intentionally emphasizes agent execution, local control, and reliability rather than counting menu items.
+**Weighted score:** approximately **5.7/10 (provisional; execution-state code is newly added and must pass fresh CI before this increase is treated as validated).** Weighting intentionally emphasizes agent execution, local control, and reliability rather than counting menu items.
 
 ## Comparison with current alternatives
 
@@ -51,7 +51,7 @@ These are capability comparisons from public project/documentation pages, not a 
 ### P0 — make current features dependable
 
 1. **Streaming chat for local and API providers:** incremental rendering, Stop, bounded buffers, cancellation propagation, and partial-response error recovery.
-2. **Agent run state machine:** persisted runs/steps, pause/resume/cancel, retries with limits, idempotency, and a visible event log.
+2. **Agent run state machine:** persist approved plans and step transitions, pause/resume/cancel, bounded retries, dependency checkpoints, and a capped event log. The run store is implemented; wire the Agents UI to it and validate crash recovery next.
 3. **Outcome verification:** every file operation should report changed paths and test results; computer actions should capture a fresh observation and check whether the intended state changed.
 4. **Security audit trail:** show exactly which files/context go to a provider, which process command runs, what permissions are requested, and why an action needs approval.
 5. **Release and app-level tests:** Electron startup smoke test, packaged-app launch test on Windows, renderer interaction tests, and a media fixture suite that validates duration, streams, and audio/video sync.
