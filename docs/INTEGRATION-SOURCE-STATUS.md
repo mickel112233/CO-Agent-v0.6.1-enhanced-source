@@ -26,18 +26,18 @@ git submodule update --init --recursive
 
 ### Desktop pet
 - Build the Tauri overlay on supported Windows machines and test its transparent window, click-through behavior, drag/drop, DPI scaling, and multiple monitors.
-- Launch/close it from CO-Agent without leaving orphan processes.
-- Route chat and computer actions through CO-Agent's existing IPC trust checks and explicit approval flow.
+- The Electron bridge now discovers, launches, tracks, and closes the upstream executable through trusted IPC; it requires an explicit native approval before launch. The executable is not built automatically, and the upstream app has not yet been adapted into a CO-Agent-controlled overlay.
+- Route pet chat and computer actions through CO-Agent's existing runtime/approval flow; currently only launching the separate pet app is bridged, not the pet's chat/actions.
 - Include required built artifacts/assets in packaging and verify clean-install behavior.
 - Run overlay regression tests and a Windows packaged-app smoke test.
 
 ### LuxTTS
-- Create an app-managed Python environment; never install Python dependencies globally.
-- Show setup/download progress, cancellation, disk-space/error states, and CPU/GPU selection.
-- Use the upstream API (`LuxTTS.encode_prompt`, `LuxTTS.generate_speech`) through a bounded worker process.
+- A setup action creates an isolated Python venv in the app user-data folder; Python 3.11 and network access are prerequisites. Dependency setup can take a long time; setup cancellation and disk-space preflight are still open.
+- Setup output is streamed to the Integrations screen; generation has a bounded timeout and cancellation. Dedicated disk-space/error recovery UI and CPU/GPU selection remain open.
+- A JSON-only Python worker calls the upstream `LuxTTS.encode_prompt` and `LuxTTS.generate_speech` APIs; output is validated as a non-empty WAV at 48 kHz.
 - Validate reference audio and output paths, limit text and runtime, and verify generated 48 kHz WAV output.
-- Add mocked worker tests plus an opt-in real-model smoke test; test the CPU path on a clean Windows machine.
+- Node tests cover argument validation, missing runtimes, and cancellation edge cases. Mocked worker tests, opt-in real-model smoke tests, and clean Windows CPU-path verification remain open.
 
 ## Current status
 
-The Node/Piper wrapper has bounded execution and output validation. LuxTTS is source-pinned only; it is not yet callable from the app. The desktop-pet source is pinned only; the Electron-to-overlay launch, approval-aware chat bridge, installer packaging, and runtime tests remain incomplete.
+The Node/Piper wrapper has bounded execution and output validation. LuxTTS now has a managed-venv setup flow, bounded generation worker, renderer controls, cancellation, output checks, and basic Node tests; no end-to-end generation has been verified with downloaded model weights. The pet has a trusted launch/close bridge and basic lifecycle tests, but the upstream Tauri app is not yet built/bundled automatically and its internal chat/actions are not connected to CO-Agent.
