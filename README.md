@@ -6,7 +6,7 @@
 
 Chat with local models. Create and inspect media. Add optional tools. Import trusted GitHub skills when you need more capability.
 
-**Electron · React · Ollama · FFmpeg · Tesseract OCR · Hyperframes · GitHub skill imports**
+**Electron · React · Ollama · FFmpeg · LuxTTS · desktop pet bridge · Tesseract OCR · Hyperframes · GitHub skill imports**
 
 [![CI](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/mickel112233/CO-Agent-v0.6.1-enhanced-source?display_name=tag)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
@@ -30,12 +30,12 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | Workspace file tools | Select a project folder, browse/read context files, preview model-proposed full-file changes, and back up existing files before applying | Only selected files are sent to the local model; path traversal, symlinks, common secret files, and protected build/dependency folders are blocked |
 | In-app terminal | Run project tests, renderer build, Git status/diff check, and dependency audit with live output | Fixed command presets only; native confirmation each run; project scripts still execute with your user permissions |
 | Model management | Pull, list, and remove Ollama models | Downloads can be large; pull progress is not fully surfaced |
-| Video Studio | Multi-track timeline for video/image overlays, separate audio clips, captions/title cards, clip trim/split/move, project save/load, preview, and FFmpeg MP4 render | Functional editing MVP; no transitions, keyframes, waveform editing, advanced color tools, or full original timeline parity |
+| Video Studio | Multi-track timeline, captions, clip trim/split/move, project save/load, FFmpeg render, and reviewable Ollama-planned timeline edits | AI edit plans require explicit Apply; no transitions, keyframes, waveform editing, advanced color tools, or full original timeline parity |
 | Image text extraction | Local Tesseract OCR for PNG/JPEG/TIFF/BMP/WebP | Optional Tesseract installation and language data |
 | HTML-to-video | Hyperframes lint, preview, and MP4 rendering | Optional external Hyperframes CLI and FFmpeg |
 | Repository skills | Import public GitHub repositories and inspect manifests; explicitly enable a detected `SKILL.md` for local chat | Imported plugin code is not executed; skills are third-party instructions and must be reviewed |
 | Computer Use | Desktop screenshot capture, top-level Windows UI Automation inspection, optional local screenshot OCR, approved mouse click/text/key actions | Windows-only native input; one action per confirmation; no autonomous action loop or arbitrary shell execution |
-| Voice foundation | Optional Piper wrapper | Piper executable and voice models are not bundled |
+| Voice foundation | Optional Piper wrapper plus a LuxTTS worker, isolated Python environment setup, and local voice-generation UI | LuxTTS dependencies/model weights are large and are not bundled; first setup and model download require network access; voice cloning needs reference audio |\n| Desktop pet | Approved Electron launch/close bridge and executable discovery for the pinned Tauri pet source | The pet executable is not built or bundled automatically yet; build the upstream Tauri app and place `AI-Desktop-Pet.exe` in the configured runtime location |
 
 ## ⬇️ Download a test build (Windows)
 
@@ -55,13 +55,13 @@ The workflow runs the automated tests, builds the renderer, packages the Windows
 
 - **Node.js 22 recommended**, npm, and Git.
 - **Ollama** for local AI chat: [ollama.com](https://ollama.com/).
-- Optional: Tesseract OCR, Hyperframes CLI, Piper and voice models.
+- Optional: Tesseract OCR, Hyperframes CLI, Piper and voice models. LuxTTS setup also requires a compatible Python 3.11 installation and a network connection for dependencies/model weights.
 
 <details>
 <summary><strong>Install and run from source</strong></summary>
 
 ```bash
-git clone https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source.git
+git clone --recurse-submodules https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source.git
 cd CO-Agent-v0.6.1-enhanced-source
 npm install
 npm test
