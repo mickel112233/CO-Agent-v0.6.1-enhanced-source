@@ -11,7 +11,7 @@ const initialProject = () => ({ version: 1, title: 'Untitled project', clips: []
 const baseName = value => String(value || '').split(/[\\/]/).pop();
 const newId = () => 'clip-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 
-export default function TimelineEditor({ onBasic }) {
+export default function TimelineEditor({ onTools }) {
   const [project, setProject] = useState(initialProject);
   const projectRef = useRef(project);
   const [undoStack, setUndoStack] = useState([]);
@@ -24,7 +24,7 @@ export default function TimelineEditor({ onBasic }) {
   const [notice, setNotice] = useState('');
   const [outputDir, setOutputDir] = useState('');
   const [filename, setFilename] = useState('co-agent-timeline.mp4');
-  const [editPrompt, setEditPrompt] = useState('Add a clean opening title and move the first video clip to start at 1 second.');
+  const [editPrompt, setEditPrompt] = useState('');
   const [editPlan, setEditPlan] = useState(null);
   const [planningEdit, setPlanningEdit] = useState(false);
   const selected = project.clips.find(clip => clip.id === selectedId) || null;
@@ -107,8 +107,8 @@ export default function TimelineEditor({ onBasic }) {
     try {
       const snapshot = { title: project.title, clips: project.clips.map(({ id, type, track, timelineStart, sourceStart, duration, text, file }) => ({ id, type, track, timelineStart, sourceStart, duration, text, name: baseName(file) })) };
       const prompt = [
-        'You are the timeline-edit planner for CO-Agent Video Studio.',
-        'Return ONLY a JSON object exactly shaped as {"actions":[...],"summary":"..."} with at most 12 actions. Do not return markdown.',
+        'You are the timeline-edit planner for CO-Agent Video Studio. Interpret the user request as natural-language editing intent.',
+        'Return ONLY a JSON object exactly shaped as {"actions":[...],"summary":"..."} with at most 12 actions. Do not return markdown. If the request is ambiguous or requires unavailable assets, return an empty actions array and explain the missing information in summary.',
         'Allowed actions: {"type":"rename_project","title":"..."}; {"type":"add_caption","text":"...","start":number,"duration":number}; {"type":"move_clip","clipId":"existing id","start":number,"track":"Video 1"|"Video 2"|"Audio 1"|"Titles"}; {"type":"set_duration","clipId":"existing id","duration":number}; {"type":"set_source_start","clipId":"existing id","sourceStart":number}; {"type":"remove_clip","clipId":"existing id"}; {"type":"split_clip","clipId":"existing id","at":number} where at is timeline seconds.',
         'Never invent clip IDs. Use only existing IDs from the project. Times must be non-negative. Keep captions at most 500 characters and project titles at most 120 characters. Do not invent file paths or run/export anything.',
         'Project state JSON: ' + JSON.stringify(snapshot),
@@ -118,7 +118,8 @@ export default function TimelineEditor({ onBasic }) {
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Timeline planner failed.');
       const raw = String(result.message || '').trim().replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/, '');
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed.actions) || parsed.actions.length < 1 || parsed.actions.length > 12) throw new Error('The model did not return a valid plan with 1–12 actions.');
+      if (!Array.isArray(parsed.actions) || parsed.actions.length > 12) throw new Error('The model did not return a valid plan with at most 12 actions.');
+      if (parsed.actions.length === 0) { setNotice(String(parsed.summary || 'The request needs more information before it can be applied.')); return; }
       const tracksAllowed = ['Video 1', 'Video 2', 'Audio 1', 'Titles'];
       const safe = parsed.actions.map(action => {
         if (!action || typeof action !== 'object') throw new Error('The plan contains an invalid action.');
@@ -251,11 +252,11 @@ export default function TimelineEditor({ onBasic }) {
   const PreviewIcon = selected?.type === 'audio' ? Music2 : selected?.type === 'image' ? Image : Film;
 
   return <section className="timeline-editor-view">
-    <div className="timeline-editor-heading"><div><p className="eyebrow">NON-LINEAR EDITING</p><h1>Video Studio</h1><p className="subhead">Arrange video, image, audio, and title clips across independent tracks. Save editable projects and render an MP4 locally with FFmpeg.</p></div><div className="timeline-heading-actions"><button className="secondary-button" onClick={onBasic}><Layers3 size={14}/> Basic tools</button><button className="secondary-button" onClick={loadProject} disabled={!!busy}><FolderOpen size={14}/> Open project</button><button className="primary-button" onClick={saveProject} disabled={!!busy}><Save size={14}/> Save project</button></div></div>
-    <div className="timeline-ai-edit-panel">
-      <div className="panel-heading"><strong><Sparkles size={15}/> Edit timeline with AI</strong><span>Local Ollama · review before applying</span></div>
-      <p>Describe edits in plain English. CO-Agent proposes a constrained action plan; nothing changes until you approve it.</p>
-      <div className="timeline-ai-edit-controls"><textarea value={editPrompt} onChange={event => setEditPrompt(event.target.value)} rows={2} maxLength={2000} placeholder="e.g. Add a title at the start, move clip 2 to 5 seconds, and trim clip 1 to 8 seconds."/><button className="primary-button" onClick={planTimelineEdit} disabled={planningEdit || !!busy || !editPrompt.trim()}>{planningEdit ? 'Planning…' : 'Plan edits'}</button></div>
+    <div className="timeline-editor-heading"><div><p className="eyebrow">NON-LINEAR EDITING</p><h1>Video Studio</h1><p className="subhead">Arrange video, image, audio, and title clips across independent tracks. Save editable projects and render an MP4 locally with FFmpeg.</p></div><div className="timeline-heading-actions"><button className="secondary-button" onClick={onTools}><Layers3 size={14}/> Media tools</button><button className="secondary-button" onClick={loadProject} disabled={!!busy}><FolderOpen size={14}/> Open project</button><button className="primary-button" onClick={saveProject} disabled={!!busy}><Save size={14}/> Save project</button></div></div>
+    <div className="timeline-ai-edit-panel timeline-edit-assistant">
+      <div className="assistant-kicker"><Sparkles size={15}/> CO-AGENT CREATIVE DIRECTOR <span>· ADVANCED</span></div><h2>Tell me how you want the video to feel.</h2>
+      <p>Talk naturally: ask for cuts, titles, timing, captions, or soundtrack placement. I’ll propose exact timeline changes first; nothing is changed until you approve the plan.</p>
+      <textarea className="edit-prompt" aria-label="Describe video edits" value={editPrompt} onChange={event => setEditPrompt(event.target.value)} rows={3} maxLength={2000} placeholder="Make the opening punchier, add a title that says “A new beginning”, then move the second clip to 5 seconds…"/><div className="assistant-suggestions"><button type="button" onClick={() => setEditPrompt('Add a bold opening title and keep it on screen for 3 seconds.')}>Add an opening title</button><button type="button" onClick={() => setEditPrompt('Trim the selected clip to 8 seconds and move it to start at 1 second.')}>Tighten the pacing</button><button type="button" onClick={() => setEditPrompt('Create a clean sequence from the current clips and align them without overlaps.')}>Clean up the sequence</button></div><div className="assistant-actions"><span className="tool-hint">Your request is reviewed before edits are applied.</span><button className="primary-button" onClick={planTimelineEdit} disabled={planningEdit || !!busy || !editPrompt.trim()}>{planningEdit ? 'Planning edits…' : 'Plan timeline edits'}</button></div><div className="review-banner"><Sparkles size={15}/><span>Safe edit flow: preview the proposed changes, discard anything you don’t want, or explicitly approve the plan. No commands or exports run from this chat.</span></div>
       {editPlan && <div className="timeline-ai-plan"><div><strong>{editPlan.summary}</strong><span>{editPlan.actions.length} proposed action(s)</span></div><ol>{editPlan.actions.map((action, index) => <li key={index}>{action.type === 'rename_project' ? 'Rename project to “' + action.title + '”' : action.type === 'add_caption' ? 'Add title at ' + action.start + 's: “' + action.text + '”' : action.type === 'move_clip' ? 'Move ' + action.clipId + ' to ' + action.start + 's on ' + action.track : action.type === 'set_duration' ? 'Set ' + action.clipId + ' duration to ' + action.duration + 's' : action.type === 'set_source_start' ? 'Trim source start of ' + action.clipId + ' to ' + action.sourceStart + 's' : action.type === 'remove_clip' ? 'Remove ' + action.clipId : 'Split ' + action.clipId + ' at ' + action.at + 's'}</li>)}</ol><div className="timeline-ai-plan-actions"><button className="secondary-button" onClick={() => setEditPlan(null)}><X size={14}/> Discard</button><button className="primary-button" onClick={applyTimelineEditPlan} disabled={!!busy}><Check size={14}/> Apply approved edits</button></div></div>}
     </div>
     <div className="timeline-toolbar"><button className="secondary-button" onClick={importAssets} disabled={!!busy}><Plus size={14}/> Import media</button><button className="secondary-button timeline-history-button" onClick={undo} disabled={!undoStack.length || !!busy} title="Undo last timeline edit"><Undo2 size={14}/> Undo</button><button className="secondary-button timeline-history-button" onClick={redo} disabled={!redoStack.length || !!busy} title="Redo timeline edit"><Redo2 size={14}/> Redo</button><label className="timeline-project-name">Project title<input value={project.title} onChange={e => { const title = e.target.value; const next = { ...projectRef.current, title }; projectRef.current = next; setProject(next); setUndoStack(old => old.map(item => ({ ...item, title }))); setRedoStack(old => old.map(item => ({ ...item, title }))); }}/></label><span className="timeline-duration"><Clock3 size={14}/> {duration.toFixed(1)}s timeline</span><span className="timeline-duration">{project.clips.length} clips</span></div>
