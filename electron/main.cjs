@@ -23,9 +23,11 @@ const mcpClient = require('./mcp-client.cjs');
 const acpClient = require('./acp-client.cjs');
 const auditModule = require('./audit-log.cjs');
 const textAttachments = require('./text-attachments.cjs');
+const { createPetOverlay } = require('./pet-overlay.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
+let petOverlay;
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
@@ -446,6 +448,14 @@ app.whenReady().then(async () => {
   } catch {}
   registerIpc();
   createWindow();
+  petOverlay = createPetOverlay({
+    onMessage: text => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pet:incoming-message', { text, createdAt: Date.now() });
+      if (petOverlay) petOverlay.sendStatus('Sent to CO-Agent chat');
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+    }
+  });
+  petOverlay.show();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
