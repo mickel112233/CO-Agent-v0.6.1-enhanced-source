@@ -83,23 +83,24 @@ function createStore(filePath, options = {}) {
       recoveryDone = true;
       let changed = false;
       for (const run of data.runs) {
-        const interrupted = run.steps.filter(step => step.status === 'running');
+        const interrupted = run.steps.filter(step => ['running', 'awaiting-approval'].includes(step.status));
         for (const step of interrupted) {
+          const wasAwaitingApproval = step.status === 'awaiting-approval';
           step.status = 'failed';
-          step.error = 'The application restarted while this step was running. Review the workspace and retry only if safe.';
+          step.error = wasAwaitingApproval
+            ? 'The application restarted before this checkpoint was reviewed. Re-run the step to regenerate its output before approving it.'
+            : 'The application restarted while this step was running. Review the workspace and retry only if safe.';
           step.updatedAt = now();
           event(run, 'step-recovered', step.error, step.id);
           changed = true;
         }
-        if (run.status === 'running') {
-          run.status = interrupted.length ? 'failed' : 'ready';
-          run.currentStepId = null;
-          event(run, 'run-recovered', interrupted.length ? 'Interrupted step marked failed; inspect state before retrying.' : 'Workflow recovered after application restart.', null);
+        if (interrupted.length) {
+          run.status = 'failed'; run.currentStepId = null;
+          event(run, 'run-recovered', 'An interrupted step was marked failed; inspect state and regenerate its output before retrying.', null);
           changed = true;
-        }
-        if (run.status === 'running' && run.steps.some(step => step.status === 'awaiting-approval')) {
+        } else if (run.status === 'running') {
           run.status = 'ready'; run.currentStepId = null;
-          event(run, 'run-recovered', 'Saved output is awaiting user review; no actions were replayed.', null);
+          event(run, 'run-recovered', 'Workflow recovered after application restart; no actions were replayed.', null);
           changed = true;
         }
       }

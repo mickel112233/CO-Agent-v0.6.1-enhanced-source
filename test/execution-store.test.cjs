@@ -76,3 +76,19 @@ test('rejects malformed histories and cyclic/unknown dependencies', async t => {
   await assert.rejects(store.create({ ...plan(), steps: [{ id: 'one', dependsOn: ['missing'] }] }), /unknown dependency/i);
   await assert.rejects(store.create({ ...plan(), steps: [{ id: 'one', dependsOn: ['two'] }, { id: 'two' }] }), /earlier step/i);
 });
+
+
+test('startup recovery marks unreviewed output failed so users can regenerate it safely', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-recovery-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, 'workflow-runs.json');
+  const first = createStore(file);
+  const run = await first.create({ approved: true, title: 'Recover review', goal: 'Review a result', steps: [{ id: 'step-1', title: 'Draft', role: 'planner', skill: 'planning', description: 'Draft output' }] });
+  await first.updateStep(run.id, 'step-1', 'start');
+  await first.updateStep(run.id, 'step-1', 'awaiting-approval', { result: 'Output waiting for review.' });
+  const recovered = await createStore(file).list();
+  assert.equal(recovered[0].status, 'failed');
+  assert.equal(recovered[0].steps[0].status, 'failed');
+  assert.match(recovered[0].steps[0].error, /re-run the step to regenerate/i);
+  assert.ok(recovered[0].events.some(event => event.type === 'run-recovered'));
+});
