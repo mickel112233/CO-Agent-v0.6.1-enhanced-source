@@ -12,6 +12,7 @@ const studio = require('./studio.cjs');
 const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
 const petRuntime = require('./pet-runtime.cjs');
+const luxTTS = require('./luxtts.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const agentOrchestrator = require('./agent-orchestrator.cjs');
 const workspace = require('./workspace.cjs');
@@ -199,6 +200,8 @@ function registerIpc() {
     return petRuntime.launch();
   });
   handle('pet:close', () => petRuntime.stop());
+  handle('luxtts:status', () => luxTTS.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
+  handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-text-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
