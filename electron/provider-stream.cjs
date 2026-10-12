@@ -22,6 +22,7 @@ async function consumeStream(response, protocol, onChunk, signal) {
   let carry = '';
   let message = '';
   let done = false;
+  let malformedFrame = false;
   const emit = event => {
     const chunk = contentFromEvent(protocol, event);
     if (!chunk) return;
@@ -35,7 +36,7 @@ async function consumeStream(response, protocol, onChunk, signal) {
     const value = line.trim();
     if (!value || value.startsWith(':')) return;
     if (protocol === 'ollama') {
-      try { const event = JSON.parse(value); emit(event); if (event.done === true) done = true; } catch {}
+      try { const event = JSON.parse(value); emit(event); if (event.done === true) done = true; } catch { malformedFrame = true; }
       return;
     }
     if (!value.startsWith('data:')) return;
@@ -47,7 +48,7 @@ async function consumeStream(response, protocol, onChunk, signal) {
       if (protocol === 'openai' && event?.choices?.[0]?.finish_reason != null) done = true;
       if (protocol === 'gemini' && event?.candidates?.[0]?.finishReason) done = true;
       emit(event);
-    } catch {}
+    } catch { malformedFrame = true; }
   };
   try {
     while (true) {
@@ -69,7 +70,9 @@ async function consumeStream(response, protocol, onChunk, signal) {
   } finally {
     try { reader.releaseLock(); } catch {}
   }
-  return { message, interrupted: !done, cancelled: false, error: !done ? 'The provider stream ended before its completion marker; this may be a partial response.' : '' };
+  const interrupted = !done || malformedFrame;
+  const error = malformedFrame ? 'The provider stream contained malformed data; this response may be incomplete.' : !done ? 'The provider stream ended before its completion marker; this may be a partial response.' : '';
+  return { message, interrupted, cancelled: false, error };
 }
 
 async function streamProviderChat(provider, key, messages, onChunk, fetchImpl = fetch, requestSignal) {

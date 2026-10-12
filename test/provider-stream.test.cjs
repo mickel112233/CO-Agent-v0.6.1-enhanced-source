@@ -60,3 +60,15 @@ test('truncated Ollama stream is marked interrupted instead of silently complete
   assert.equal(result.interrupted, true);
   assert.match(result.error, /completion marker/i);
 });
+
+
+test('malformed streamed frames cannot be reported as a complete response', async () => {
+  const result = await streamProviderChat({ protocol: 'openai', model: 'demo', baseUrl: 'https://example.com/v1' }, '', [{ role: 'user', content: 'hi' }], () => {}, async () => response([
+    'data: {"choices":[{"delta":{"content":"partial"}}]}\n',
+    'data: {this is not valid json}\n',
+    'data: [DONE]\n'
+  ]));
+  assert.equal(result.message, 'partial');
+  assert.equal(result.interrupted, true);
+  assert.match(result.error, /malformed data/i);
+});
