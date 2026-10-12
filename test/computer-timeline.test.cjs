@@ -51,6 +51,8 @@ test('export verification rejects missing video streams and invalid duration met
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '0' }, streams: [{ codec_type: 'video' }] }, 2048), /duration/i);
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '12' }, streams: [{ codec_type: 'audio' }] }, 2048), /video stream/i);
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '12' }, streams: [{ codec_type: 'video' }] }, 20), /small/i);
+  assert.throws(() => timeline.validateExportMetadata({ format: { duration: '4.1' }, streams: [{ codec_type: 'video' }] }, 2048, 10), /truncated/i);
+  assert.doesNotThrow(() => timeline.validateExportMetadata({ format: { duration: '9.8' }, streams: [{ codec_type: 'video' }] }, 2048, 10));
 });
 
 test('caption filter escaping handles common filter syntax characters', () => {
