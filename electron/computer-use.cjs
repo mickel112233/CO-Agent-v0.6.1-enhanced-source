@@ -155,7 +155,7 @@ async function invokeAccessibleControl(payload = {}) {
   assertApproved(payload); assertWindows();
   const target = normalizeAccessibleTarget(payload);
   const encoded = value => Buffer.from(value, 'utf8').toString('base64');
-  const script = String.raw\`
+  const script = String.raw`
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $windowName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__WINDOW__'))
@@ -191,7 +191,7 @@ try {
 } catch { throw "UI Automation did not invoke the selected control: $($_.Exception.Message)" }
 $current = $target.Current
 ConvertTo-Json -InputObject ([pscustomobject]@{ ok=$true; window=$windowName; name=$current.Name; automationId=$current.AutomationId; controlType=$current.ControlType.ProgrammaticName }) -Compress
-\`.replace('__WINDOW__', encoded(target.windowTitle)).replace('__NAME__', encoded(target.name)).replace('__ID__', encoded(target.automationId)).replace('__TYPE__', encoded(target.controlType));
+`.replace('__WINDOW__', encoded(target.windowTitle)).replace('__NAME__', encoded(target.name)).replace('__ID__', encoded(target.automationId)).replace('__TYPE__', encoded(target.controlType));
   const { stdout } = await powershell(script, 15000);
   let result;
   try { result = JSON.parse(stdout.trim() || '{}'); } catch { throw new Error('Windows UI Automation returned an unreadable invocation result.'); }
