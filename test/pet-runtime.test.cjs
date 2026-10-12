@@ -10,8 +10,8 @@ const pet = require('../electron/pet-runtime.cjs');
 test('pet executable candidates are Windows-only and use fixed app-owned locations', () => {
   assert.deepEqual(pet.candidates({ platform: 'linux', appPath: '/app' }), []);
   const paths = pet.candidates({ platform: 'win32', appPath: '/app', resourcesPath: '/resources' });
-  assert.equal(paths[0], path.resolve('/resources/pet/AI-Desktop-Pet.exe'));
-  assert.ok(paths.every(value => value.endsWith('AI-Desktop-Pet.exe')));
+  assert.equal(paths[0], path.resolve('/resources/pet/convai-desktop-pet.exe'));
+  assert.ok(paths.every(value => value.endsWith('convai-desktop-pet.exe')));
 });
 
 test('pet status reports source-only state instead of pretending it is installed', async () => {
@@ -27,7 +27,7 @@ test('pet status reports source-only state instead of pretending it is installed
 
 test('pet launcher uses an explicit executable, no shell, and prevents duplicate launches', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-pet-'));
-  const exe = path.join(dir, 'pet', 'AI-Desktop-Pet.exe');
+  const exe = path.join(dir, 'pet', 'convai-desktop-pet.exe');
   await fs.mkdir(path.dirname(exe), { recursive: true });
   await fs.writeFile(exe, 'test executable placeholder');
   const fake = new EventEmitter();
