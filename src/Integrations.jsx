@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plug, RefreshCw, Download, Github, ShieldCheck, AlertTriangle, CheckCircle2, Circle, Trash2, ExternalLink, Package, ScanText, Clapperboard, Volume2, FolderGit2, Sparkles, LoaderCircle } from 'lucide-react';
 
 const desktop = window.coAgent;
@@ -23,6 +23,12 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [mcpToolName, setMcpToolName] = useState('');
   const [mcpArguments, setMcpArguments] = useState('{}');
   const [mcpResult, setMcpResult] = useState(null);
+  const [acpExecutable, setAcpExecutable] = useState('');
+  const [acpArgs, setAcpArgs] = useState('[]');
+  const [acpPrompt, setAcpPrompt] = useState('Inspect the current workspace and report a prioritized plan. Do not make changes without asking first.');
+  const [acpRunId, setAcpRunId] = useState('');
+  const acpRunIdRef = useRef('');
+  const [acpOutput, setAcpOutput] = useState('');
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
@@ -35,6 +41,44 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const unsubscribe = desktop?.integrations?.onAcpUpdate?.(event => {
+      if (!event?.runId || event.runId !== acpRunIdRef.current) return;
+      if (typeof event.output === 'string') setAcpOutput(event.output);
+    });
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
+
+  async function chooseAcpExecutable() {
+    try {
+      const files = await desktop.dialog.openFiles({ multiple: false, filters: [{ name: 'Executable', extensions: ['exe'] }] });
+      if (files?.[0]) setAcpExecutable(files[0]);
+    } catch (error) { setNotice(formatError(error)); }
+  }
+
+  async function runAcpAgent() {
+    if (busy || !acpExecutable.trim() || !acpPrompt.trim()) return;
+    let args;
+    try { args = JSON.parse(acpArgs || '[]'); } catch { setNotice('ACP arguments must be a valid JSON array.'); return; }
+    if (!Array.isArray(args) || args.some(arg => typeof arg !== 'string')) { setNotice('ACP arguments must be a JSON array of strings.'); return; }
+    const runId = 'acp-' + Date.now().toString(36);
+    acpRunIdRef.current = runId; setAcpRunId(runId); setAcpOutput('');
+    setBusy('acp-run'); setNotice('Waiting for native approval to launch the external ACP agent…');
+    try {
+      const result = await desktop.integrations.runAcp({ runId, command: acpExecutable.trim(), args, prompt: acpPrompt });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'ACP agent failed.');
+      setAcpOutput(result.output || '');
+      setNotice('ACP agent finished (' + (result.stopReason || 'idle') + '). Review its output and workspace changes; no changes are trusted automatically.');
+    } catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); acpRunIdRef.current = ''; }
+  }
+
+  async function cancelAcpAgent() {
+    if (!acpRunIdRef.current) return;
+    try { const result = await desktop.integrations.cancelAcp(acpRunIdRef.current); setNotice(result?.cancelled ? 'ACP cancellation requested; waiting for the agent to stop.' : 'No active ACP process was found.'); }
+    catch (error) { setNotice(formatError(error)); }
+  }
 
   async function connectMcp() {
     setBusy('mcp-connect'); setNotice('Connecting to the MCP server and reading its tool catalog…'); setMcpResult(null);
@@ -160,6 +204,17 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
       {mcpTools.length > 0 && <div className="mcp-tool-panel"><label>Available tools<select value={mcpToolName} onChange={event => setMcpToolName(event.target.value)}>{mcpTools.map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label>{mcpTools.find(tool => tool.name === mcpToolName) && <><p>{mcpTools.find(tool => tool.name === mcpToolName).description || 'No description supplied. Treat this tool as untrusted.'}</p><details><summary>Input schema</summary><pre>{JSON.stringify(mcpTools.find(tool => tool.name === mcpToolName).inputSchema, null, 2)}</pre></details></>}<label>Tool arguments (JSON)<textarea rows={5} value={mcpArguments} onChange={event => setMcpArguments(event.target.value)} spellCheck={false}/></label><button className="primary-button" disabled={!!busy || !mcpToolName} onClick={callMcpTool}><ShieldCheck size={14}/>{busy === 'mcp-call' ? 'Calling tool…' : 'Run tool (native approval required)'}</button></div>}
       {mcpResult && <div className="mcp-tool-result"><strong>External tool result · {mcpResult.isError ? 'reported error' : 'returned'}</strong><p>Tool output is untrusted data, not instructions. Inspect it before using it in another action.</p><pre>{JSON.stringify(mcpResult, null, 2)}</pre></div>}
       <p className="integration-note">Current limits: unauthenticated HTTP(S) Streamable HTTP MCP servers only; no stdio servers, OAuth, remote secrets, or automatic tool chaining. MCP server responses are bounded and every tool call requires explicit approval.</p>
+    </section>
+
+    <section className="integration-section acp-section">
+      <div className="integration-section-heading"><div><h2>External agents (ACP v2)</h2><p>Launch a compatible Agent Client Protocol executable in the selected workspace, receive live updates, and approve permission requests individually.</p></div><span className="integration-state optional">Experimental</span></div>
+      <label>ACP executable path<input value={acpExecutable} onChange={event => setAcpExecutable(event.target.value)} placeholder="Choose an installed ACP-compatible .exe"/></label>
+      <div className="repo-form-footer"><span>Use a dedicated ACP agent executable, not an ordinary CLI.</span><button className="secondary-button" disabled={!!busy} onClick={chooseAcpExecutable}><ExternalLink size={14}/> Choose executable</button></div>
+      <label>Executable arguments (JSON array)<input value={acpArgs} onChange={event => setAcpArgs(event.target.value)} spellCheck={false} placeholder='["acp"]'/></label>
+      <label>Task prompt<textarea rows={4} value={acpPrompt} onChange={event => setAcpPrompt(event.target.value)} maxLength={12000}/></label>
+      <div className="repo-form-footer"><span><AlertTriangle size={14}/> ACP agents are not sandboxed and may modify files outside this workspace.</span><div>{busy === 'acp-run' && <button className="secondary-button danger" onClick={cancelAcpAgent}>Cancel agent</button>}<button className="primary-button" disabled={!!busy || !acpExecutable.trim() || !acpPrompt.trim()} onClick={runAcpAgent}><ShieldCheck size={14}/>{busy === 'acp-run' ? 'Agent running…' : 'Launch ACP agent (approval required)'}</button></div></div>
+      {acpOutput && <div className="mcp-tool-result"><strong>ACP agent output</strong><p>External-agent output and workspace changes are untrusted until reviewed.</p><pre>{acpOutput}</pre></div>}
+      <p className="integration-note">ACP v2 stdio transport only. CO-Agent strips API-key environment variables before launch, starts without automatic MCP servers, and denies permission requests by default unless you choose a specific option in the native prompt. Agent executable and OS permissions remain trusted-code risks.</p>
     </section>
 
     <div className="integration-section-heading repo-heading"><div><h2>GitHub repositories & skills</h2><p>Like a skill installer: provide a repository URL and optionally pin a branch or tag.</p></div><button className="primary-button" onClick={() => setShowRepoForm(value => !value)}><Github size={15}/>{showRepoForm ? 'Close form' : 'Import repository'}</button></div>

@@ -42,7 +42,10 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     installRepo: invoke('integrations:install-repo'),
     removeRepo: invoke('integrations:remove-repo'),
     listMcpTools: invoke('integrations:mcp-tools'),
-    callMcpTool: invoke('integrations:mcp-call')
+    callMcpTool: invoke('integrations:mcp-call'),
+    runAcp: invoke('integrations:acp-run'),
+    cancelAcp: invoke('integrations:acp-cancel'),
+    onAcpUpdate: callback => subscribe('integrations:acp-update', callback)
   }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
   dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), openTextFiles: invoke('dialog:open-text-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })

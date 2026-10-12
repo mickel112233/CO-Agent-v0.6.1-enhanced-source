@@ -46,6 +46,7 @@ These are capability comparisons from public project/documentation pages, not a 
 - AionUi, [project README](https://github.com/iOfficeAI/AionUi): multi-agent/CLI integration, parallel sessions, MCP management, and assistant presets.
 - Ollama, [API documentation](https://github.com/ollama/ollama/blob/main/docs/api.md): conversation-role messages and streaming chat responses.
 - MCP, [Streamable HTTP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/transports/streamable-http.mdx): required method/name headers and current transport behavior.
+- ACP, [protocol v2 overview](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/docs/protocol/v2/overview.mdx) and [v2 initialization](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/docs/protocol/v2/initialization.mdx): JSON-RPC process/session lifecycle and capability negotiation.
 
 ## Highest-value improvements, ordered by impact
 
@@ -67,7 +68,7 @@ These are capability comparisons from public project/documentation pages, not a 
 
 ### P2 — only after reliability improves
 
-11. Expand MCP transport/auth support and add curated connectors, then implement an ACP-compatible external-agent adapter with the same permission and audit contracts.
+11. Expand MCP transport/auth support and add curated connectors; test ACP v2 against real agent executables, implement auth/login where advertised, and add stronger workspace isolation and auditable file-change previews.
 12. Optional scheduled tasks with explicit schedules, pause/cancel, logs, and safe defaults.
 13. Creative pipelines for captions/transcription, motion graphics, and export presets.
 14. Automated benchmark harness: fixed tasks, success criteria, repeat runs, latency, failures, resource use, and regression comparisons.
