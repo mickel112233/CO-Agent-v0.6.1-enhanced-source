@@ -6,7 +6,7 @@ This repository is an active reconstruction. The current source now includes pra
 
 - Electron main process and context-isolated preload bridge.
 - Local Ollama status, model pull/delete, and non-streaming chat path.
-- Optional API-provider read-only helper for OpenAI-compatible, Anthropic, and Gemini endpoints.
+- Optional API-provider chat for OpenAI-compatible, Anthropic, and Gemini endpoints; conversation turns preserve user/assistant roles rather than flattening history into one prompt. A separate read-only API helper remains available for delegated child-agent tasks.
 - Media probing, WAV extraction, compatible-clip concat, and FFmpeg capability checks.
 - **Multi-track timeline MVP:** video and image clips positioned on a timeline, separate audio clips, title/caption overlays, source in-point and duration editing, move/split/remove operations, local project save/load (.coagent-project.json), preview, and FFmpeg MP4 rendering.
 - **Computer-use MVP:** desktop screenshot capture, selected-display coordinate mapping, Windows top-level UI Automation window inspection, optional local Tesseract OCR, screenshot-aware local-model action planning, and explicit-approval mouse click, text input, and allow-listed keypresses. The plan is still reviewed and executed one action at a time.
@@ -30,7 +30,7 @@ The selected workspace is persisted between launches. Agents can only inspect ex
 
 The in-app terminal streams output and exposes fixed presets only: `npm test`, `npm run build`, `git status --short --branch`, `git diff --check`, and `npm audit --omit=dev`. Every command requires native confirmation. These commands still run project-defined scripts with the user's OS permissions; only run them in a trusted workspace. This is not an arbitrary command shell, and no command is automatically executed because an agent suggested it.
 
-Still unfinished: automatic pipeline execution, concurrent agent scheduling, durable workflow-history persistence, patch/diff generation, rollback UI for file proposals, per-project command policies, test coverage reports, and model-independent agent providers. Local model quality and JSON/tool adherence vary by installed model.
+Still unfinished: automatic pipeline execution, concurrent agent scheduling, durable workflow-history persistence, patch/diff generation, rollback UI for file proposals, per-project command policies, test coverage reports, streaming chat, and a unified provider/agent adapter interface. Local model quality and JSON/tool adherence vary by installed model.
 
 ## Computer-use behavior and safety boundaries
 
