@@ -223,7 +223,11 @@ async function applyChanges(payload = {}) {
       // Track before writing: a failed write can still truncate/create a partial file.
       attempted.push(item);
       await fs.writeFile(item.absolute, item.content, { encoding: 'utf8', flag: item.existed ? 'w' : 'wx' });
-      applied.push({ path: item.relative.split(path.sep).join('/'), bytes: item.bytes, created: !item.existed });
+      const written = await fs.readFile(item.absolute, 'utf8');
+      const expectedHash = createHash('sha256').update(item.content, 'utf8').digest('hex');
+      const actualHash = createHash('sha256').update(written, 'utf8').digest('hex');
+      if (actualHash !== expectedHash) throw new Error('Post-write verification failed for ' + item.relative + '; the file contents do not match the approved proposal.');
+      applied.push({ path: item.relative.split(path.sep).join('/'), bytes: item.bytes, created: !item.existed, sha256: actualHash, verified: true });
     }
   } catch (error) {
     const rollbackErrors = [];
