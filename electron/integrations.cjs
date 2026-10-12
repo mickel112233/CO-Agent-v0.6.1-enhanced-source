@@ -10,7 +10,7 @@ const hyperframesService = require('./hyperframes.cjs');
 const TOOLS = Object.freeze({
   tesseract: Object.freeze({ id: 'tesseract', name: 'Tesseract OCR', kind: 'native', required: false, description: 'Local image-to-text extraction for screenshots, scans, and still images.', install: 'winget', command: 'winget', args: ['install', '--id', 'UB-Mannheim.TesseractOCR', '--exact', '--accept-package-agreements', '--accept-source-agreements'], docs: 'https://tesseract-ocr.github.io/tessdoc/Installation.html' }),
   hyperframes: Object.freeze({ id: 'hyperframes', name: 'Hyperframes', kind: 'npm-cli', required: false, description: 'Create and render HTML/CSS/animation compositions as video.', install: 'npm', command: 'npm', args: ['install', '--global', 'hyperframes'], docs: 'https://hyperframes.app/docs/5-packages/cli' }),
-  luxtts: Object.freeze({ id: 'luxtts', name: 'LuxTTS', kind: 'python-runtime', required: false, description: 'Local text-to-speech for generated voiceovers and audio assets. Use CO-Agent LuxTTS setup/runtime; this integration entry does not itself install the Python runtime.', install: null, command: null, args: [], docs: 'https://github.com/ysharma3501/LuxTTS' }),
+  luxtts: Object.freeze({ id: 'luxtts', name: 'LuxTTS', kind: 'python-runtime', required: false, description: 'Local text-to-speech for generated voiceovers and audio assets. Use the dedicated CO-Agent LuxTTS setup flow.', install: null, command: null, args: [], docs: 'https://github.com/ysharma3501/LuxTTS' }),
   piper: Object.freeze({ id: 'piper', name: 'Piper TTS', kind: 'external-runtime', required: false, description: 'Optional local text-to-speech. Piper executable and voice models must be configured separately.', install: null, command: null, args: [], docs: 'https://github.com/rhasspy/piper' })
 });
 const GITHUB_HTTPS = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
@@ -35,17 +35,15 @@ async function executableVersion(file, args = ['--version']) {
   }
 }
 async function getStatus() {
-  const [tesseract, hyperframes, piper, git] = await Promise.all([
+  const [tesseract, hyperframes, git] = await Promise.all([
     ocr.getStatus(),
     hyperframesService.getStatus(),
-    executableVersion('piper'),
     executableVersion('git')
   ]);
   return {
     tools: [
       { ...TOOLS.tesseract, ...tesseract, installed: tesseract.available, installAvailable: process.platform === 'win32' && !!(await executableVersion('winget')).available },
       { ...TOOLS.hyperframes, ...hyperframes, installed: hyperframes.available, installAvailable: !!(await executableVersion('npm')).available },
-      { ...TOOLS.piper, ...piper, installed: piper.available, installAvailable: false },
       { id: 'git', name: 'Git', kind: 'repository-runtime', required: false, description: 'Needed to import public GitHub repositories and skills.', docs: 'https://git-scm.com/downloads', ...git, installed: git.available, installAvailable: false }
     ],
     gitAvailable: git.available,
