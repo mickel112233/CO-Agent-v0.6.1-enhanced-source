@@ -82,6 +82,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
     proc.once('close', async code => {
       if (settled) return;
+      if (proc.__coAgentCancelled) { finish(new Error('LuxTTS generation cancelled by user.')); return; }
       let result;
       try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
       if (code !== 0 || !result?.ok) { finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
@@ -97,7 +98,7 @@ function cancel(requestId) {
   const id = String(requestId || '');
   const proc = activeJobs.get(id);
   if (!proc) return { ok: true, cancelled: false };
-  try { proc.kill(); return { ok: true, cancelled: true }; }
+  try { proc.__coAgentCancelled = true; proc.kill(); return { ok: true, cancelled: true }; }
   catch (error) { return { ok: false, cancelled: false, error: String(error.message || error) }; }
 }
 
