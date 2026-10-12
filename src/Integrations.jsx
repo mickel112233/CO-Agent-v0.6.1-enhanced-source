@@ -29,6 +29,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [acpRunId, setAcpRunId] = useState('');
   const acpRunIdRef = useRef('');
   const [acpOutput, setAcpOutput] = useState('');
+  const [auditEvents, setAuditEvents] = useState([]);
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
@@ -78,6 +79,16 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     if (!acpRunIdRef.current) return;
     try { const result = await desktop.integrations.cancelAcp(acpRunIdRef.current); setNotice(result?.cancelled ? 'ACP cancellation requested; waiting for the agent to stop.' : 'No active ACP process was found.'); }
     catch (error) { setNotice(formatError(error)); }
+  }
+
+  async function loadAuditLog() {
+    setBusy('audit-load');
+    try {
+      const result = await desktop.audit.list(100);
+      setAuditEvents(Array.isArray(result) ? result : result?.events || []);
+      setNotice('Loaded local audit history. Sensitive fields are redacted before storage.');
+    } catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
   }
 
   async function connectMcp() {
@@ -215,6 +226,12 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
       <div className="repo-form-footer"><span><AlertTriangle size={14}/> ACP agents are not sandboxed and may modify files outside this workspace.</span><div>{busy === 'acp-run' && <button className="secondary-button danger" onClick={cancelAcpAgent}>Cancel agent</button>}<button className="primary-button" disabled={!!busy || !acpExecutable.trim() || !acpPrompt.trim()} onClick={runAcpAgent}><ShieldCheck size={14}/>{busy === 'acp-run' ? 'Agent running…' : 'Launch ACP agent (approval required)'}</button></div></div>
       {acpOutput && <div className="mcp-tool-result"><strong>ACP agent output</strong><p>External-agent output and workspace changes are untrusted until reviewed.</p><pre>{acpOutput}</pre></div>}
       <p className="integration-note">ACP v2 stdio transport only. CO-Agent strips API-key environment variables before launch, starts without automatic MCP servers, and denies permission requests by default unless you choose a specific option in the native prompt. Agent executable and OS permissions remain trusted-code risks.</p>
+    </section>
+
+    <section className="integration-section audit-section">
+      <div className="integration-section-heading"><div><h2>Local security audit trail</h2><p>Review approval decisions, agent steps, file changes, computer actions, MCP/ACP calls, and video renders recorded on this device.</p></div><button className="secondary-button" disabled={busy === 'audit-load'} onClick={loadAuditLog}><RefreshCw size={14}/>{busy === 'audit-load' ? 'Loading…' : 'Load recent events'}</button></div>
+      {auditEvents.length === 0 ? <p className="integration-note">No events loaded. Choose “Load recent events” to inspect the local log.</p> : <div className="audit-event-list">{auditEvents.map(event => <details key={event.id}><summary><span>{event.action}</span><span className={'audit-status ' + event.status}>{event.status}</span><time>{new Date(event.at).toLocaleString()}</time></summary><p>{event.target || 'No target recorded'}</p><pre>{JSON.stringify(event.details || {}, null, 2)}</pre></details>)}</div>}
+      <p className="integration-note">Stored locally in the CO-Agent user-data directory, bounded to 1,000 events / 2 MB. Prompts, credentials, tool arguments, images, and content fields are redacted. Audit logging is best-effort and is not a tamper-proof security boundary.</p>
     </section>
 
     <div className="integration-section-heading repo-heading"><div><h2>GitHub repositories & skills</h2><p>Like a skill installer: provide a repository URL and optionally pin a branch or tag.</p></div><button className="primary-button" onClick={() => setShowRepoForm(value => !value)}><Github size={15}/>{showRepoForm ? 'Close form' : 'Import repository'}</button></div>

@@ -21,6 +21,7 @@ const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
 const mcpClient = require('./mcp-client.cjs');
 const acpClient = require('./acp-client.cjs');
+const auditModule = require('./audit-log.cjs');
 const textAttachments = require('./text-attachments.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
@@ -30,6 +31,14 @@ let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
 const activeAcpRuns = new Map();
 const activeAgentSteps = new Map();
+let auditLogStore;
+function getAuditLogStore() {
+  if (!auditLogStore) auditLogStore = auditModule.createAuditLog(path.join(app.getPath('userData'), 'audit-log.jsonl'));
+  return auditLogStore;
+}
+async function recordAudit(action, status, details = {}, target = '') {
+  try { await getAuditLogStore().append({ action, status, target, details }); } catch {}
+}
 const activeModelPulls = new Map();
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
@@ -76,6 +85,7 @@ async function confirmComputerAction(message, detail) {
   return result.response === 1;
 }
 function registerIpc() {
+  handle('audit:list', limit => getAuditLogStore().list(limit));
   handle('chat-history:load', async () => {
     const file = path.join(app.getPath('userData'), 'chat-history.json');
     try {
@@ -110,13 +120,20 @@ function registerIpc() {
     const requestId = String(payload?.requestId || ('agent-step-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)));
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId) || activeAgentSteps.has(requestId)) throw new Error('Agent step request ID is invalid or already active.');
     const controller = new AbortController(); activeAgentSteps.set(requestId, controller);
-    try { return await agentOrchestrator.runWorkflowStep({ ...payload, signal: controller.signal }); }
-    finally { activeAgentSteps.delete(requestId); }
+    await recordAudit('agent.step', 'started', { requestId, role: payload?.step?.role || '' });
+    try {
+      const result = await agentOrchestrator.runWorkflowStep({ ...payload, signal: controller.signal });
+      await recordAudit('agent.step', 'completed', { requestId, role: payload?.step?.role || '' });
+      return result;
+    } catch (error) {
+      await recordAudit('agent.step', controller.signal.aborted ? 'cancelled' : 'failed', { requestId, role: payload?.step?.role || '', errorType: error.name || 'Error' });
+      throw error;
+    } finally { activeAgentSteps.delete(requestId); }
   });
   handle('agents:cancel-step', requestId => {
     const controller = activeAgentSteps.get(String(requestId || ''));
     if (!controller) return { ok: true, cancelled: false };
-    controller.abort(); return { ok: true, cancelled: true };
+    controller.abort(); void recordAudit('agent.step', 'cancel-requested', { requestId: String(requestId || '') }); return { ok: true, cancelled: true };
   });
   let workflowRunStore;
   const runs = () => workflowRunStore || (workflowRunStore = executionStore.createStore(path.join(app.getPath('userData'), 'workflow-runs.json')));
@@ -145,19 +162,23 @@ function registerIpc() {
     const approvedFiles = [];
     for (const file of files) {
       const preview = (await workspace.previewChanges({ files: [file] })).files[0];
-      if (preview.unchanged) continue;
+      if (preview.unchanged) { await recordAudit('workspace.file-change', 'unchanged', { bytes: preview.newBytes }, preview.path); continue; }
       const summary = (preview.created ? 'Create ' : 'Replace ') + preview.path + ' (' + preview.oldBytes + ' → ' + preview.newBytes + ' bytes)';
       const decision = await dialog.showMessageBox(mainWindow, {
         type: 'warning', title: 'Review proposed file diff', message: 'Approve this file change?',
         detail: 'Workspace: ' + workspace.getRoot() + '\n' + summary + '\n\n' + preview.diff + '\n\nEach file is approved separately. Approved changes are backed up and rolled back if the multi-file transaction fails.',
         buttons: ['Skip file', 'Approve this file'], defaultId: 0, cancelId: 0, noLink: true
       });
-      if (decision.response === 1) approvedFiles.push(file);
+      if (decision.response === 1) { approvedFiles.push(file); await recordAudit('workspace.file-change', 'approved', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path); }
+      else await recordAudit('workspace.file-change', 'skipped', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path);
     }
     const skipped = files.filter(file => !approvedFiles.includes(file)).map(file => String(file.path || '(unnamed)'));
-    if (!approvedFiles.length) return { ok: true, applied: [], skipped, backupDirectory: null };
-    const result = await workspace.applyChanges({ ...payload, files: approvedFiles, approved: true });
-    return { ...result, skipped };
+    if (!approvedFiles.length) { await recordAudit('workspace.apply-changes', 'skipped', { proposed: files.length, approved: 0 }, workspace.getRoot()); return { ok: true, applied: [], skipped, backupDirectory: null }; }
+    try {
+      const result = await workspace.applyChanges({ ...payload, files: approvedFiles, approved: true });
+      await recordAudit('workspace.apply-changes', 'completed', { applied: result.applied?.length || approvedFiles.length, skipped: skipped.length, backupDirectory: result.backupDirectory || '' }, workspace.getRoot());
+      return { ...result, skipped };
+    } catch (error) { await recordAudit('workspace.apply-changes', 'failed', { approved: approvedFiles.length, errorType: error.name || 'Error' }, workspace.getRoot()); throw error; }
   });
   handle('terminal:list-commands', () => ({ ok: true, commands: workspace.commandList() }));
   handle('terminal:run-command', async commandId => {
@@ -229,17 +250,25 @@ function registerIpc() {
   handle('computer-use:plan-actions', payload => computerUse.planActions(payload));
   handle('computer-use:verify-outcome', payload => computerUse.verifyActionOutcome(payload));
   handle('computer-use:click', async payload => {
-    if (!await confirmComputerAction('Allow one mouse click?', 'Click once at screenshot coordinates ' + Number(payload?.x) + ', ' + Number(payload?.y) + '. Review the desktop before allowing.')) throw new Error('Click cancelled by user.');
-    return computerUse.click({ ...payload, approved: true });
+    const target = Number(payload?.x) + ',' + Number(payload?.y);
+    if (!await confirmComputerAction('Allow one mouse click?', 'Click once at screenshot coordinates ' + target + '. Review the desktop before allowing.')) { await recordAudit('computer.click', 'denied', {}, target); throw new Error('Click cancelled by user.'); }
+    await recordAudit('computer.click', 'approved', {}, target);
+    try { const result = await computerUse.click({ ...payload, approved: true }); await recordAudit('computer.click', 'completed', {}, target); return result; }
+    catch (error) { await recordAudit('computer.click', 'failed', { errorType: error.name || 'Error' }, target); throw error; }
   });
   handle('computer-use:type-text', async payload => {
     const length = String(payload?.text || '').length;
-    if (!await confirmComputerAction('Allow text input?', 'Type ' + length + ' character(s) into the currently focused application. Do not enter passwords, API keys, or private information.')) throw new Error('Text input cancelled by user.');
-    return computerUse.typeText({ ...payload, approved: true });
+    if (!await confirmComputerAction('Allow text input?', 'Type ' + length + ' character(s) into the currently focused application. Do not enter passwords, API keys, or private information.')) { await recordAudit('computer.type-text', 'denied', { length }); throw new Error('Text input cancelled by user.'); }
+    await recordAudit('computer.type-text', 'approved', { length });
+    try { const result = await computerUse.typeText({ ...payload, approved: true }); await recordAudit('computer.type-text', 'completed', { length }); return result; }
+    catch (error) { await recordAudit('computer.type-text', 'failed', { length, errorType: error.name || 'Error' }); throw error; }
   });
   handle('computer-use:press-key', async payload => {
-    if (!await confirmComputerAction('Allow one key press?', 'Send the ' + String(payload?.key || '') + ' key once to the currently focused application.')) throw new Error('Key press cancelled by user.');
-    return computerUse.pressKey({ ...payload, approved: true });
+    const key = String(payload?.key || '').slice(0, 40);
+    if (!await confirmComputerAction('Allow one key press?', 'Send the ' + key + ' key once to the currently focused application.')) { await recordAudit('computer.press-key', 'denied', { key }); throw new Error('Key press cancelled by user.'); }
+    await recordAudit('computer.press-key', 'approved', { key });
+    try { const result = await computerUse.pressKey({ ...payload, approved: true }); await recordAudit('computer.press-key', 'completed', { key }); return result; }
+    catch (error) { await recordAudit('computer.press-key', 'failed', { key, errorType: error.name || 'Error' }); throw error; }
   });
   handle('studio:capabilities', () => studio.getCapabilities());
   handle('studio:probe', filePath => studio.probe(filePath));
@@ -247,8 +276,15 @@ function registerIpc() {
   handle('studio:concat', args => studio.concat(args?.inputs, args?.outputDir, args?.filename));
   handle('studio:save-project', args => timeline.saveProject(args?.path, args?.project));
   handle('studio:load-project', args => timeline.loadProject(args?.path));
-  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename, { requestId: args?.requestId, onProgress: progress => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('studio:render-progress', { requestId: args?.requestId, ...progress }); } }));
-  handle('studio:cancel-render', requestId => timeline.cancelRender(requestId));
+  handle('studio:render-timeline', async args => {
+    await recordAudit('video.render', 'started', { requestId: args?.requestId, filename: String(args?.filename || '').slice(0, 200), clipCount: Array.isArray(args?.project?.clips) ? args.project.clips.length : 0 }, args?.outputDir || '');
+    try {
+      const result = await timeline.render(args?.project, args?.outputDir, args?.filename, { requestId: args?.requestId, onProgress: progress => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('studio:render-progress', { requestId: args?.requestId, ...progress }); } });
+      await recordAudit('video.render', 'completed', { requestId: args?.requestId, duration: result.duration, fileSize: result.fileSize, hasAudio: result.hasAudio }, result.output);
+      return result;
+    } catch (error) { await recordAudit('video.render', /cancelled/i.test(error.message || '') ? 'cancelled' : 'failed', { requestId: args?.requestId, errorType: error.name || 'Error' }, String(args?.filename || '')); throw error; }
+  });
+  handle('studio:cancel-render', async requestId => { const result = timeline.cancelRender(requestId); await recordAudit('video.render', result.cancelled ? 'cancel-requested' : 'cancel-not-found', { requestId }); return result; });
   handle('studio:ocr-status', () => ocr.getStatus());
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
@@ -264,7 +300,8 @@ function registerIpc() {
     if (!prompt.trim() || prompt.length > acpClient.MAX_PROMPT) throw new Error('ACP task must contain between 1 and 12,000 characters.');
     await fs.access(command);
     const detail = 'Executable: ' + command + '\nArguments: ' + JSON.stringify(args).slice(0, 800) + '\nWorkspace: ' + root + '\nTask: ' + prompt.slice(0, 1500) + '\n\nWARNING: This external process runs as your Windows user and may read or change files outside the workspace. ACP permissions are not an OS sandbox. Launch only an agent executable you trust.';
-    if (!await confirmComputerAction('Start external ACP agent?', detail)) throw new Error('ACP agent launch cancelled by user.');
+    if (!await confirmComputerAction('Start external ACP agent?', detail)) { await recordAudit('acp.launch', 'denied', { executable: path.basename(command), argsCount: args.length }, runId); throw new Error('ACP agent launch cancelled by user.'); }
+    await recordAudit('acp.launch', 'approved', { executable: path.basename(command), argsCount: args.length, workspace: root }, runId);
     const client = acpClient.createClient({
       command, args, cwd: root,
       onUpdate: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('integrations:acp-update', { runId, ...event }); },
@@ -278,8 +315,10 @@ function registerIpc() {
           detail: (String(request.description || 'No explanation supplied.') + '\n\nSubject: ' + JSON.stringify(request.subject || {}).slice(0, 1500) + '\n\nChoose the exact permission option to grant.').slice(0, 3000),
           buttons, defaultId: 0, cancelId: 0, noLink: true
         });
-        if (decision.response <= 0) return { outcome: 'cancelled' };
-        return { outcome: 'selected', optionId: options[decision.response - 1].optionId };
+        if (decision.response <= 0) { await recordAudit('acp.permission', 'denied', { runId, optionCount: options.length }); return { outcome: 'cancelled' }; }
+        const selected = options[decision.response - 1];
+        await recordAudit('acp.permission', 'approved', { runId, optionId: selected.optionId });
+        return { outcome: 'selected', optionId: selected.optionId };
       }
     });
     activeAcpRuns.set(runId, client);
@@ -287,7 +326,11 @@ function registerIpc() {
       await client.initialize();
       await client.newSession();
       const result = await client.runPrompt(prompt);
+      await recordAudit('acp.launch', 'completed', { runId, stopReason: result.stopReason, outputChars: result.output.length }, path.basename(command));
       return { ...result, runId };
+    } catch (error) {
+      await recordAudit('acp.launch', 'failed', { runId, errorType: error.name || 'Error' }, path.basename(command));
+      throw error;
     } finally {
       activeAcpRuns.delete(runId);
       client.close();
@@ -304,8 +347,11 @@ function registerIpc() {
     const toolName = String(payload?.toolName || '');
     const args = mcpClient.normalizeToolArguments(payload?.arguments);
     const summary = JSON.stringify(args).slice(0, 1800);
-    if (!await confirmComputerAction('Allow this MCP tool call?', 'Server: ' + serverUrl + '\nTool: ' + toolName + '\nArguments (untrusted input): ' + summary + '\n\nThe server may perform external actions. Only approve if you trust this server and understand the tool. CO-Agent does not automatically execute returned instructions.')) throw new Error('MCP tool call cancelled by user.');
-    return mcpClient.createClient(serverUrl).callTool(toolName, args);
+    const serverHost = new URL(serverUrl).host;
+    if (!await confirmComputerAction('Allow this MCP tool call?', 'Server: ' + serverUrl + '\nTool: ' + toolName + '\nArguments (untrusted input): ' + summary + '\n\nThe server may perform external actions. Only approve if you trust this server and understand the tool. CO-Agent does not automatically execute returned instructions.')) { await recordAudit('mcp.tool.call', 'denied', { serverHost, toolName }); throw new Error('MCP tool call cancelled by user.'); }
+    await recordAudit('mcp.tool.call', 'approved', { serverHost, toolName });
+    try { const result = await mcpClient.createClient(serverUrl).callTool(toolName, args); await recordAudit('mcp.tool.call', result.isError ? 'failed' : 'completed', { serverHost, toolName, isError: result.isError }); return result; }
+    catch (error) { await recordAudit('mcp.tool.call', 'failed', { serverHost, toolName, errorType: error.name || 'Error' }); throw error; }
   });
   handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));
   handle('integrations:install-tool', id => integrations.installTool(id));

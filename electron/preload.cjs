@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     ocrStatus: invoke('studio:ocr-status'), ocrImage: invoke('studio:ocr-image'),
     hyperframesStatus: invoke('studio:hyperframes-status'), hyperframesRun: invoke('studio:hyperframes-run')
   }),
+  audit: Object.freeze({ list: invoke('audit:list') }),
   integrations: Object.freeze({
     status: invoke('integrations:status'),
     installTool: invoke('integrations:install-tool'),
