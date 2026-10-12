@@ -405,6 +405,9 @@ function registerIpc() {
     const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory','createDirectory'] });
     return result.canceled ? null : result.filePaths[0];
   });
+  handle('pet:show', async () => { if (petOverlay) petOverlay.show(); return { ok: true }; });
+  handle('pet:hide', async () => { if (petOverlay) petOverlay.hide(); return { ok: true }; });
+  handle('pet:toggle', async () => { if (petOverlay) petOverlay.toggle(); return { ok: true }; });
 }
 function createWindow() {
   mainWindow = new BrowserWindow({
