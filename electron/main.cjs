@@ -160,6 +160,7 @@ function registerIpc() {
     const files = Array.isArray(payload?.files) ? payload.files : [];
     if (!files.length || files.length > 12) throw new Error('Choose between 1 and 12 proposed files to apply.');
     const approvedFiles = [];
+    const approvedOriginals = new Set();
     for (const file of files) {
       const preview = (await workspace.previewChanges({ files: [file] })).files[0];
       if (preview.unchanged) { await recordAudit('workspace.file-change', 'unchanged', { bytes: preview.newBytes }, preview.path); continue; }
@@ -169,10 +170,10 @@ function registerIpc() {
         detail: 'Workspace: ' + workspace.getRoot() + '\n' + summary + '\n\n' + preview.diff + '\n\nEach file is approved separately. Approved changes are backed up and rolled back if the multi-file transaction fails.',
         buttons: ['Skip file', 'Approve this file'], defaultId: 0, cancelId: 0, noLink: true
       });
-      if (decision.response === 1) { approvedFiles.push({ ...file, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }); await recordAudit('workspace.file-change', 'approved', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path); }
+      if (decision.response === 1) { approvedFiles.push({ ...file, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }); approvedOriginals.add(file); await recordAudit('workspace.file-change', 'approved', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path); }
       else await recordAudit('workspace.file-change', 'skipped', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path);
     }
-    const skipped = files.filter(file => !approvedFiles.includes(file)).map(file => String(file.path || '(unnamed)'));
+    const skipped = files.filter(file => !approvedOriginals.has(file)).map(file => String(file.path || '(unnamed)'));
     if (!approvedFiles.length) { await recordAudit('workspace.apply-changes', 'skipped', { proposed: files.length, approved: 0 }, workspace.getRoot()); return { ok: true, applied: [], skipped, backupDirectory: null }; }
     try {
       const result = await workspace.applyChanges({ ...payload, files: approvedFiles, approved: true });
