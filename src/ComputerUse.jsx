@@ -68,6 +68,43 @@ export default function ComputerUse() {
     if (success) setPlan([]);
   }
 
+  async function invokeControl(item) {
+    if (!current || !item?.windowName || (!item.name && !item.automationId)) return;
+    const before = current;
+    const description = 'Invoke ' + (item.name || item.automationId) + ' in ' + item.windowName;
+    setBusy('invoke-control'); setNotice('Waiting for native Windows approval…'); setVerification(null);
+    try {
+      const result = await desktop?.computerUse?.invokeControl({
+        windowTitle: item.windowName, name: item.name || '', automationId: item.automationId || '',
+        controlType: item.type || ''
+      });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Accessibility control invocation failed.');
+      const after = await desktop?.computerUse?.captureScreen();
+      if (!Array.isArray(after) || !after.length) {
+        setNotice('Windows invoked the selected control, but CO-Agent could not recapture the desktop. Inspect it manually.');
+        return;
+      }
+      const afterIndex = Math.max(0, after.findIndex(screen => screen.displayId === before.displayId));
+      const observed = after[afterIndex] || after[0];
+      setScreens(after); setScreenIndex(afterIndex); setLastAction(description);
+      try {
+        const checked = await desktop?.computerUse?.verifyOutcome({
+          task: description + '. Verify only the visible result of this control invocation.',
+          action: 'Windows UI Automation Invoke pattern; exact window and control identity checked',
+          beforeImageBase64: String(before.dataUrl || '').split(',')[1] || '',
+          afterImageBase64: String(observed.dataUrl || '').split(',')[1] || '',
+          beforeText: screenText.slice(0, 3000), afterText: '', model: undefined
+        });
+        if (checked?.ok === false || checked?.error) throw new Error(checked.error || 'Visual verification failed.');
+        setVerification(checked);
+        setNotice('Semantic control invoked. Verification: ' + checked.status + ' (' + Math.round(checked.confidence * 100) + '% model confidence). ' + checked.evidence + ' Inspect the updated screenshot before continuing.');
+      } catch (error) {
+        setNotice('Semantic control invoked and a fresh screenshot was captured, but automated verification was unavailable: ' + (error.message || String(error)) + '. Inspect the screenshot manually.');
+      }
+    } catch (error) { setNotice(error.message || String(error)); }
+    finally { setBusy(''); }
+  }
+
   async function inspect() {
     setBusy('inspect'); setNotice('');
     try {
@@ -147,7 +184,7 @@ export default function ComputerUse() {
         <div className="panel-heading"><strong><ScanSearch size={16}/> Windows accessibility</strong><button className="tool-button" title="Inspect windows" onClick={inspect} disabled={!!busy}><RefreshCw size={14}/></button></div>
         <p className="computer-help">Read top-level window names and basic UI Automation properties from Windows. This helps identify the app you intend to control; it does not inspect private content in the background.</p>
         <button className="secondary-button" onClick={inspect} disabled={!!busy}><Eye size={14}/>{busy === 'inspect' ? 'Inspecting…' : 'Inspect accessible windows'}</button>
-        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Window'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}{accessibilityControls.length > 0 && <div className="computer-window-list computer-control-list"><strong className="computer-control-heading">Visible interactive controls · {accessibilityControls.length}</strong>{accessibilityControls.slice(0, 80).map((item, i) => <div key={i}><strong>{item.name || item.type || 'Unnamed control'}</strong><small>{item.type || 'Control'} · {item.enabled ? 'enabled' : 'disabled'} · {item.x},{item.y} · {item.width}×{item.height}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div>}
+        {windows.length > 0 ? <div className="computer-window-list">{windows.map((item, i) => <div key={i}><strong>{item.name || '(unnamed window)'}</strong><small>{item.type || 'Window'}{item.className ? ' · ' + item.className : ''}{item.automationId ? ' · ID ' + item.automationId : ''}</small></div>)}</div> : <div className="computer-empty-list"><AlertTriangle size={16}/><span>No window list yet. On Windows, run an accessibility inspection.</span></div>}{accessibilityControls.length > 0 && <div className="computer-window-list computer-control-list"><strong className="computer-control-heading">Visible interactive controls · {accessibilityControls.length}</strong>{accessibilityControls.slice(0, 80).map((item, i) => <div key={i}><strong>{item.name || item.type || 'Unnamed control'}</strong><small>{item.windowName ? item.windowName + ' · ' : ''}{item.type || 'Control'} · {item.enabled ? 'enabled' : 'disabled'} · {item.x},{item.y} · {item.width}×{item.height}{item.automationId ? ' · ID ' + item.automationId : ''}</small><button className="tool-button" disabled={!!busy || !item.enabled || !item.windowName} onClick={() => invokeControl(item)} title="Invoke this exact control through Windows UI Automation">Invoke control</button></div>)}</div>}
       </div>
     </div>
     {lastAction && <p className="computer-last-action"><CheckCircle2 size={15}/> Last approved action: {lastAction}</p>}
