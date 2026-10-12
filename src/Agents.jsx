@@ -250,7 +250,8 @@ export default function Agents() {
       if (applied?.ok === false || applied?.error) throw new Error(applied.error || 'Could not apply file proposals.');
       setResults(old => ({ ...old, [stepId]: { ...old[stepId], files: [], applied: applied.applied, backupDirectory: applied.backupDirectory } }));
       await refreshFiles();
-      setNotice('Applied ' + (applied.applied || []).length + ' file(s). Backups: ' + applied.backupDirectory);
+      const verifiedFiles = (applied.applied || []).filter(item => item.verified === true && /^[a-f0-9]{64}$/.test(item.sha256 || ''));
+      setNotice('Applied and read-back verified ' + verifiedFiles.length + '/' + (applied.applied || []).length + ' file(s): ' + verifiedFiles.map(item => item.path + ' (SHA-256 ' + item.sha256.slice(0, 12) + '…)').join(', ') + '. Backups: ' + applied.backupDirectory);
     } catch (error) { setNotice(errorText(error)); }
     finally { setBusy(''); }
   };
