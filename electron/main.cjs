@@ -207,7 +207,9 @@ function registerIpc() {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:setup-progress', progress);
     });
   });
-  handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
+  handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }, progress => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:generation-progress', progress);
+  }));
   handle('luxtts:cancel', requestId => luxTTS.cancel(requestId));
   handle('voice:synthesize', args => piper.synthesize(args));
   handle('dialog:open-text-files', async () => {
