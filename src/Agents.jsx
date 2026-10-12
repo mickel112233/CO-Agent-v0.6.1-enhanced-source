@@ -25,6 +25,7 @@ export default function Agents() {
   const [workflow, setWorkflow] = useState(() => readSavedState('co-agent:agent-workflow', null));
   const [activeRun, setActiveRun] = useState(null);
   const activeStepRequestRef = useRef('');
+  const interruptedStepIdsRef = useRef(new Set());
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [agentCatalog, setAgentCatalog] = useState({ agents: [], skills: [] });
@@ -154,10 +155,16 @@ export default function Agents() {
     if (!activeRun || (busy && action !== 'cancel')) return;
     setBusy('run-control');
     try {
-      if (action === 'cancel' && activeStepRequestRef.current) await desktop.agents.cancelStep(activeStepRequestRef.current);
+      if (action === 'pause' || action === 'cancel') {
+        const activeStepId = activeRun.steps?.find(step => step.id === activeRun.currentStepId)?.id || (busy && busy !== 'run-control' ? busy : '');
+        if (activeStepId) interruptedStepIdsRef.current.add(activeStepId);
+      }
       const response = action === 'pause' ? await desktop.agents.pauseRun(activeRun.id)
         : action === 'resume' ? await desktop.agents.resumeRun(activeRun.id)
         : await desktop.agents.cancelRun(activeRun.id);
+      if ((action === 'pause' || action === 'cancel') && activeStepRequestRef.current) {
+        await desktop.agents.cancelStep(activeStepRequestRef.current);
+      }
       if (response?.ok === false || response?.error) throw new Error(response.error || 'Workflow control failed.');
       setActiveRun(response.run);
       setNotice('Saved workflow ' + (action === 'cancel' ? 'cancelled' : action === 'pause' ? 'paused' : 'resumed') + '.');
@@ -208,6 +215,7 @@ export default function Agents() {
         if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');
         externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];
       }
+      if (interruptedStepIdsRef.current.has(step.id)) throw new Error('This step was interrupted by workflow control before its model request started. Resume and retry it.');
       const requestId = 'agent-step-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       activeStepRequestRef.current = requestId;
       const result = await desktop.agents.runStep({ requestId, goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
@@ -225,10 +233,12 @@ export default function Agents() {
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'review', result: result.summary } : item) }));
       setNotice(step.title + ' produced a result. Review the output and check every acceptance criterion before the next dependent step can run. ' + (result.files?.length ? result.files.length + ' file proposal(s) await your review.' : 'No files were changed.'));
     } catch (error) {
-      if (activeRun?.goal === workflow.goal) { try { await syncRunStep(step.id, 'fail', { error: errorText(error) }); } catch {} }
-      setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'blocked', result: errorText(error) } : item) }));
-      setNotice(errorText(error));
-    } finally { activeStepRequestRef.current = ''; setBusy(''); }
+      const interruptedByControl = interruptedStepIdsRef.current.has(step.id);
+      if (!interruptedByControl && activeRun?.goal === workflow.goal) { try { await syncRunStep(step.id, 'fail', { error: errorText(error) }); } catch {} }
+      const message = interruptedByControl ? 'Step interrupted by pause/cancel. Resume the workflow and retry if needed.' : errorText(error);
+      setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'blocked', result: message } : item) }));
+      setNotice(message);
+    } finally { interruptedStepIdsRef.current.delete(step.id); activeStepRequestRef.current = ''; setBusy(''); }
   };
 
   const applyProposals = async stepId => {
