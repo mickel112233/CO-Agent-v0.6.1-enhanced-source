@@ -74,7 +74,6 @@ test('model pull times out when Ollama never responds', async () => {
   await withServer((req, res) => {
     if (req.url === '/api/pull') {
       // Deliberately never send headers or a body; the client must time out.
-      req.on('close', () => { if (!res.destroyed) res.destroy(); });
       return;
     }
     res.statusCode = 404;
