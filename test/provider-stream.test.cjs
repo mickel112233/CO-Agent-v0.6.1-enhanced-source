@@ -40,7 +40,7 @@ test('Ollama NDJSON streaming emits text and requires a loopback endpoint', asyn
 });
 
 test('partial stream is preserved when the reader fails after emitting text', async () => {
-  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\n')); controller.error(new Error('connection reset')); } });
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\\n')); }, pull(controller) { controller.error(new Error('connection reset')); } });
   const result = await consumeStream({ body: stream }, 'openai', () => {}, new AbortController().signal);
   assert.equal(result.message, 'partial');
   assert.equal(result.interrupted, true);
