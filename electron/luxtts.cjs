@@ -68,7 +68,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS request ID is missing or invalid.');
   if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
   return new Promise((resolve, reject) => {
-    const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
     activeJobs.set(jobId, proc);
