@@ -18,7 +18,7 @@ function runtimePaths({ appPath = process.cwd(), userDataPath = path.join(os.hom
     path.join(userDataPath, 'runtime', 'luxtts', 'venv', platform === 'win32' ? 'Scripts' : 'bin', pythonName),
     process.env.CO_AGENT_LUXTTS_PYTHON
   ].filter(Boolean).map(value => path.resolve(value));
-  return { sourceCandidates, pythonCandidates, worker: path.resolve(appPath, 'scripts', 'luxtts-worker.py') };
+  return { sourceCandidates, pythonCandidates, workerCandidates: [resourcesPath && path.join(resourcesPath, 'scripts', 'luxtts-worker.py'), path.join(appPath, 'scripts', 'luxtts-worker.py')].filter(Boolean).map(value => path.resolve(value)) };
 }
 async function firstFile(paths) {
   for (const item of paths) {
@@ -37,7 +37,7 @@ async function firstDirectory(paths) {
 async function status(options = {}) {
   const paths = runtimePaths(options);
   const [python, source, worker] = await Promise.all([
-    firstFile(paths.pythonCandidates), firstDirectory(paths.sourceCandidates), firstFile([paths.worker])
+    firstFile(paths.pythonCandidates), firstDirectory(paths.sourceCandidates), firstFile(paths.workerCandidates)
   ]);
   return {
     ok: true, installed: !!(python && source && worker), pythonAvailable: !!python,
@@ -64,7 +64,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   const runtime = await status(options);
   if (!runtime.installed) throw new Error(runtime.message);
   return new Promise((resolve, reject) => {
-    const proc = spawn(runtime.python, ['-u', runtimePaths(options).worker], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(runtime.python, ['-u', runtimePaths(options).workerCandidates.find(Boolean) || 'scripts/luxtts-worker.py'], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', settled = false, timer;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
