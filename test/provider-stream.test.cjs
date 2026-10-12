@@ -50,3 +50,13 @@ test('streamed provider errors and empty responses are surfaced', async () => {
   await assert.rejects(streamProviderChat({ protocol: 'openai', model: 'demo', baseUrl: 'https://example.com/v1' }, '', [{ role: 'user', content: 'hi' }], () => {}, async () => response([], 429)), /429/);
   await assert.rejects(streamProviderChat({ protocol: 'openai', model: 'demo', baseUrl: 'https://example.com/v1' }, '', [{ role: 'user', content: 'hi' }], () => {}, async () => response(['data: [DONE]\n'])), /empty streamed response/i);
 });
+
+
+test('truncated Ollama stream is marked interrupted instead of silently complete', async () => {
+  const result = await streamOllamaChat('http://127.0.0.1:11434', 'gemma3:4b', [{ role: 'user', content: 'hi' }], () => {}, async () => response([
+    '{"message":{"content":"partial local response"},"done":false}\n'
+  ]));
+  assert.equal(result.message, 'partial local response');
+  assert.equal(result.interrupted, true);
+  assert.match(result.error, /completion marker/i);
+});

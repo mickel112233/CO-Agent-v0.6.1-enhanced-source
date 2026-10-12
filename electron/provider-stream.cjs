@@ -69,7 +69,7 @@ async function consumeStream(response, protocol, onChunk, signal) {
   } finally {
     try { reader.releaseLock(); } catch {}
   }
-  return { message, interrupted: !done && protocol !== 'ollama', cancelled: false, error: !done && protocol !== 'ollama' ? 'The provider stream ended before its completion marker; this may be a partial response.' : '' };
+  return { message, interrupted: !done, cancelled: false, error: !done ? 'The provider stream ended before its completion marker; this may be a partial response.' : '' };
 }
 
 async function streamProviderChat(provider, key, messages, onChunk, fetchImpl = fetch, requestSignal) {
