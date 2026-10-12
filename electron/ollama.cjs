@@ -2,8 +2,12 @@ const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 const DEFAULT_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 
 function normalizeBaseUrl(value = DEFAULT_OLLAMA_URL) {
-  const url = new URL(value);
+  let url;
+  try { url = new URL(value); } catch { throw new Error('Ollama base URL is invalid.'); }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Ollama URL must use HTTP or HTTPS.');
+  if (url.username || url.password || url.search || url.hash) throw new Error('Ollama base URLs cannot contain credentials, query parameters, or fragments.');
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !loopback) throw new Error('Remote Ollama endpoints must use HTTPS. Plain HTTP is allowed only for loopback services.');
   return url.toString().replace(/\/+$/, '');
 }
 function validateModelName(value) {
