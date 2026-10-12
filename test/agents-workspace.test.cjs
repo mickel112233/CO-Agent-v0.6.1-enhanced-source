@@ -55,6 +55,9 @@ test('workspace lists, reads, applies approved file proposals and backs up origi
     await assert.rejects(workspace.applyChanges({ files: [{ path: 'src/app.js', content: 'new' }] }), /approval/i);
     const result = await workspace.applyChanges({ approved: true, files: [{ path: 'src/app.js', content: 'new content' }, { path: 'src/new.js', content: 'created' }] });
     assert.equal(result.ok, true);
+    assert.equal(result.applied.length, 2);
+    assert.ok(result.applied.every(item => item.verified === true && /^[a-f0-9]{64}$/.test(item.sha256)));
+    assert.equal(result.applied[0].path, 'src/app.js');
     assert.equal(await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8'), 'new content');
     assert.equal(await fs.readFile(path.join(root, 'src', 'new.js'), 'utf8'), 'created');
     assert.equal(await fs.readFile(path.join(result.backupDirectory, 'src', 'app.js'), 'utf8'), 'old content');
