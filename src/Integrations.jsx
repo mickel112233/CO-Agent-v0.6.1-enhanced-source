@@ -161,10 +161,10 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     <div className="integration-cards">
       <article className="integration-card">
         <div className="integration-card-top"><span className="integration-icon"><Sparkles size={20}/></span><span className={'integration-state ' + (petStatus?.running ? 'ready' : 'optional')}>{petStatus?.running ? 'Running' : petStatus?.installed ? 'Ready' : 'Source only'}</span></div>
-        <h3>CO-Agent desktop pet</h3><p>Launch the separate desktop companion through an approved native process bridge.</p>
+        <h3>CO-Agent desktop pet</h3><p>Launch the separate Tauri desktop companion through an approved native process bridge.</p>
         <div className="integration-card-meta"><span>{petStatus?.installed ? 'Windows executable detected' : 'Tauri 2 executable not packaged'}</span></div>
         <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy || !petStatus?.installed} onClick={launchPet}>{busy === 'pet' ? 'Working…' : petStatus?.running ? 'Launch / focus' : 'Launch pet'}</button><button className="text-link" disabled={!!busy || !petStatus?.running} onClick={closePet}>Close tracked process</button></div>
-        {!petStatus?.installed && <p className="integration-note">{petStatus?.message || 'Build and package AI-Desktop-Pet.exe before launching.'}</p>}
+        {!petStatus?.installed && <p className="integration-note">{petStatus?.message || 'Build and package convai-desktop-pet.exe before launching.'}</p>}
       </article>
       <article className="integration-card luxtts-card">
         <div className="integration-card-top"><span className="integration-icon"><Volume2 size={20}/></span><span className={'integration-state ' + (luxStatus?.installed ? 'ready' : 'optional')}>{luxStatus?.installed ? 'Runtime ready' : 'Setup required'}</span></div>
