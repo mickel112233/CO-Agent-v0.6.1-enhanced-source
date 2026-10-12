@@ -129,3 +129,21 @@ test('agent file proposals require grounded context and enforce workspace safety
   assert.throws(() => agents.validateFileProposals([{ path: '.env', content: 'SECRET=x' }], [{ path: 'README.md', content: 'context' }]), /blocked/i);
   assert.throws(() => agents.validateFileProposals([{ path: 'large.txt', content: 'x'.repeat(workspace.MAX_FILE_BYTES + 1) }], [{ path: 'README.md', content: 'context' }]), /120 KB/i);
 });
+
+
+test('workspace file previews show bounded unified diffs for edits and creates', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-preview-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, 'hello.txt'), 'alpha\nbeta\ngamma\n');
+  await workspace.setRoot(root);
+  const edited = await workspace.previewChanges({ files: [{ path: 'hello.txt', content: 'alpha\nchanged\ngamma\n' }] });
+  assert.equal(edited.files[0].unchanged, false);
+  assert.match(edited.files[0].diff, /-beta/);
+  assert.match(edited.files[0].diff, /\+changed/);
+  const created = await workspace.previewChanges({ files: [{ path: 'new.txt', content: 'new file\n' }] });
+  assert.equal(created.files[0].created, true);
+  assert.match(created.files[0].diff, /\+new file/);
+  const unchanged = await workspace.previewChanges({ files: [{ path: 'hello.txt', content: 'alpha\nbeta\ngamma\n' }] });
+  assert.equal(unchanged.files[0].unchanged, true);
+  await assert.rejects(workspace.previewChanges({ files: [{ path: '../outside.txt', content: 'no' }] }), /relative path|traversal/i);
+});

@@ -73,7 +73,7 @@ function run(binary, args, options = {}) {
   if (!binary) return Promise.reject(new Error('FFmpeg is unavailable.'));
   if (options.signal?.aborted) return Promise.reject(Object.assign(new Error('Timeline render cancelled by user.'), { name: 'AbortError', code: 'CANCELLED' }));
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = (options.spawn || spawn)(binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '', buffer = '', values = {}, settled = false;
     const finish = (error, result) => {
       if (settled) return;
@@ -229,4 +229,4 @@ function cancelRender(requestId) {
   controller.abort();
   return { ok: true, cancelled: true };
 }
-module.exports = { normalizeProject, saveProject, loadProject, render, cancelRender, parseFfmpegProgress, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };
+module.exports = { normalizeProject, saveProject, loadProject, render, cancelRender, run, parseFfmpegProgress, escapeDrawtext, validateExportMetadata, MAX_CLIPS, MAX_PROJECT_BYTES, MAX_DURATION };

@@ -97,3 +97,23 @@ test('export validation requires expected audio streams when audio clips were re
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }] }, 2048, 4, true), /missing its expected audio stream/i);
   assert.doesNotThrow(() => timeline.validateExportMetadata({ format: { duration: '4' }, streams: [{ codec_type: 'video' }, { codec_type: 'audio' }] }, 2048, 4, true));
 });
+
+
+test('FFmpeg runner emits parsed progress and aborts a running child process', async () => {
+  const { EventEmitter } = require('node:events');
+  let child;
+  const progress = [];
+  const controller = new AbortController();
+  const fakeSpawn = () => {
+    child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => { setImmediate(() => child.emit('close', null)); return true; };
+    return child;
+  };
+  const pending = timeline.run('fake-ffmpeg', [], { signal: controller.signal, spawn: fakeSpawn, duration: 10, onProgress: value => progress.push(value) });
+  child.stdout.emit('data', Buffer.from('out_time=00:00:05.000000\nprogress=continue\n'));
+  assert.equal(progress[0].percent, 50);
+  controller.abort();
+  await assert.rejects(pending, /cancelled by user/i);
+});
