@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const { getOllamaStatus, pullOllamaModel, validateModelName } = require('../electron/ollama.cjs');
+const { getOllamaStatus, pullOllamaModel, validateModelName, normalizeBaseUrl } = require('../electron/ollama.cjs');
 
 async function withServer(handler, run) {
   const server = http.createServer(handler);
@@ -84,4 +84,15 @@ test('model pull times out when Ollama never responds', async () => {
       /timed out/i
     );
   });
+});
+
+
+test('Ollama endpoint validation blocks credential-bearing URLs and plaintext remote hosts', () => {
+  assert.equal(normalizeBaseUrl('http://127.0.0.1:11434/'), 'http://127.0.0.1:11434');
+  assert.equal(normalizeBaseUrl('https://ollama.example.test:11434/'), 'https://ollama.example.test:11434');
+  assert.throws(() => normalizeBaseUrl('http://ollama.example.test:11434'), /remote Ollama endpoints must use HTTPS/i);
+  assert.throws(() => normalizeBaseUrl('https://user:secret@ollama.example.test:11434'), /cannot contain credentials/i);
+  assert.throws(() => normalizeBaseUrl('https://ollama.example.test:11434?token=secret'), /cannot contain credentials/i);
+  assert.throws(() => normalizeBaseUrl('https://ollama.example.test:11434/#admin'), /cannot contain credentials/i);
+  assert.throws(() => normalizeBaseUrl('not a url'), /base URL is invalid/i);
 });
