@@ -49,3 +49,23 @@ test('parses streamed pull progress and reports completion', async () => {
     assert.equal(progress.at(-1).status, 'success');
   });
 });
+
+
+test('model pull supports cancellation while the progress stream is open', async () => {
+  const controller = new AbortController();
+  let started;
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  await withServer((req, res) => {
+    if (req.url !== '/api/pull') { res.statusCode = 404; res.end(); return; }
+    res.writeHead(200, { 'content-type': 'application/x-ndjson' });
+    res.write('{"status":"downloading","total":100,"completed":1}\\n');
+    started();
+    // Keep the response open until the client aborts.
+    req.on('close', () => { if (!res.destroyed) res.destroy(); });
+  }, async base => {
+    const pending = pullOllamaModel('qwen3.5:2b', () => {}, base, fetch, { signal: controller.signal, timeoutMs: 5000 });
+    await requestStarted;
+    controller.abort();
+    await assert.rejects(pending, /cancelled/i);
+  });
+});
