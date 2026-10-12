@@ -23,7 +23,21 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Run tests
+      - name: Run regression suite
         run: npm test
       - name: Build renderer
         run: npm run build
+      - name: Package Windows installer
+        if: runner.os == 'Windows'
+        run: npm run dist:win
+      - name: Verify release artifacts
+        if: runner.os == 'Windows'
+        run: npm run verify:release
+      - name: Upload Windows installer for inspection
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CO-Agent-Windows-Installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
