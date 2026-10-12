@@ -128,3 +128,10 @@ test('accessibility targets require an exact window and unique semantic control 
   assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', name: 'Display', controlType: 'Button' }), /control type is invalid/i);
   assert.throws(() => computerUse.normalizeAccessibleTarget({ windowTitle: 'Settings', automationId: 'x'.repeat(301) }), /Automation ID/i);
 });
+
+
+test('semantic UI Automation refuses unapproved invocation before platform access', async () => {
+  await assert.rejects(computerUse.invokeAccessibleControl({
+    windowTitle: 'Settings', name: 'Display', automationId: 'display-link', controlType: 'ControlType.Button'
+  }), /explicit user approval/i);
+});
