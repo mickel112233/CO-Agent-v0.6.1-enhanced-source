@@ -41,7 +41,7 @@ async function status(options = {}) {
   ]);
   return {
     ok: true, installed: !!(python && source && worker), pythonAvailable: !!python,
-    sourceAvailable: !!source, workerAvailable: !!worker, python: python || '', source: source || '',
+    sourceAvailable: !!source, workerAvailable: !!worker, python: python || '', source: source || '', worker: (await firstFile(paths.workerCandidates)) || '',
     model: MODEL_ID, message: python && source && worker
       ? 'LuxTTS runtime files are ready; the model downloads on first generation if not cached.'
       : 'LuxTTS is not provisioned yet. CO-Agent needs its managed Python environment, pinned LuxTTS source, and worker script.'
@@ -64,7 +64,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   const runtime = await status(options);
   if (!runtime.installed) throw new Error(runtime.message);
   return new Promise((resolve, reject) => {
-    const proc = spawn(runtime.python, ['-u', runtimePaths(options).workerCandidates.find(Boolean) || 'scripts/luxtts-worker.py'], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', settled = false, timer;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
