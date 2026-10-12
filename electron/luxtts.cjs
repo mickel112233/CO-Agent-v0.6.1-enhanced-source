@@ -135,6 +135,9 @@ async function setup({ pythonPath = '' } = {}, options = {}, onProgress = () => 
   onProgress({ stage: 'dependencies', message: 'Installing LuxTTS dependencies. This can take a while and may download several gigabytes…' });
   await runSetupCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {}, chunk => onProgress({ stage: 'dependencies', message: chunk }));
   await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source }, chunk => onProgress({ stage: 'dependencies', message: chunk }));
+  // The upstream requirements do not declare soundfile directly, but the
+  // isolated worker imports it to write a standards-compliant WAV file.
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', 'soundfile'], { cwd: source }, chunk => onProgress({ stage: 'dependencies', message: chunk }));
   const result = await status({ ...options, userDataPath });
   if (!result.installed) throw new Error('LuxTTS setup finished but runtime verification failed: ' + result.message);
   return { ok: true, python: result.python, source: result.source, message: 'LuxTTS Python environment installed and verified. Model weights are downloaded on first generation.' };
