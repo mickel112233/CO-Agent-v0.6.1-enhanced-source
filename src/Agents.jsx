@@ -183,6 +183,7 @@ export default function Agents() {
 
   const runStep = async step => {
     if (!workflow || busy) return;
+    if (!activeRun || activeRun.goal !== workflow.goal) { setNotice('Approve and save the plan before running any workflow steps.'); return; }
     const pendingDependencies = (step.dependsOn || []).filter(id => workflow.pipeline.find(item => item.id === id)?.status !== 'done');
     if (pendingDependencies.length) { setNotice('Complete the prerequisite steps first.'); return; }
     try {
@@ -319,7 +320,7 @@ export default function Agents() {
                 {step.dependsOn?.length > 0 && <small className="agents-dependencies">Depends on: {step.dependsOn.join(', ')}</small>}
                 {step.status === 'review' && result && <div className="agents-checkpoint"><strong><ShieldCheck size={14}/> Review checkpoint</strong>{step.acceptanceCriteria?.length ? <ul>{step.acceptanceCriteria.map((criterion, criterionIndex) => <li key={criterionIndex}><label><input type="checkbox" checked={(result.reviewChecks || []).includes(criterionIndex)} onChange={event => toggleCriterion(step.id, criterionIndex, event.target.checked)}/><span>{criterion}</span></label></li>)}</ul> : <p>Review the summary, findings, risks, and any proposed changes before confirming this step.</p>}<button className="primary-button" disabled={!!busy || (step.acceptanceCriteria || []).some((_, criterionIndex) => !(result.reviewChecks || []).includes(criterionIndex))} onClick={() => confirmCheckpoint(step.id)}><ShieldCheck size={13}/> Confirm checkpoint &amp; unlock next step</button></div>}
                 <div className="agents-step-actions">
-                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0 || (activeRun?.goal === workflow.goal && activeRun.steps?.find(saved => saved.id === step.id)?.status === 'completed')} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
+                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0 || !activeRun || activeRun.goal !== workflow.goal || activeRun.steps?.find(saved => saved.id === step.id)?.status === 'completed'} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
                   {result && <button className="text-link" onClick={() => setActiveResult(activeResult === step.id ? '' : step.id)}>{activeResult === step.id ? 'Hide result' : 'View result'}</button>}
                   {blockedBy.length > 0 && <small>Finish dependencies first</small>}
                 </div>

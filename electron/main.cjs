@@ -360,6 +360,20 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 app.whenReady().then(async () => {
+  if (process.argv.includes('--co-agent-smoke-test')) {
+    try {
+      await fs.access(path.join(app.getAppPath(), 'dist', 'index.html'));
+      await fs.access(path.join(__dirname, 'preload.cjs'));
+      registerIpc();
+      process.stdout.write(JSON.stringify({ ok: true, version: app.getVersion(), packaged: app.isPackaged, ipcHandlersRegistered: true }) + '\n');
+      app.exit(0);
+      return;
+    } catch (error) {
+      process.stderr.write('CO-Agent packaged smoke test failed: ' + (error.message || String(error)) + '\n');
+      app.exit(1);
+      return;
+    }
+  }
   try {
     const preferencesPath = path.join(app.getPath('userData'), 'agent-workspace.json');
     const preferences = JSON.parse(await fs.readFile(preferencesPath, 'utf8'));

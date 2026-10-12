@@ -34,6 +34,21 @@ jobs:
       - name: Verify release artifacts
         if: runner.os == 'Windows'
         run: npm run verify:release
+      - name: Install and smoke-test packaged Windows app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "release\*.exe" | Where-Object { $_.Name -match 'Setup' } | Select-Object -First 1
+          if (-not $installer) { throw "Windows installer was not found." }
+          $installDir = Join-Path $env:RUNNER_TEMP 'CO-Agent-Smoke'
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Silent installer exited with code $($install.ExitCode)." }
+          $appExe = Join-Path $installDir 'CO-Agent.exe'
+          if (-not (Test-Path $appExe)) { Get-ChildItem $installDir -Recurse | Select-Object FullName; throw "Installed CO-Agent.exe was not found." }
+          $smoke = Start-Process -FilePath $appExe -ArgumentList '--co-agent-smoke-test' -Wait -PassThru -NoNewWindow
+          if ($smoke.ExitCode -ne 0) { throw "Packaged application smoke test exited with code $($smoke.ExitCode)." }
+          $uninstaller = Join-Path $installDir 'Uninstall CO-Agent.exe'
+          if (Test-Path $uninstaller) { Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait }
       - name: Upload Windows installer for inspection
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
