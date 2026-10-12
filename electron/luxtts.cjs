@@ -75,7 +75,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
     proc.stdout.on('data', chunk => {
       const value = chunk.toString(); stdout = (stdout + value).slice(-100000); lineBuffer += value;
-      const lines = lineBuffer.split(/\\r?\\n/); lineBuffer = lines.pop() || '';
+      const lines = lineBuffer.split(/\r?\n/); lineBuffer = lines.pop() || '';
       for (const line of lines) { try { const event = JSON.parse(line); if (event?.stage) onProgress({ requestId: jobId, ...event }); } catch {} }
     });
     proc.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8000); });
