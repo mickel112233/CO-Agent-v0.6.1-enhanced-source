@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     onChatChunk: callback => subscribe('runtime:chat-chunk', callback)
   }),
   computer: Object.freeze({ allowedApps: invoke('computer:allowed-apps'), launchApp: invoke('computer:launch-app'), openPath: invoke('computer:open-path') }),
-  computerUse: Object.freeze({ captureScreen: invoke('computer-use:capture-screen'), inspectAccessibility: invoke('computer-use:inspect-accessibility'), readScreenText: invoke('computer-use:read-screen-text'), planActions: invoke('computer-use:plan-actions'), verifyOutcome: invoke('computer-use:verify-outcome'), click: invoke('computer-use:click'), typeText: invoke('computer-use:type-text'), pressKey: invoke('computer-use:press-key') }),
+  computerUse: Object.freeze({ captureScreen: invoke('computer-use:capture-screen'), inspectAccessibility: invoke('computer-use:inspect-accessibility'), invokeControl: invoke('computer-use:invoke-control'), readScreenText: invoke('computer-use:read-screen-text'), planActions: invoke('computer-use:plan-actions'), verifyOutcome: invoke('computer-use:verify-outcome'), click: invoke('computer-use:click'), typeText: invoke('computer-use:type-text'), pressKey: invoke('computer-use:press-key') }),
   studio: Object.freeze({
     capabilities: invoke('studio:capabilities'), probe: invoke('studio:probe'), extractAudio: invoke('studio:extract-audio'), concat: invoke('studio:concat'),
     saveProject: invoke('studio:save-project'), loadProject: invoke('studio:load-project'), renderTimeline: invoke('studio:render-timeline'), cancelRender: invoke('studio:cancel-render'), onRenderProgress: callback => subscribe('studio:render-progress', callback),
