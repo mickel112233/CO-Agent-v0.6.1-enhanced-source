@@ -169,7 +169,7 @@ function registerIpc() {
         detail: 'Workspace: ' + workspace.getRoot() + '\n' + summary + '\n\n' + preview.diff + '\n\nEach file is approved separately. Approved changes are backed up and rolled back if the multi-file transaction fails.',
         buttons: ['Skip file', 'Approve this file'], defaultId: 0, cancelId: 0, noLink: true
       });
-      if (decision.response === 1) { approvedFiles.push(file); await recordAudit('workspace.file-change', 'approved', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path); }
+      if (decision.response === 1) { approvedFiles.push({ ...file, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }); await recordAudit('workspace.file-change', 'approved', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path); }
       else await recordAudit('workspace.file-change', 'skipped', { created: preview.created, oldBytes: preview.oldBytes, newBytes: preview.newBytes }, preview.path);
     }
     const skipped = files.filter(file => !approvedFiles.includes(file)).map(file => String(file.path || '(unnamed)'));

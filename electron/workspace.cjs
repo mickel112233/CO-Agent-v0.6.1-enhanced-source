@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 
 const MAX_FILE_BYTES = 120_000;
 const MAX_CHANGE_BYTES = 600_000;
@@ -162,7 +162,7 @@ async function previewChanges(payload = {}) {
       if (before.includes('\0')) throw new Error('Binary files cannot be previewed as text: ' + item.path);
     }
     const diff = !existing && item.content === '' ? { diff: '--- /dev/null\n+++ b/' + normalizedRelative + '\n@@ -0,0 +0,0 @@', unchanged: false, truncated: false } : createUnifiedDiff(normalizedRelative, before, item.content);
-    files.push({ path: normalizedRelative, created: !existing, oldBytes: Buffer.byteLength(before, 'utf8'), newBytes: bytes, oldLines: before === '' ? 0 : before.split(/\r?\n/).length, newLines: item.content === '' ? 0 : item.content.split(/\r?\n/).length, ...diff });
+    files.push({ path: normalizedRelative, created: !existing, exists: !!existing, beforeHash: existing ? createHash('sha256').update(before, 'utf8').digest('hex') : null, oldBytes: Buffer.byteLength(before, 'utf8'), newBytes: bytes, oldLines: before === '' ? 0 : before.split(/\r?\n/).length, newLines: item.content === '' ? 0 : item.content.split(/\r?\n/).length, ...diff });
   }
   return { ok: true, files };
 }
@@ -187,7 +187,14 @@ async function applyChanges(payload = {}) {
     if (total > MAX_CHANGE_BYTES) throw new Error('The complete change set exceeds 600 KB.');
     const existing = await fs.lstat(target.absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
     if (existing && (!existing.isFile() || existing.isSymbolicLink())) throw new Error('Only regular files can be replaced: ' + item.path);
-    prepared.push({ ...target, content: item.content, bytes, existed: !!existing });
+    if (typeof item.expectedExists === 'boolean' && item.expectedExists !== !!existing) throw new Error('File changed after review; preview it again before applying: ' + item.path);
+    let currentHash = null;
+    if (existing && typeof item.expectedBeforeHash === 'string') {
+      const currentContent = await fs.readFile(target.absolute, 'utf8');
+      currentHash = createHash('sha256').update(currentContent, 'utf8').digest('hex');
+      if (currentHash !== item.expectedBeforeHash) throw new Error('File changed after review; preview it again before applying: ' + item.path);
+    }
+    prepared.push({ ...target, content: item.content, bytes, existed: !!existing, expectedBeforeHash: item.expectedBeforeHash, expectedExists: item.expectedExists });
   }
   const backupRoot = path.join(getRoot(), '.co-agent-backups', new Date().toISOString().replace(/[:.]/g, '-'));
   const backupPaths = new Map();
@@ -204,6 +211,14 @@ async function applyChanges(payload = {}) {
       backupPaths.set(item.relative, backup);
     }
     for (const item of prepared) {
+      if (typeof item.expectedExists === 'boolean') {
+        const current = await fs.lstat(item.absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+        if (!!current !== item.expectedExists) throw new Error('File changed after review; preview it again before applying: ' + item.relative);
+        if (current && typeof item.expectedBeforeHash === 'string') {
+          const currentContent = await fs.readFile(item.absolute, 'utf8');
+          if (createHash('sha256').update(currentContent, 'utf8').digest('hex') !== item.expectedBeforeHash) throw new Error('File changed after review; preview it again before applying: ' + item.relative);
+        }
+      }
       await fs.mkdir(path.dirname(item.absolute), { recursive: true });
       // Track before writing: a failed write can still truncate/create a partial file.
       attempted.push(item);

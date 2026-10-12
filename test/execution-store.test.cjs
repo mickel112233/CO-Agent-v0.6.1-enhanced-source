@@ -92,3 +92,29 @@ test('startup recovery marks unreviewed output failed so users can regenerate it
   assert.match(recovered[0].steps[0].error, /re-run the step to regenerate/i);
   assert.ok(recovered[0].events.some(event => event.type === 'run-recovered'));
 });
+
+
+test('startup recovery retries if persisting recovery state fails once', async t => {
+  const { file } = await fixture(t);
+  const initial = createStore(file);
+  const run = await initial.create({ ...plan(), steps: [{ id: 'one', title: 'One' }] });
+  await initial.updateStep(run.id, 'one', 'start');
+  let failOnce = true;
+  const flakyFs = {
+    stat: (...args) => fs.stat(...args),
+    readFile: (...args) => fs.readFile(...args),
+    mkdir: (...args) => fs.mkdir(...args),
+    rename: (...args) => fs.rename(...args),
+    rm: (...args) => fs.rm(...args),
+    writeFile: (...args) => {
+      if (failOnce) { failOnce = false; const error = new Error('simulated disk full'); error.code = 'ENOSPC'; return Promise.reject(error); }
+      return fs.writeFile(...args);
+    }
+  };
+  const recovering = createStore(file, { fs: flakyFs });
+  await assert.rejects(recovering.list(), /could not be read safely|disk full/i);
+  const recovered = await recovering.list();
+  assert.equal(recovered[0].status, 'failed');
+  assert.equal(recovered[0].steps[0].status, 'failed');
+  assert.ok(recovered[0].events.some(event => event.type === 'run-recovered'));
+});

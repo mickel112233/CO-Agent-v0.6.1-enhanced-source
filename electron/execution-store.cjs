@@ -80,7 +80,6 @@ function createStore(filePath, options = {}) {
       else throw new Error('Execution history could not be read safely: ' + (error.message || String(error)));
     }
     if (!recoveryDone) {
-      recoveryDone = true;
       let changed = false;
       for (const run of data.runs) {
         const interrupted = run.steps.filter(step => ['running', 'awaiting-approval'].includes(step.status));
@@ -105,6 +104,7 @@ function createStore(filePath, options = {}) {
         }
       }
       if (changed) data = await write(data);
+      recoveryDone = true;
     }
     return data;
   }

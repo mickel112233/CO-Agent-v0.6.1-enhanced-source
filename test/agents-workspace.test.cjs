@@ -147,3 +147,27 @@ test('workspace file previews show bounded unified diffs for edits and creates',
   assert.equal(unchanged.files[0].unchanged, true);
   await assert.rejects(workspace.previewChanges({ files: [{ path: '../outside.txt', content: 'no' }] }), /relative path|traversal/i);
 });
+
+
+test('approved file changes are rejected if the target changes after diff review', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-stale-preview-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, 'hello.txt'), 'original\n');
+  await workspace.setRoot(root);
+  const proposal = { path: 'hello.txt', content: 'agent version\n' };
+  const preview = (await workspace.previewChanges({ files: [proposal] })).files[0];
+  await fs.writeFile(path.join(root, 'hello.txt'), 'user edited this meanwhile\n');
+  await assert.rejects(workspace.applyChanges({ approved: true, files: [{ ...proposal, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }] }), /changed after review/i);
+  assert.equal(await fs.readFile(path.join(root, 'hello.txt'), 'utf8'), 'user edited this meanwhile\n');
+});
+
+test('approved file creation is rejected if a file appears after review', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-stale-create-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await workspace.setRoot(root);
+  const proposal = { path: 'new.txt', content: 'agent version\n' };
+  const preview = (await workspace.previewChanges({ files: [proposal] })).files[0];
+  await fs.writeFile(path.join(root, 'new.txt'), 'user file\n');
+  await assert.rejects(workspace.applyChanges({ approved: true, files: [{ ...proposal, expectedExists: preview.exists, expectedBeforeHash: preview.beforeHash }] }), /changed after review/i);
+  assert.equal(await fs.readFile(path.join(root, 'new.txt'), 'utf8'), 'user file\n');
+});
