@@ -13,6 +13,11 @@ Updated: 2026-10-12
 ## Pet source
 The user supplied `AI-Desktop-Pet-master.zip`. A local merged source archive was assembled and its files were preserved under `integrations/AI-Desktop-Pet/` in that archive. The pet project uses a Tauri/Rust architecture, so its overlay cannot be assumed to work inside Electron unchanged. Inspect its license, asset references, IPC, display geometry, and platform APIs before adapting. Do not copy its Tauri runtime into CO-Agent's runtime as a second competing app.
 
+## Implemented in this branch (pending CI/runtime verification)
+- Added a transparent, always-on-top Electron pet overlay with a narrow isolated preload, bounded text messages, navigation/window-open blocking, close/hide behavior, and a small built-in fallback companion UI.
+- The overlay is launched by the main process and its text requests are routed to the existing CO-Agent chat renderer. This is a basic text bridge; voice, user-visible approval preview in the overlay, pet asset pack integration, and a true task-planning checkpoint are not yet implemented.
+- Added source-level regression tests for overlay security settings and the chat bridge. These tests have been committed but have not yet been run in this environment.
+
 ## Not yet verified as integrated
 These are requirements, not completed features:
 - Actual Electron-native floating pet window using selected pet assets.
@@ -33,4 +38,4 @@ These are requirements, not completed features:
 - All operations need timeouts, cancellation, clear errors, and audit events with secrets redacted.
 
 ## Verification record
-No runtime integration or end-to-end test is claimed by this document. Future agents must update this file with exact commands, results, and known failures after making changes.
+No runtime integration or end-to-end test is claimed by this document. The overlay code has source-level tests; confirm CI results and test on Windows before calling the overlay release-ready. Future agents must update this file with exact commands, results, and known failures after making changes.
