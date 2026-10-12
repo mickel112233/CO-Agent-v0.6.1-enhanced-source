@@ -141,17 +141,17 @@ export default function App() {
       if (result?.ok === false || result?.error) throw new Error(result.error || 'The AI request failed.');
       const answer = result.message || streamingTextRef.current;
       if (result.cancelled && !answer) setMessages(old => [...old, { role: 'assistant', content: 'Request cancelled before a response was received.' }]);
-      else setMessages(old => [...old, { role: 'assistant', content: (answer || 'The model returned an empty response.') + (result.interrupted ? '\\n\\n> [Generation interrupted — this response may be incomplete.]' : result.cancelled ? '\\n\\n> [Generation stopped — showing the partial response.]' : result.streamError ? '\\n\\n> [Stream warning: ' + result.streamError + ']' : '') }]);
+      else setMessages(old => [...old, { role: 'assistant', content: (answer || 'The model returned an empty response.') + (result.interrupted ? '\n\n> [Generation interrupted — this response may be incomplete.]' : result.cancelled ? '\n\n> [Generation stopped — showing the partial response.]' : result.streamError ? '\n\n> [Stream warning: ' + result.streamError + ']' : '') }]);
       setFailedPrompt('');
       if (attachments.length) setAttachments([]);
     } catch (error) {
       setFailedPrompt(value);
       const partial = streamingTextRef.current;
       if (error?.name === 'AbortError' || /aborted|cancelled/i.test(error?.message || '')) {
-        setMessages(old => [...old, { role: 'assistant', content: partial ? partial + '\\n\\n> [Generation stopped — showing the partial response.]' : 'Request cancelled. You can retry it when ready.' }]);
+        setMessages(old => [...old, { role: 'assistant', content: partial ? partial + '\n\n> [Generation stopped — showing the partial response.]' : 'Request cancelled. You can retry it when ready.' }]);
       } else {
         const hint = chatProvider === 'ollama' ? '\n\nCheck that Ollama is running, a model is installed, and a model is selected in Settings.' : '\n\nCheck the provider, API endpoint, model name, and API key in Models & settings.';
-        setMessages(old => [...old, { role: 'assistant', content: (partial ? partial + '\\n\\n' : '') + 'I could not complete that request. ' + (error.message || String(error)) + hint }]);
+        setMessages(old => [...old, { role: 'assistant', content: (partial ? partial + '\n\n' : '') + 'I could not complete that request. ' + (error.message || String(error)) + hint }]);
       }
     } finally { setBusy(false); setActiveRequestId(''); activeRequestIdRef.current = ''; streamingTextRef.current = ''; setStreamingText(''); }
   };
