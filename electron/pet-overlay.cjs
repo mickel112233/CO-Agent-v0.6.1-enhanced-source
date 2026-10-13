@@ -131,7 +131,7 @@ function createPetOverlay({ preloadPath, onMessage, onClose, app: appApi = app, 
   const displayChanged = () => {
     if (!win || win.isDestroyed()) return;
     const current = win.getBounds();
-    const display = screen.getDisplayMatching(current);
+    const display = screenApi.getDisplayMatching(current);
     const safe = clampBounds(current, display);
     if (safe.x !== current.x || safe.y !== current.y || safe.width !== current.width || safe.height !== current.height) win.setBounds(safe);
     scheduleSave();

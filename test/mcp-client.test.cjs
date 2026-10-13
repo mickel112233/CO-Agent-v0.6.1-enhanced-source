@@ -74,7 +74,7 @@ test('MCP client interoperates with a real local HTTP server using JSON-RPC mess
     };
     if (message.method === 'initialize') return send(200, { protocolVersion: '2026-07-28', capabilities: { tools: {} }, serverInfo: { name: 'CO-Agent local MCP fixture', version: '1.0' } });
     if (message.method === 'notifications/initialized') { res.statusCode = 202; return res.end(); }
-    if (message.method === 'tools/list') return send(200, { tools: [{ name: 'echo', description: 'Echo a value', inputSchema: { type: 'object', properties: { text: { type: 'string' } } }] });
+    if (message.method === 'tools/list') return send(200, { tools: [{ name: 'echo', description: 'Echo a value', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] });
     if (message.method === 'tools/call') return send(200, { content: [{ type: 'text', text: 'local MCP: ' + message.params.arguments.text }] });
     res.statusCode = 400; res.end(JSON.stringify({ error: 'unknown method' }));
   });
