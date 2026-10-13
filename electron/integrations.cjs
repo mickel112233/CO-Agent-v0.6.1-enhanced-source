@@ -196,4 +196,4 @@ async function removeRepo(slug, userDataPath) {
   await fs.rm(target, { recursive: true, force: false });
   return { ok: true, removed: slug };
 }
-module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, getSkillContents, removeRepo, GITHUB_HTTPS, REF_RE };
+module.exports = { TOOLS, getStatus, installTool, installRepo, listRepos, inspectRepo, getSkillContents, removeRepo, GITHUB_HTTPS, REF_RE, MAX_REPO_FILES, MAX_REPO_FILE_BYTES, MAX_REPO_TOTAL_BYTES, validateRepositoryTree };
