@@ -29,6 +29,8 @@ const auditModule = require('./audit-log.cjs');
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 let petOverlay;
+let petMessageBridgeReady = false;
+const pendingPetMessages = [];
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
@@ -46,6 +48,16 @@ function getAuditLogStore() {
 }
 async function recordAudit(action, status, details = {}, target = '') {
   try { await getAuditLogStore().append({ action, status, target, details }); } catch {}
+}
+function deliverPetMessage(text) {
+  const message = { id: 'pet-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), text: String(text || '').slice(0, 4000) };
+  if (!message.text.trim()) return;
+  if (!petMessageBridgeReady || !mainWindow || mainWindow.isDestroyed()) {
+    pendingPetMessages.push(message);
+    if (pendingPetMessages.length > 10) pendingPetMessages.shift();
+    return;
+  }
+  mainWindow.webContents.send('pet:incoming-message', message);
 }
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
@@ -288,6 +300,12 @@ function registerIpc() {
   handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
+  handle('pet:bridge-ready', () => {
+    petMessageBridgeReady = true;
+    const queued = pendingPetMessages.splice(0, pendingPetMessages.length);
+    for (const message of queued) if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pet:incoming-message', message);
+    return { ok: true, delivered: queued.length };
+  });
   handle('pet:show-overlay', () => { petOverlay?.show(); return { ok: true, visible: !!petOverlay?.isVisible() }; });
   handle('pet:hide-overlay', () => { petOverlay?.hide(); return { ok: true, visible: false }; });
   handle('pet:toggle-overlay', () => { petOverlay?.toggle(); return { ok: true, visible: !!petOverlay?.isVisible() }; });
@@ -360,7 +378,7 @@ function createWindow() {
   const load = isDev ? mainWindow.loadURL(devUrl) : mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   load.catch(error => console.error('CO-Agent renderer failed to load:', error));
   mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => console.error('Renderer load failed:', { code, description, url }));
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => { mainWindow = null; petMessageBridgeReady = false; });
 }
 app.whenReady().then(async () => {
   try {
@@ -370,8 +388,8 @@ app.whenReady().then(async () => {
   } catch {}
   registerIpc();
   createWindow();
-  petOverlay = createPetOverlay({ onMessage: text => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pet:incoming-message', { text }); } });
-  petOverlay.show();
+  petOverlay = createPetOverlay({ onMessage: deliverPetMessage });
+  await petOverlay.restore();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('before-quit', () => { petRuntime.stop(); petOverlay?.destroy(); });
