@@ -102,3 +102,44 @@ test('LuxTTS refuses to overwrite an existing output file', async () => {
     assert.equal(await fs.readFile(output, 'utf8'), 'keep this file');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('LuxTTS rejects and removes malformed output even when the worker claims success', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-luxtts-invalid-output-'));
+  const source = path.join(dir, 'third_party', 'LuxTTS');
+  const worker = path.join(dir, 'scripts', 'luxtts-worker.py');
+  const userDataPath = path.join(dir, 'user-data');
+  const python = path.join(userDataPath, 'runtime', 'luxtts', 'venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
+  const reference = path.join(dir, 'reference.wav');
+  const output = path.join(dir, 'invalid-output.wav');
+  await fs.mkdir(source, { recursive: true });
+  await fs.mkdir(path.dirname(worker), { recursive: true });
+  await fs.mkdir(path.dirname(python), { recursive: true });
+  await fs.writeFile(worker, '# test worker');
+  await fs.writeFile(python, 'test python');
+  await fs.writeFile(reference, Buffer.from('RIFF0000WAVE'));
+  let spawnResolve;
+  const spawnStarted = new Promise(resolve => { spawnResolve = resolve; });
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = { end(payload) {
+    const request = JSON.parse(payload);
+    fsSync.writeFileSync(request.outputPath, Buffer.alloc(64, 0x41));
+    queueMicrotask(() => { child.stdout.emit('data', Buffer.from('{"ok":true}\\n')); child.emit('close', 0); });
+  } };
+  child.kill = () => { queueMicrotask(() => child.emit('close', 1)); return true; };
+  let pending;
+  try {
+    pending = lux.generate(
+      { text: 'hello', referenceAudio: reference, outputPath: output, requestId: 'voice-invalid-test' },
+      { appPath: dir, resourcesPath: path.join(dir, 'resources'), userDataPath, spawn: () => { spawnResolve(); return child; } }
+    );
+    await spawnStarted;
+    await assert.rejects(pending, /valid RIFF\\/WAVE/i);
+    await assert.rejects(fs.stat(output), { code: 'ENOENT' });
+  } finally {
+    lux.cancel('voice-invalid-test');
+    if (pending) await pending.catch(() => {});
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
