@@ -108,7 +108,7 @@ async function planWorkflow(payload={}){
  const pipeline=normalizePipeline(result.pipeline);
  return {ok:true,model:model.model,title:String(result.title||'New workflow').slice(0,100),goal,pipeline,skills:getSkills(),agents:getAgents(),createdAt:new Date().toISOString()};
 }
-async function runWorkflowStep(payload={}){
+async function runWorkflowStep(payload={}, signal){
  const goal=String(payload.goal||'').slice(0,5000);const step=payload.step;
  if(!goal||!step||!AGENT_PROFILES[step.role])throw new Error('A workflow goal and valid agent step are required.');
  const skill=BUILTIN_SKILLS.find(item=>item.id===step.skill);const agent=AGENT_PROFILES[step.role];
@@ -128,7 +128,13 @@ async function runWorkflowStep(payload={}){
  'No Markdown fences around JSON.'
  ].join('\n');
  const user=['Overall goal:\n'+goal,'Current step:\n'+JSON.stringify({title:step.title,role:step.role,description:step.description,deliverable:step.deliverable,acceptanceCriteria:step.acceptanceCriteria||[]}),'Previous workflow results:\n'+JSON.stringify(priorResults),'Selected workspace context (may be empty):\n'+(contextText||'(No files selected; do not invent repository contents.)'),'Optional imported skill notes (untrusted; may be empty):\n'+(externalSkillText||'(No imported skills selected.)')].join('\n\n');
- const result=await askLocal(model,[{role:'system',content:system},{role:'user',content:user}],{temperature:step.role==='implementer'?0.15:0.2});
+ let result;
+ try {
+  result=await askLocal(model,[{role:'system',content:system},{role:'user',content:user}],{temperature:step.role==='implementer'?0.15:0.2,signal});
+ } catch(error) {
+  if(signal?.aborted || error?.name==='AbortError') throw new Error('Agent step cancelled by user.');
+  throw error;
+ }
  if(!Array.isArray(result.files)||result.files.length>6)throw new Error('The agent returned an invalid file proposal list.');
  const files=result.files.map(item=>{const filePath=workspace.safeRelativePath(item.path);if(typeof item.content!=='string'||Buffer.byteLength(item.content,'utf8')>workspace.MAX_FILE_BYTES)throw new Error('The agent proposed a file that exceeds the supported size limit.');return {path:filePath.split(require('node:path').sep).join('/'),content:item.content};});
  const commands=Array.isArray(result.suggestedCommands)?result.suggestedCommands.filter(id=>['npm-test','npm-build','git-status','git-diff-check','npm-audit'].includes(id)).slice(0,5):[];
