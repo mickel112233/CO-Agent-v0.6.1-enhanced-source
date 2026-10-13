@@ -109,11 +109,13 @@ async function planWorkflow(payload={}){
  return {ok:true,model:model.model,title:String(result.title||'New workflow').slice(0,100),goal,pipeline,skills:getSkills(),agents:getAgents(),createdAt:new Date().toISOString()};
 }
 async function runWorkflowStep(payload={}, signal){
+ if(signal?.aborted)throw new Error('Agent step cancelled by user.');
  const goal=String(payload.goal||'').slice(0,5000);const step=payload.step;
  if(!goal||!step||!AGENT_PROFILES[step.role])throw new Error('A workflow goal and valid agent step are required.');
  const skill=BUILTIN_SKILLS.find(item=>item.id===step.skill);const agent=AGENT_PROFILES[step.role];
  if(!skill)throw new Error('Unknown built-in skill.');
  const model=await localModel(payload.model);
+ if(signal?.aborted)throw new Error('Agent step cancelled by user.');
  const contextFiles=Array.isArray(payload.contextFiles)?payload.contextFiles.slice(0,8):[];
  const contextText=contextFiles.map(item=>{const filePath=String(item.path||'');const content=String(item.content||'');if(content.length>30000)throw new Error('A context file exceeds the 30 KB per-file agent limit.');return '### Workspace file: '+filePath+'\nFILE CONTENT START\n'+content+'\nFILE CONTENT END';}).join('\n\n').slice(0,90000);
  const priorResults=Array.isArray(payload.priorResults)?payload.priorResults.slice(-6).map(item=>({title:String(item.title||'').slice(0,120),role:String(item.role||'').slice(0,40),result:String(item.result||'').slice(0,5000)})):[];
