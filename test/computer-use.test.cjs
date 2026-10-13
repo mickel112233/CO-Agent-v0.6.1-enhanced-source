@@ -44,3 +44,24 @@ test('computer-use outcome verification normalizes evidence and rejects overconf
   assert.throws(() => normalizeVerification({ status: 'verified', confidence: 1.2 }), /confidence/i);
   assert.throws(() => normalizeVerification({ status: 'verified', confidence: 'high' }), /confidence/i);
 });
+
+test('computer-use accessibility target selection is exact and rejects invalid targets', () => {
+  const { normalizeAccessibleTarget } = require('../electron/computer-use.cjs');
+  assert.deepEqual(normalizeAccessibleTarget({
+    windowTitle: 'Settings', name: 'Save', automationId: 'saveButton', controlType: 'ControlType.Button'
+  }), {
+    windowTitle: 'Settings', name: 'Save', automationId: 'saveButton', controlType: 'ControlType.Button'
+  });
+  assert.throws(() => normalizeAccessibleTarget({ windowTitle: '', name: 'Save' }), /specific visible window/i);
+  assert.throws(() => normalizeAccessibleTarget({ windowTitle: 'Settings' }), /exact name or Automation ID/i);
+  assert.throws(() => normalizeAccessibleTarget({ windowTitle: 'Settings', automationId: 'x', controlType: 'Button' }), /control type is invalid/i);
+  assert.throws(() => normalizeAccessibleTarget({ windowTitle: 'x'.repeat(301), name: 'Save' }), /specific visible window/i);
+});
+
+test('computer-use verifier handles uncertain and contradictory evidence conservatively', () => {
+  const { normalizeVerification } = require('../electron/computer-use.cjs');
+  assert.equal(normalizeVerification({ status: 'uncertain', confidence: 0, evidence: '', nextStep: '' }).status, 'uncertain');
+  assert.equal(normalizeVerification({ status: 'not_verified', confidence: 0.99, evidence: 'The target is absent.' }).status, 'not_verified');
+  assert.throws(() => normalizeVerification(null), /invalid response/i);
+  assert.throws(() => normalizeVerification([]), /invalid response/i);
+});
