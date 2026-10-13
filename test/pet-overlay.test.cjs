@@ -40,11 +40,11 @@ test('main process wires pet messages into the primary renderer and exposes cont
 
 test('pet overlay persists visibility and bounds and restores safely after restart', () => {
   const source = fs.readFileSync(path.join(root, 'electron', 'pet-overlay.cjs'), 'utf8');
-  assert.match(source, /pet-overlay\\.json/);
+  assert.match(source, /pet-overlay\.json/);
   assert.match(source, /persistPreferences/);
   assert.match(source, /async function loadPreferences/);
-  assert.match(source, /function restore\\(\\)/);
-  assert.match(source, /screen\\.getDisplayMatching/);
+  assert.match(source, /function restore\(\)/);
+  assert.match(source, /screen\.getDisplayMatching/);
   assert.match(source, /display-metrics-changed/);
   assert.match(source, /display-removed/);
   assert.match(source, /clampBounds/);
@@ -56,9 +56,9 @@ test('pet requests queue during renderer startup and bridge readiness drains the
   const app = fs.readFileSync(path.join(root, 'src', 'App.jsx'), 'utf8');
   assert.match(main, /pendingPetMessages/);
   assert.match(main, /petMessageBridgeReady/);
-  assert.match(main, /handle\\('pet:bridge-ready'/);
-  assert.match(main, /pendingPetMessages\\.splice\\(0, pendingPetMessages\\.length\\)/);
-  assert.match(preload, /markBridgeReady: invoke\\('pet:bridge-ready'\\)/);
+  assert.match(main, /handle\('pet:bridge-ready'/);
+  assert.match(main, /pendingPetMessages\.splice\(0, pendingPetMessages\.length\)/);
+  assert.match(preload, /markBridgeReady: invoke\('pet:bridge-ready'\)/);
   assert.match(app, /markBridgeReady/);
   assert.match(app, /Subscribe before acknowledging readiness/);
 });
