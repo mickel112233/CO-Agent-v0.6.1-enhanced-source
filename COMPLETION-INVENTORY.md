@@ -65,7 +65,7 @@
 - [x] Orchestrator accepts a request AbortSignal and passes it into the local model call with a timeout; unit tests cover cancellation/recovery. Multi-step Windows UI acceptance remains.
 - [ ] Verify pause/resume/cancel and interrupted-run recovery with persisted state after restart. Core cancellation/persistence primitives exist, but a restart-driven desktop acceptance test has not yet been run.
 - [x] Agent workflow exposes fixed verification commands and the desktop verifier distinguishes verified/not_verified/uncertain with an evidence disclaimer. End-to-end acceptance must still inspect actual command output.
-- [ ] Exercise per-action desktop approval, denial, stale screenshots, multi-monitor selection, accessibility/OCR failure, and recovery after a failed input action.
+- [x] Computer Use discards the remaining proposed action plan after every attempted input, including failed dispatch, because the desktop may have partially changed; regression tests cover strict accessibility-target validation and conservative verification results. **Windows approval/denial dialogs, stale-screen behavior, multi-monitor selection, OCR/UI Automation failures, and native-input recovery still require an interactive Windows acceptance run.**
 - [x] Audit log has secret-redaction and bounded persistence coverage in the existing regression suite; latest CI must confirm it passes.
 
 ## P2 — UX and release completeness
