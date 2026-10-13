@@ -421,5 +421,13 @@ app.whenReady().then(async () => {
   await petOverlay.restore();
   app.on('activate', showMainWindow);
 });
-app.on('before-quit', () => { isQuitting = true; petRuntime.stop(); petOverlay?.destroy(); if (tray) { tray.destroy(); tray = null; } });
+app.on('before-quit', event => {
+  if (isQuitting) return;
+  event.preventDefault();
+  isQuitting = true;
+  petRuntime.stop();
+  petOverlay?.destroy();
+  if (tray) { tray.destroy(); tray = null; }
+  Promise.resolve(petOverlay?.flush?.()).catch(() => {}).finally(() => app.quit());
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
