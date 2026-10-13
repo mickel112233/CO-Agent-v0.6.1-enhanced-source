@@ -60,7 +60,7 @@ jobs:
           Expand-Archive -LiteralPath $zip.FullName -DestinationPath $zipDir -Force
           $zipExe = Join-Path $zipDir 'CO-Agent.exe'
           if (-not (Test-Path $zipExe)) { throw 'CO-Agent.exe missing from standalone ZIP.' }
-          foreach ($required in @('resources\pet\convai-desktop-pet.exe','resources\pet-assets\LICENSE','resources\THIRD-PARTY-NOTICES.txt')) {
+          foreach ($required in @('resources\pet\convai-desktop-pet.exe','resources\pet-assets\albedo\id1_1.png','resources\pet-assets\LICENSE','resources\pet-assets\licenses\licence.txt','resources\THIRD-PARTY-NOTICES.txt')) {
             if (-not (Test-Path (Join-Path $zipDir $required))) { throw "ZIP package missing required resource: $required" }
           }
           $smoke = Start-Process -FilePath $zipExe -ArgumentList '--co-agent-smoke-test' -Wait -PassThru -NoNewWindow
