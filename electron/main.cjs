@@ -208,6 +208,7 @@ function registerIpc() {
   handle('studio:probe', filePath => studio.probe(filePath));
   handle('studio:extract-audio', args => studio.extractAudio(args?.input, args?.outputDir));
   handle('studio:concat', args => studio.concat(args?.inputs, args?.outputDir, args?.filename));
+  handle('studio:generate-sound-effect', args => studio.generateSoundEffect(args));
   handle('studio:save-project', args => timeline.saveProject(args?.path, args?.project));
   handle('studio:load-project', args => timeline.loadProject(args?.path));
   handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename));
