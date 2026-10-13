@@ -77,6 +77,13 @@
       {
         "from": "scripts/luxtts-worker.py",
         "to": "scripts/luxtts-worker.py"
+      },
+      {
+        "from": "integrations/AI-Desktop-Pet/public/assets",
+        "to": "pet-assets",
+        "filter": [
+          "**/*.png"
+        ]
       }
     ],
     "afterPack": "scripts/after-pack.cjs"
