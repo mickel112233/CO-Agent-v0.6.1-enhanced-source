@@ -496,6 +496,7 @@ app.on('before-quit', event => {
   if (isQuitting) return;
   event.preventDefault();
   isQuitting = true;
+  for (const controller of activeAgentStepRequests.values()) controller.abort();
   petRuntime.stop();
   petOverlay?.destroy();
   if (tray) { tray.destroy(); tray = null; }
