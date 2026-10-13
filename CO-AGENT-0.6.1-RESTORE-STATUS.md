@@ -40,3 +40,13 @@ The app must not be described as fully restored or tested until the original mod
 - Empty planner action lists are now treated as a clarification response instead of an invalid plan.
 - LuxTTS is listed as an optional integration alongside the existing Piper compatibility entry. The LuxTTS setup/runtime still needs to be wired into the integration installer before claiming it is one-click.
 - Still outstanding: supplied pet archive asset integration and default packaged pet build, first-run Ollama/model/LuxTTS onboarding and re-entry on missing dependencies, repo-drop scanning/approval flow, and expanded automated UI/E2E verification. Do not describe those as complete.
+
+
+## 2026-10-13 follow-up implementation
+
+- Added chat ZIP import via drag-and-drop and file picker. ZIP extraction validates path traversal, rejects symbolic links, and applies compressed-size, entry-count, per-file, and expanded-size limits. Imports are extracted into a review-only folder and scanned for common manifests, lifecycle scripts, executable files, and package roots. No imported code is executed during scanning.
+- Added an explicit second approval for Node dependency installation from a scanned ZIP. The installer restricts package specs to registry-style version ranges, forces the official npm registry, rejects project .npmrc files and non-default lockfile sources, and runs npm with lifecycle scripts disabled. It does not launch the imported app. Other ecosystems remain review-only and require a separately approved workflow.
+- Added Video Studio asset generation: LuxTTS voiceover from a user-selected reference recording, with the generated WAV inserted as an editable Audio 1 timeline clip; FFmpeg-generated impact, sweep, ambient, and UI-beep WAV effects are also inserted directly into the timeline.
+- Added prompt-driven, self-contained animated HTML/CSS motion-graphics composition generation for Hyperframes, with HTML escaping and overwrite protection. The generated folder can be linted/rendered by the optional Hyperframes CLI.
+- Added regression tests for ZIP path guards and manifest/script scanning, approved-install guardrails, sound-effect command construction, and safe Hyperframes composition generation.
+- Current verification is being rerun by GitHub Actions for the latest main commit. Do not treat the latest tests, Windows package, or native pet executable as verified until the corresponding workflow runs finish successfully.
