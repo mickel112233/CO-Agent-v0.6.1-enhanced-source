@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     generateSoundEffect: invoke('studio:generate-sound-effect'),
     saveProject: invoke('studio:save-project'), loadProject: invoke('studio:load-project'), renderTimeline: invoke('studio:render-timeline'),
     ocrStatus: invoke('studio:ocr-status'), ocrImage: invoke('studio:ocr-image'),
-    hyperframesStatus: invoke('studio:hyperframes-status'), hyperframesRun: invoke('studio:hyperframes-run')
+    hyperframesStatus: invoke('studio:hyperframes-status'), hyperframesRun: invoke('studio:hyperframes-run'), hyperframesCreateComposition: invoke('studio:hyperframes-create')
   }),
   audit: Object.freeze({ list: invoke('audit:list') }),
   integrations: Object.freeze({
