@@ -65,3 +65,23 @@ test('agent-step cancellation is exposed through validated request-scoped IPC an
   assert.match(ui, /Cancel agent/);
   assert.match(ui, /desktop\.agents\.cancelStep\(requestId\)/);
 });
+
+test('a pre-cancelled agent step does not query Ollama or start a model call', async () => {
+  const { runWorkflowStep } = require('../electron/agent-orchestrator.cjs');
+  const originalFetch = global.fetch;
+  const controller = new AbortController();
+  controller.abort();
+  let fetchCalls = 0;
+  global.fetch = async () => { fetchCalls++; throw new Error('A pre-cancelled step must not make network requests.'); };
+  try {
+    await assert.rejects(
+      runWorkflowStep({
+        goal: 'Review this project safely',
+        step: { id: 'step-1', title: 'Review', role: 'planner', skill: 'planner', description: 'Plan the review', deliverable: 'A review plan', acceptanceCriteria: [] },
+        model: 'qwen3.5:2b'
+      }, controller.signal),
+      /Agent step cancelled by user/i
+    );
+    assert.equal(fetchCalls, 0);
+  } finally { global.fetch = originalFetch; }
+});
