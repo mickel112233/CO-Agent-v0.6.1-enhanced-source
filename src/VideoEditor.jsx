@@ -122,7 +122,6 @@ export default function VideoEditor() {
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Composition generation failed.');
       setHyperProject(result.projectDir);
       setNotice(result.message + ' Project folder: ' + result.projectDir);
-      if (hyperStatus.available && window.confirm('Composition created. Run Hyperframes lint now?')) await runHyperframes('lint');
     } catch (error) { setNotice('Composition generation failed: ' + (error.message || String(error))); }
     finally { setCompositionBusy(false); }
   }
