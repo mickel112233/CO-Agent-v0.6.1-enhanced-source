@@ -60,17 +60,25 @@ test('LuxTTS worker rejects malformed reference-audio requests without loading m
     const worker = path.join(__dirname, '..', 'scripts', 'luxtts-worker.py');
     const output = path.join(dir, 'out.wav');
     const request = { text: 'hello', referenceAudio: path.join(dir, 'missing.wav'), outputPath: output };
-    await assert.rejects(
-      () => run(python, [worker], { input: JSON.stringify(request), timeout: 10000 }),
-      error => {
-        const lines = String(error.stdout || '').trim().split(/\\r?\\n/).filter(Boolean);
-        assert.ok(lines.length > 0, 'worker should emit a structured JSON error');
-        const response = JSON.parse(lines.at(-1));
-        assert.equal(response.ok, false);
-        assert.match(response.error, /Reference audio file does not exist/);
-        return true;
-      }
-    );
+    const response = await new Promise((resolve, reject) => {
+      const child = spawn(python, [worker], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', chunk => { stdout += chunk; });
+      child.stderr.on('data', chunk => { stderr += chunk; });
+      child.once('error', reject);
+      child.once('close', code => {
+        const lines = stdout.trim().split(/\\r?\\n/).filter(Boolean);
+        try {
+          assert.ok(lines.length > 0, 'worker should emit a structured JSON error');
+          const value = JSON.parse(lines.at(-1));
+          assert.equal(code, 1, stderr);
+          resolve(value);
+        } catch (error) { reject(error); }
+      });
+      child.stdin.end(JSON.stringify(request));
+    });
+    assert.equal(response.ok, false);
+    assert.match(response.error, /Reference audio file does not exist/);
     await assert.rejects(() => fs.stat(output), { code: 'ENOENT' });
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
