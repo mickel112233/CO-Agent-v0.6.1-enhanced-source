@@ -40,6 +40,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [showComputerUse, setShowComputerUse] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState(() => { try { return localStorage.getItem('co-agent-setup-dismissed') === 'true'; } catch { return false; } });
   const [showComputerUse, setShowComputerUse] = useState(false);
 
   const refreshRuntime = useCallback(async () => {
@@ -53,6 +54,10 @@ export default function App() {
   }, [selectedModel]);
 
   useEffect(() => { refreshRuntime(); }, []);
+
+  useEffect(() => {
+    if (!setupDismissed && !runtime.loading && (!runtime.available || runtime.models.length === 0)) setSection('Setup');
+  }, [setupDismissed, runtime.loading, runtime.available, runtime.models.length]);
 
   useEffect(() => {
     desktop?.runtime?.hardwareInfo?.().then(result => { if (result?.ok) setHardwareInfo(result); }).catch(() => {});
@@ -131,8 +136,13 @@ export default function App() {
       if (error?.name === 'AbortError' || /aborted|cancelled/i.test(error?.message || '')) {
         setMessages(old => [...old, { role: 'assistant', content: 'Request cancelled. You can retry it when ready.' }]);
       } else {
+        const detail = error.message || String(error);
         const hint = chatProvider === 'ollama' ? '\n\nCheck that Ollama is running, a model is installed, and a model is selected in Settings.' : '\n\nCheck the provider, API endpoint, model name, and API key in Models & settings.';
-        setMessages(old => [...old, { role: 'assistant', content: 'I could not complete that request. ' + (error.message || String(error)) + hint }]);
+        setMessages(old => [...old, { role: 'assistant', content: 'I could not complete that request. ' + detail + hint }]);
+        if (chatProvider === 'ollama' && /ollama.*(not reachable|not responding|not connected|not running)|no model|choose an installed local/i.test(detail)) {
+          setSetupDismissed(false); setSection('Setup');
+          try { localStorage.removeItem('co-agent-setup-dismissed'); } catch {}
+        }
       }
     } finally { setBusy(false); setActiveRequestId(''); }
   };
@@ -151,6 +161,48 @@ export default function App() {
       if (result?.ok === false || result?.error || !result?.message) throw new Error(result?.error || 'The provider returned no response.');
       setNotice('API connection succeeded with model ' + (result.model || apiModel.trim()) + '.');
     } catch (error) { setNotice('API connection failed: ' + (error.message || String(error))); }
+    finally { setBusy(false); }
+  }
+
+  async function dismissSetup() {
+    setSetupDismissed(true);
+    try { localStorage.setItem('co-agent-setup-dismissed', 'true'); } catch {}
+    setSection('Chat');
+  }
+
+  async function installOllama() {
+    if (!window.confirm('Install Ollama using the Windows package manager?\n\nCommand: winget install --id Ollama.Ollama --exact\n\nThis downloads and installs third-party software. Continue only if you trust the official Ollama package.')) return;
+    setBusy(true); setNotice('Installing Ollama. This may take several minutes…');
+    try {
+      const result = await desktop.integrations.installTool('ollama');
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Ollama installation failed.');
+      setNotice('Ollama installer finished. Refresh its status; a restart may be needed before model downloads work.');
+      await refreshRuntime();
+    } catch (error) { setNotice('Ollama installation failed: ' + (error.message || String(error))); }
+    finally { setBusy(false); }
+  }
+
+  async function installSetupModel(model) {
+    setModelToInstall(model); setBusy(true);
+    setDownloadProgress({ model, status: 'Connecting to Ollama…', percent: null, completed: 0, total: 0 });
+    setNotice('Downloading ' + model + '. The first model can take several minutes and multiple GB.');
+    try {
+      const result = await desktop.runtime.pullModel(model);
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Model download failed.');
+      setSelectedModel(model); setNotice('Model is ready: ' + model);
+      await refreshRuntime();
+    } catch (error) { setNotice('Model setup failed: ' + (error.message || String(error)) + '. You can retry; Ollama may resume existing layers.'); }
+    finally { setBusy(false); }
+  }
+
+  async function setupLuxTTSFromSetup() {
+    if (!window.confirm('Set up LuxTTS local voice generation? This creates an isolated Python environment and may download several GB.')) return;
+    setBusy(true); setNotice('Preparing LuxTTS. Dependencies and model weights may take a while.');
+    try {
+      const result = await desktop.luxTTS.setup();
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS setup failed.');
+      setNotice(result.message || 'LuxTTS setup completed.');
+    } catch (error) { setNotice('LuxTTS setup failed: ' + (error.message || String(error))); }
     finally { setBusy(false); }
   }
 
@@ -201,7 +253,11 @@ export default function App() {
     </aside>
     <main className="main">
       <header className="topbar"><div className="crumb"><span>{section}</span><ChevronDown size={14}/></div><div className="top-actions"><span className="local-pill"><span className="status-dot" style={{background:runtime.available?'#4e9c70':'#c7a15b'}}/> {runtime.available ? 'Local AI ready' : 'Local-first'}</span><button className="icon-button" title="Refresh runtime" onClick={refreshRuntime}><RefreshCw size={16}/></button><button className="icon-button" title="Settings" onClick={() => setSection('Settings')}><Settings2 size={17}/></button></div></header>
-      {section === 'Agents' ? <Agents/> : section === 'Computer Use' ? <ComputerUse/> : section === 'Integrations' ? <Integrations selectedSkills={selectedSkills} onSkillsChange={setSelectedSkills}/> : section === 'Chat' ? <section className="chat-view">
+      {section === 'Setup' ? <section className="settings-view setup-view"><div className="settings-heading"><p className="eyebrow">FIRST-RUN SETUP</p><h1>Set up CO-Agent</h1><p className="subhead">Prepare your local AI runtime first, choose a model, then optionally add local voice generation. You can skip setup and return later.</p></div>
+      <div className="setup-step"><div className="setup-step-number">1</div><div className="setup-step-content"><h2>Install and start Ollama</h2><p>{runtime.available ? 'Ollama is responding at 127.0.0.1:11434.' : runtime.error || 'Ollama is not detected yet.'} The Windows one-click installer uses winget and asks for confirmation.</p><div className="settings-card-actions"><button className="primary-button" disabled={busy || runtime.available || desktop?.platform !== 'win32'} onClick={installOllama}>{busy ? 'Working…' : runtime.available ? 'Ollama connected' : 'Install Ollama for Windows'}</button><button className="secondary-button" onClick={refreshRuntime} disabled={busy}><RefreshCw size={14}/> Check again</button><button className="text-link" onClick={() => { try { window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer'); } catch {} }}>Official download page</button></div>{desktop?.platform !== 'win32' && <p className="integration-note">Automatic installation is currently Windows-only. Use the official download page for your operating system.</p>}</div></div>
+      <div className="setup-step"><div className="setup-step-number">2</div><div className="setup-step-content"><h2>Choose a local model</h2><p>Install one model after Ollama is ready. Downloads use Ollama and can require several GB of disk space.</p><div className="quick-models setup-models">{['gemma3:4b','qwen2.5:3b','phi4-mini'].map(model => <button key={model} disabled={busy || !runtime.available} onClick={() => installSetupModel(model)}>{busy && modelToInstall === model ? 'Installing… ' + model : 'Install ' + model}</button>)}</div>{runtime.models.length > 0 && <p className="integration-note">Already installed: {runtime.models.map(model => model.name || model.model).join(', ')}</p>}{downloadProgress && <div className="download-progress" role="status"><strong>{downloadProgress.model}</strong><span>{downloadProgress.percent == null ? downloadProgress.status : downloadProgress.percent + '% · ' + downloadProgress.status}</span>{downloadProgress.percent != null && <progress max="100" value={downloadProgress.percent} />}{downloadProgress.error && <small className="download-error">{downloadProgress.error}</small>}</div>}</div></div>
+      <div className="setup-step"><div className="setup-step-number">3</div><div className="setup-step-content"><h2>Optional local voice</h2><p>LuxTTS generates local voiceovers for creative work. It needs an isolated Python environment and may download several GB; it is not required for chat.</p><button className="secondary-button" disabled={busy} onClick={setupLuxTTSFromSetup}>{busy ? 'Working…' : 'Set up LuxTTS'}</button></div></div>
+      <div className="setup-footer"><span>API providers are available in Models & settings if you prefer cloud inference.</span><button className="secondary-button" onClick={dismissSetup}>Skip setup and open chat</button></div>{notice && <p className="inline-notice" role="status">{notice}</p>}</section> : section === 'Agents' ? <Agents/> : section === 'Computer Use' ? <ComputerUse/> : section === 'Integrations' ? <Integrations selectedSkills={selectedSkills} onSkillsChange={setSelectedSkills}/> : section === 'Chat' ? <section className="chat-view">
         {messages.length === 0 ? <div className="welcome"><div className="welcome-icon"><Sparkles size={22}/></div><p className="eyebrow">YOUR DESKTOP AI WORKSPACE</p><h1>What can we work on?</h1><p className="subhead">Chat, create, and plan your next task in one workspace.</p><div className="starter-grid">{starterPrompts.map(item => <button className="starter" key={item.title} onClick={() => send(item.text)}><strong>{item.title}</strong><span>{item.text}</span><ArrowUp size={15}/></button>)}</div>{!runtime.available && <p className="runtime-warning"><AlertCircle size={15}/> Ollama is not connected yet. Open Models & settings to diagnose it.</p>}</div> : <div className="messages">{messages.map((item, i) => <article className={'message ' + item.role} key={i}><div className="avatar">{item.role === 'user' ? 'You' : <Bot size={17}/>}</div><div className="message-content"><strong>{item.role === 'user' ? 'You' : 'CO-Agent'}</strong><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown></div></div></article>)}{failedPrompt && !busy && <button className="secondary-button retry-button" onClick={() => send(failedPrompt, true)}>Retry last request</button>}{busy && <article className="message assistant"><div className="avatar"><Bot size={17}/></div><div><strong>CO-Agent</strong><p className="typing">Working on it…</p></div></article>}</div>}
         {showComputerUse && <div className="chat-computer-use"><div className="chat-computer-use-heading"><div><strong>Computer use</strong><span>Review the screen, plan actions, and approve each input.</span></div><button type="button" className="tool-button" onClick={() => setShowComputerUse(false)} aria-label="Close computer use panel">×</button></div><ComputerUse/></div>}
         {showComputerUse && <div className="chat-computer-use"><div className="chat-computer-use-heading"><div><strong>Computer use</strong><span>Review the screen, plan actions, and approve each input.</span></div><button type="button" className="tool-button" onClick={() => setShowComputerUse(false)} aria-label="Close computer use panel">×</button></div><ComputerUse/></div>}

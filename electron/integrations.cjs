@@ -8,10 +8,10 @@ const ocr = require('./ocr.cjs');
 const hyperframesService = require('./hyperframes.cjs');
 
 const TOOLS = Object.freeze({
+  ollama: Object.freeze({ id: 'ollama', name: 'Ollama', kind: 'local-runtime', required: true, description: 'Local model runtime used by CO-Agent chat and model downloads.', install: 'winget', command: 'winget', args: ['install', '--id', 'Ollama.Ollama', '--exact', '--accept-package-agreements', '--accept-source-agreements'], docs: 'https://ollama.com/download/windows' }),
   tesseract: Object.freeze({ id: 'tesseract', name: 'Tesseract OCR', kind: 'native', required: false, description: 'Local image-to-text extraction for screenshots, scans, and still images.', install: 'winget', command: 'winget', args: ['install', '--id', 'UB-Mannheim.TesseractOCR', '--exact', '--accept-package-agreements', '--accept-source-agreements'], docs: 'https://tesseract-ocr.github.io/tessdoc/Installation.html' }),
   hyperframes: Object.freeze({ id: 'hyperframes', name: 'Hyperframes', kind: 'npm-cli', required: false, description: 'Create and render HTML/CSS/animation compositions as video.', install: 'npm', command: 'npm', args: ['install', '--global', 'hyperframes'], docs: 'https://hyperframes.app/docs/5-packages/cli' }),
   luxtts: Object.freeze({ id: 'luxtts', name: 'LuxTTS', kind: 'python-runtime', required: false, description: 'Local text-to-speech for generated voiceovers and audio assets. Use the dedicated CO-Agent LuxTTS setup flow.', install: null, command: null, args: [], docs: 'https://github.com/ysharma3501/LuxTTS' }),
-  piper: Object.freeze({ id: 'piper', name: 'Piper TTS', kind: 'external-runtime', required: false, description: 'Optional local text-to-speech. Piper executable and voice models must be configured separately.', install: null, command: null, args: [], docs: 'https://github.com/rhasspy/piper' })
 });
 const GITHUB_HTTPS = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
 const REF_RE = /^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._/-]{1,128}$/;
@@ -35,13 +35,15 @@ async function executableVersion(file, args = ['--version']) {
   }
 }
 async function getStatus() {
-  const [tesseract, hyperframes, git] = await Promise.all([
+  const [ollamaExecutable, tesseract, hyperframes, git] = await Promise.all([
+    executableVersion('ollama'),
     ocr.getStatus(),
     hyperframesService.getStatus(),
     executableVersion('git')
   ]);
   return {
     tools: [
+      { ...TOOLS.ollama, ...ollamaExecutable, installed: ollamaExecutable.available, installAvailable: process.platform === 'win32' && !!(await executableVersion('winget')).available },
       { ...TOOLS.tesseract, ...tesseract, installed: tesseract.available, installAvailable: process.platform === 'win32' && !!(await executableVersion('winget')).available },
       { ...TOOLS.hyperframes, ...hyperframes, installed: hyperframes.available, installAvailable: !!(await executableVersion('npm')).available },
       { id: 'git', name: 'Git', kind: 'repository-runtime', required: false, description: 'Needed to import public GitHub repositories and skills.', docs: 'https://git-scm.com/downloads', ...git, installed: git.available, installAvailable: false }

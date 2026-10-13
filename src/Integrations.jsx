@@ -129,7 +129,7 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
       setNotice(tool.id === 'tesseract' ? 'Tesseract does not have a one-click installer for this platform. Use the official setup guide.' : 'Install Node.js/npm first, then use the official Hyperframes setup guide.');
       return;
     }
-    const command = tool.id === 'tesseract' ? 'winget install --id UB-Mannheim.TesseractOCR --exact' : 'npm install --global hyperframes';
+    const command = tool.id === 'ollama' ? 'winget install --id Ollama.Ollama --exact' : tool.id === 'tesseract' ? 'winget install --id UB-Mannheim.TesseractOCR --exact' : 'npm install --global hyperframes';
     if (!window.confirm('Install ' + tool.name + ' on this computer?\n\nCommand: ' + command + '\n\nThis runs the platform package manager and may download software or request administrator approval.')) return;
     setBusy(tool.id); setNotice('Installing ' + tool.name + '. This can take several minutes; do not close CO-Agent.');
     try {
