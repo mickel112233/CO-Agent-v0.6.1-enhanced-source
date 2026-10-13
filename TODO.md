@@ -10,4 +10,4 @@
 - [x] Add a dedicated **Pets** screen using the complete existing `integrations/AI-Desktop-Pet` source and assets; show honest runtime readiness and provide explicit overlay show/hide and native launch/close controls without bypassing the existing launch confirmation.
 - [x] Recompose Video Studio into a ChatCut-inspired conversational editing workspace with the existing AI edit assistant and media assets beside the real preview and multitrack timeline; preserve review/apply, save/load, clip, undo/redo, and export behavior.
 - [x] Update navigation/build documentation, preserve the pet's pinned source and license notices, and create a self-contained ZIP that contains all pinned pet submodule files while excluding Git/dependency/build output and internal plan/checklist files.
-- [ ] Push the new code and ZIP to a GitHub feature branch and open a reviewable pull request.
+- [x] Push the new code and ZIP to a GitHub feature branch and open a reviewable pull request. Completed on `feature/manus-chatcut-pets-20261013`; see PR #18.
