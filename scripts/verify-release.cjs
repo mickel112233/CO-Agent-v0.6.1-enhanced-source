@@ -10,7 +10,7 @@ async function exists(file) {
 }
 async function main() {
   const pkg = await readJson('package.json');
-  const required = ['dist/index.html', 'electron/main.cjs', 'electron/preload.cjs'];
+  const required = ['dist/index.html', 'electron/main.cjs', 'electron/preload.cjs', 'THIRD-PARTY-NOTICES.md', 'integrations/AI-Desktop-Pet/LICENSE', 'integrations/AI-Desktop-Pet/licenses/licence.txt'];
   const missing = [];
   for (const file of required) if (!await exists(file)) missing.push(file);
   if (missing.length) throw new Error('Release is missing required runtime files: ' + missing.join(', '));
