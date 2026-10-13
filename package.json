@@ -84,6 +84,21 @@
         "filter": [
           "**/*.png"
         ]
+      },
+      {
+        "from": "integrations/AI-Desktop-Pet/LICENSE",
+        "to": "pet-assets/LICENSE"
+      },
+      {
+        "from": "integrations/AI-Desktop-Pet/licenses",
+        "to": "pet-assets/licenses",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "THIRD-PARTY-NOTICES.md",
+        "to": "THIRD-PARTY-NOTICES.txt"
       }
     ],
     "afterPack": "scripts/after-pack.cjs"
