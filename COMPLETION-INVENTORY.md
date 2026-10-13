@@ -11,7 +11,7 @@
 - [x] Windows Download workflow passed at commit `3bb6c95` and published a workflow artifact.
 - [x] Repository contains a persistent project-context document and an initial pet/video/setup/import completion gate.
 - [x] Desktop pet source, isolated preload, transparent overlay, persistence, display-bound clamping, tray controls, and runtime bridge exist in source. Existing pet tests are mostly source-contract checks, not real desktop interaction.
-- [x] Video Studio contains an advanced timeline, natural-language edit-plan review/apply, LuxTTS voiceover path, FFmpeg-generated SFX, project save/load, and FFmpeg/FFprobe export validation paths. Real reference-audio synthesis and export playback still require runtime tests.
+- [x] Video Studio contains an advanced timeline, natural-language edit-plan review/apply, LuxTTS voiceover path, FFmpeg-generated SFX, project save/load, and FFmpeg/FFprobe export validation paths. A provisioned-runtime LuxTTS test now synthesizes against a deterministic WAV fixture and validates the output RIFF/WAVE headers; it skips unless `CO_AGENT_LUXTTS_PYTHON` points at an installed runtime, so a model-backed pass is still required.
 - [x] ZIP import has traversal, symlink, file-count, expanded-size, and review-only scanning protections plus regression tests. It still needs adversarial fixtures against both platform extractors and full drag/drop UI acceptance.
 - [x] Ollama status/model inventory and streamed pull progress exist.
 - [x] Model pull cancellation is wired end-to-end with request IDs, an abort controller, stream-reader cancellation, and a renderer Cancel button. A regression test covers abort behavior; CI for the current head is pending.
@@ -72,7 +72,7 @@
 
 - [x] Setup presents three optional Ollama model choices and describes model download as multi-GB; choices are optional, and cloud API providers remain available. Hardware requirements vary by quantization/context, so the app avoids claiming a guaranteed RAM floor.
 - [x] Provider adapters validate protocol/configuration and surface connection errors; stream parser tests and Video Studio provider tests cover wiring. A live credential-backed smoke test is intentionally not claimed.
-- [ ] Verify keyboard navigation, focus management, accessible status/progress, responsive layout, and no blank/white screen in packaged builds.
+- [ ] Verify keyboard navigation, focus management, accessible status/progress, responsive layout, and no blank/white screen in packaged builds using a real Windows UI automation session.
 - [ ] Run a clean Windows install → launch → setup → chat → pet → media export → upgrade/repair → uninstall smoke test. CI now builds and packages the actual pet executable, checks required assets/licenses, starts the app from ZIP and NSIS install, and uninstalls; interactive setup/chat/pet/media and upgrade/repair acceptance still require a desktop session.
 - [ ] Attach passing CI logs and artifact links to a versioned GitHub Release; review dependency-audit report findings and document any accepted exceptions. Both CI and Windows-download workflows generate and upload an npm audit JSON report; audit findings have not yet been reviewed or signed off.
 - [x] README streaming and Computer Use limitation claims reconciled with the current implementation; CI still needs to pass on the updated head.
