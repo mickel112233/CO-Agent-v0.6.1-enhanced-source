@@ -22,6 +22,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   const [captionText, setCaptionText] = useState('Your title here');
   const [busy, setBusy] = useState('');
   const renderRequestRef = useRef('');
+  const voiceRequestRef = useRef('');
   const [notice, setNotice] = useState('');
   const [outputDir, setOutputDir] = useState('');
   const [filename, setFilename] = useState('co-agent-timeline.mp4');
@@ -76,7 +77,10 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   }
   React.useEffect(() => {
     refreshVoiceStatus();
-    const unsubscribe = desktop?.luxTTS?.onGenerationProgress?.(event => setGenerationProgress(event?.message || event?.stage || 'Generating…'));
+    const unsubscribe = desktop?.luxTTS?.onGenerationProgress?.(event => {
+      if (event?.requestId && event.requestId !== voiceRequestRef.current) return;
+      setGenerationProgress(event?.message || event?.stage || 'Generating…');
+    });
     return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
   async function chooseVoiceReference() {
@@ -88,21 +92,39 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   async function generateVoiceover() {
     if (!voiceText.trim()) { setNotice('Enter the voiceover text first.'); return; }
     if (!voiceReference) { setNotice('Choose a reference voice recording first. LuxTTS uses it for voice cloning.'); return; }
-    setBusy('voice'); setNotice('Generating local LuxTTS voiceover…');
+    setBusy('voice'); setNotice('Preparing local LuxTTS voiceover…');
     try {
       const dir = outputDir || await desktop.dialog.chooseDirectory();
       if (!dir) return;
       if (!outputDir) setOutputDir(dir);
-      const sep = dir.includes('\\') ? '\\' : '/';
-      const target = dir.replace(/[\\/]+$/, '') + sep + 'co-agent-voiceover-' + Date.now() + '.wav';
-      const result = await desktop.luxTTS.generate({ text: voiceText.trim(), referenceAudio: voiceReference, outputPath: target, requestId: 'studio-tts-' + Date.now().toString(36), numSteps: 4, speed: 1 });
+      const sep = dir.includes('\\\\') ? '\\\\' : '/';
+      const target = dir.replace(/[\\\\/]+$/, '') + sep + 'co-agent-voiceover-' + Date.now() + '.wav';
+      const requestId = 'studio-tts-' + Date.now().toString(36);
+      voiceRequestRef.current = requestId;
+      setGenerationProgress('Starting voice generation…');
+      setNotice('Generating local LuxTTS voiceover…');
+      const result = await desktop.luxTTS.generate({ text: voiceText.trim(), referenceAudio: voiceReference, outputPath: target, requestId, numSteps: 4, speed: 1 });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS generation failed.');
       setAssets(old => [...new Set([...old, result.output])]);
       addAsset(result.output, 'Audio 1');
       setNotice('Voiceover generated and added to Audio 1: ' + result.output);
+    } catch (error) {
+      const message = error.message || String(error);
+      setNotice(/cancel|abort/i.test(message) ? 'Voiceover generation cancelled. No new clip was added.' : 'Voiceover generation failed: ' + message);
+    } finally {
+      voiceRequestRef.current = '';
       setGenerationProgress('');
-    } catch (error) { setNotice('Voiceover generation failed: ' + (error.message || String(error))); }
-    finally { setBusy(''); }
+      setBusy('');
+    }
+  }
+  async function cancelVoiceover() {
+    const requestId = voiceRequestRef.current;
+    if (!requestId) return;
+    try {
+      const result = await desktop.luxTTS.cancel(requestId);
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Could not cancel voice generation.');
+      setNotice(result?.cancelled ? 'Cancelling voiceover…' : 'Voiceover generation is no longer running.');
+    } catch (error) { setNotice('Could not cancel voiceover: ' + (error.message || String(error))); }
   }
   async function generateSoundEffect() {
     setBusy('sound'); setNotice('Generating a local sound effect with FFmpeg…');
@@ -362,7 +384,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       <div className="panel-heading"><strong><Sparkles size={16}/> Generate assets for this edit</strong><span>Local voice + sound effects</span></div>
       <p className="studio-footnote">Voiceover uses LuxTTS voice cloning and a reference recording you choose. Sound effects are generated locally with FFmpeg and placed directly on Audio 1. Generated assets remain editable timeline clips.</p>
       <label>Voiceover script<textarea value={voiceText} onChange={e => setVoiceText(e.target.value)} rows={3} maxLength={12000} placeholder="Write narration for this video…"/></label>
-      <div className="export-row"><button className="secondary-button" onClick={chooseVoiceReference}><FolderOpen size={14}/>{voiceReference ? baseName(voiceReference) : 'Choose reference voice'}</button><button className="primary-button" disabled={!!busy || !voiceStatus.installed || !voiceText.trim() || !voiceReference} onClick={generateVoiceover}><Music2 size={14}/>{busy === 'voice' ? 'Generating voice…' : 'Generate voiceover & add to timeline'}</button><button className="text-link" onClick={refreshVoiceStatus}>Refresh LuxTTS</button></div>
+      <div className="export-row"><button className="secondary-button" onClick={chooseVoiceReference}><FolderOpen size={14}/>{voiceReference ? baseName(voiceReference) : 'Choose reference voice'}</button><button className="primary-button" disabled={!!busy || !voiceStatus.installed || !voiceText.trim() || !voiceReference} onClick={generateVoiceover}><Music2 size={14}/>{busy === 'voice' ? 'Generating voice…' : 'Generate voiceover & add to timeline'}</button>{busy === 'voice' && voiceRequestRef.current && <button className="secondary-button" onClick={cancelVoiceover}>Cancel voiceover</button>}<button className="text-link" onClick={refreshVoiceStatus}>Refresh LuxTTS</button></div>
       {!voiceStatus.installed && <p className="tool-hint">{voiceStatus.message || 'LuxTTS is not installed. Set it up from first-run setup or Integrations.'}</p>}
       {generationProgress && <p className="tool-hint" role="status">{generationProgress}</p>}
       <div className="export-row"><label>Sound effect<select value={soundPreset} onChange={e => setSoundPreset(e.target.value)}><option value="impact">Impact / hit</option><option value="sweep">Rising sweep</option><option value="ambient">Soft ambient noise</option><option value="beep">UI notification</option></select></label><label>Duration (seconds)<input type="number" min="0.25" max="12" step="0.25" value={soundDuration} onChange={e => setSoundDuration(Math.max(0.25, Math.min(12, Number(e.target.value) || 2)))}/></label><button className="secondary-button" disabled={!!busy} onClick={generateSoundEffect}><Sparkles size={14}/>{busy === 'sound' ? 'Generating…' : 'Generate SFX & add to timeline'}</button></div>
