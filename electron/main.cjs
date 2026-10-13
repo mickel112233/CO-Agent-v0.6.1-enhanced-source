@@ -482,10 +482,10 @@ function createWindow({ show = true } = {}) {
   const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
   const load = isDev ? mainWindow.loadURL(devUrl) : mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   load.catch(error => console.error('CO-Agent renderer failed to load:', error));
-  return load;
   mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => console.error('Renderer load failed:', { code, description, url }));
   mainWindow.on('close', event => { if (!isQuitting) { event.preventDefault(); mainWindow.hide(); } });
   mainWindow.on('closed', () => { mainWindow = null; petMessageBridgeReady = false; });
+  return load;
 }
 app.whenReady().then(async () => {
   if (process.argv.includes('--co-agent-smoke-test')) {
