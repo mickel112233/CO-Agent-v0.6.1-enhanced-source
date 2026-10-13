@@ -5,7 +5,7 @@ import { Film, FolderOpen, Scissors, AudioLines, Download, RefreshCw, Trash2, Pl
 const desktop = window.coAgent;
 const imageFilters = [{ name: 'Images for OCR', extensions: ['png','jpg','jpeg','tif','tiff','bmp','webp'] }];
 
-export default function VideoEditor() {
+export default function VideoEditor({ chatConfig = { provider: 'ollama' } }) {
   const [mode, setMode] = useState('timeline');
   const [files, setFiles] = useState([]);
   const [outputDir, setOutputDir] = useState('');
@@ -137,7 +137,7 @@ export default function VideoEditor() {
     finally { setHyperBusy(false); }
   }
 
-  if (mode === 'timeline') return <TimelineEditor onTools={() => setMode('tools')}/>;
+  if (mode === 'timeline') return <TimelineEditor chatConfig={chatConfig} onTools={() => setMode('tools')}/>;
 
   return <section className="studio-view">
     <div className="studio-heading"><div><p className="eyebrow">CREATION WORKSPACE</p><h1>Video Studio</h1><p className="subhead">Import media, inspect clips, extract audio, assemble sequences, and use optional OCR and HTML-to-video tools.</p></div><div className="studio-heading-actions"><button className="secondary-button" onClick={() => setMode('timeline')}><Film size={14}/> Back to timeline</button><button className="primary-button" onClick={importFiles}><Plus size={16}/> Import media</button></div></div>
