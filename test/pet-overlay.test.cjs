@@ -82,7 +82,7 @@ test('application waits for companion preferences to flush before final quit', (
   const overlay = fs.readFileSync(path.join(root, 'electron', 'pet-overlay.cjs'), 'utf8');
   assert.match(main, /event\.preventDefault\(\);\s*isQuitting = true/);
   assert.match(main, /petOverlay\?\.flush\?\.\(\)/);
-  assert.match(overlay, /flush: \(\) => writeQueue/);
+  assert.match(overlay, /flush: \(\) => \{ if \(saveTimer\)/);
 });
 
 test('pet overlay restores saved visibility and bounds, clamps display changes, and persists hide/show', async () => {

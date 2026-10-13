@@ -58,3 +58,36 @@ test('MCP custom header values cannot inject headers or non-ASCII data', () => {
   assert.throws(() => extractMcpParamHeaders(schema, { region: 'us-east-1\nX-Admin: true' }), /printable ASCII/i);
   assert.throws(() => extractMcpParamHeaders(schema, { region: '東京' }), /printable ASCII/i);
 });
+
+test('MCP client interoperates with a real local HTTP server using JSON-RPC messages', async t => {
+  const http = require('node:http');
+  const requests = [];
+  const server = http.createServer(async (req, res) => {
+    let raw = '';
+    for await (const chunk of req) raw += chunk.toString();
+    const message = JSON.parse(raw);
+    requests.push({ method: message.method, headers: req.headers });
+    const send = (status, body) => {
+      res.statusCode = status;
+      res.setHeader('content-type', 'application/json');
+      res.end(body == null ? '' : JSON.stringify({ jsonrpc: '2.0', id: message.id, result: body }));
+    };
+    if (message.method === 'initialize') return send(200, { protocolVersion: '2026-07-28', capabilities: { tools: {} }, serverInfo: { name: 'CO-Agent local MCP fixture', version: '1.0' } });
+    if (message.method === 'notifications/initialized') { res.statusCode = 202; return res.end(); }
+    if (message.method === 'tools/list') return send(200, { tools: [{ name: 'echo', description: 'Echo a value', inputSchema: { type: 'object', properties: { text: { type: 'string' } } }] });
+    if (message.method === 'tools/call') return send(200, { content: [{ type: 'text', text: 'local MCP: ' + message.params.arguments.text }] });
+    res.statusCode = 400; res.end(JSON.stringify({ error: 'unknown method' }));
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const address = server.address();
+  const client = createClient('http://127.0.0.1:' + address.port + '/mcp');
+  const catalog = await client.listTools();
+  assert.equal(catalog.serverInfo.name, 'CO-Agent local MCP fixture');
+  assert.equal(catalog.tools[0].name, 'echo');
+  const result = await client.callTool('echo', { text: 'round-trip' });
+  assert.equal(result.content[0].text, 'local MCP: round-trip');
+  assert.ok(requests.some(item => item.method === 'initialize'));
+  assert.ok(requests.some(item => item.method === 'tools/call'));
+  assert.equal(requests.find(item => item.method === 'tools/call').headers['mcp-name'], 'echo');
+});

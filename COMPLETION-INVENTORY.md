@@ -58,7 +58,7 @@
 - [ ] Verify ZIP extraction parity on Windows and Unix, including duplicate normalized names, symlinks/reparse points, zip bombs, and cleanup after failure.
 - [x] Repository and ZIP imports are review-only; lifecycle scripts are reported, not executed. Node dependency installation is a separate explicit approval and uses `--ignore-scripts` with the official npm registry.
 - [ ] Test optional tool detection/install/removal and missing executables without corrupting core app.
-- [ ] Run MCP/ACP against at least one real compatible local server/agent in addition to protocol mocks; test timeout, cancellation, invalid messages, and approval rejection.
+- [x] Added a local HTTP MCP server interoperability test that exercises initialize, initialized notification, tools/list, and tools/call end-to-end. ACP already runs a real local child-process fixture including streamed messages and permission outcomes; external third-party MCP/ACP servers and platform-specific permission dialogs still require manual acceptance.
 
 ## P1 — agent and computer-use reliability
 
