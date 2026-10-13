@@ -9,6 +9,9 @@ const MAX_TEXT_LENGTH = 12000;
 const MAX_TIMEOUT_MS = 15 * 60 * 1000;
 const activeJobs = new Map();
 const activeSetupJobs = new Map();
+function isWavHeader(buffer) {
+  return Buffer.isBuffer(buffer) && buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WAVE';
+}
 function runtimePaths({ appPath = process.cwd(), userDataPath = path.join(os.homedir(), '.co-agent'), resourcesPath = process.resourcesPath, platform = process.platform } = {}) {
   const pythonName = platform === 'win32' ? 'python.exe' : 'python';
   const sourceCandidates = [
@@ -62,6 +65,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   const stat = await fs.stat(reference).catch(() => null);
   if (!stat?.isFile()) throw new Error('Reference audio must be an existing regular file.');
   const output = path.resolve(outputPath);
+  if (await fs.stat(output).catch(() => null)) throw new Error('Output WAV already exists. Choose a new filename to avoid overwriting existing audio.');
   await fs.mkdir(path.dirname(output), { recursive: true });
   const runtime = await status(options);
   if (!runtime.installed) throw new Error(runtime.message);
@@ -69,9 +73,17 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS request ID is missing or invalid.');
   if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
   return new Promise((resolve, reject) => {
-    const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const spawnImpl = options.spawn || spawn;
+    const proc = spawnImpl(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
-    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
+    const finish = async (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) await fs.rm(output, { force: true }).catch(() => {});
+      if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId);
+      error ? reject(error) : resolve(value);
+    };
     activeJobs.set(jobId, proc);
     timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
     proc.stdout.on('data', chunk => {
@@ -83,13 +95,21 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
     proc.once('close', async code => {
       if (settled) return;
-      if (proc.__coAgentCancelled) { finish(new Error('LuxTTS generation cancelled by user.')); return; }
+      if (proc.__coAgentCancelled) { await finish(new Error('LuxTTS generation cancelled by user.')); return; }
       let result;
       try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
-      if (code !== 0 || !result?.ok) { finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
+      if (code !== 0 || !result?.ok) { await finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
       const outStat = await fs.stat(output).catch(() => null);
-      if (!outStat?.isFile() || outStat.size < 44) { finish(new Error('LuxTTS reported success but no valid WAV output was created.')); return; }
-      finish(null, { ok: true, output, sampleRate: 48000, bytes: outStat.size, model: MODEL_ID });
+      let header = Buffer.alloc(0);
+      if (outStat?.isFile() && outStat.size >= 44) {
+        const handle = await fs.open(output, 'r').catch(() => null);
+        if (handle) {
+          try { const result = await handle.read(header, 0, 12, 0); header = header.subarray(0, result.bytesRead); }
+          finally { await handle.close().catch(() => {}); }
+        }
+      }
+      if (!outStat?.isFile() || outStat.size < 44 || !isWavHeader(header)) { await finish(new Error('LuxTTS reported success but did not create a valid RIFF/WAVE output.')); return; }
+      await finish(null, { ok: true, output, sampleRate: 48000, bytes: outStat.size, model: MODEL_ID });
     });
     proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
   });
@@ -171,4 +191,4 @@ async function setup({ pythonPath = '', requestId = '' } = {}, options = {}, onP
   } finally { activeSetupJobs.delete(jobId); }
 }
 
-module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup, cancel, cancelSetup };
+module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup, cancel, cancelSetup, isWavHeader };
