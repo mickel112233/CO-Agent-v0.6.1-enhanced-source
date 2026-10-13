@@ -194,14 +194,14 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
         }
         if (action.type === 'add_caption') {
           const text = String(action.text || '').trim().slice(0, 500), start = Number(action.start), duration = Number(action.duration ?? 3);
-          if (!text || !Number.isFinite(start) || start < 0 || start > 86400 || !Number.isFinite(duration) || duration <= 0 || duration > 600) throw new Error('The plan contains an invalid caption.');
+          if (!text || !Number.isFinite(start) || start < 0 || start > 3600 || !Number.isFinite(duration) || duration <= 0 || duration > 600 || start + duration > 3600) throw new Error('The plan contains an invalid caption. Timeline edits must remain within the one-hour project limit.');
           return { type: action.type, text, start, duration };
         }
         const clip = projectRef.current.clips.find(item => item.id === action.clipId);
         if (!clip) throw new Error('The plan references a clip that is no longer in the timeline.');
         if (action.type === 'move_clip') {
           const start = Number(action.start), track = String(action.track || '');
-          if (!Number.isFinite(start) || start < 0 || start > 86400 || !tracksAllowed.includes(track)) throw new Error('The plan contains an invalid clip move.');
+          if (!Number.isFinite(start) || start < 0 || start > 3600 || start + clip.duration > 3600 || !tracksAllowed.includes(track)) throw new Error('The plan contains an invalid clip move. Timeline edits must remain within the one-hour project limit.');
           if (clip.type === 'audio' && track !== 'Audio 1') throw new Error('Audio clips can only move to the Audio 1 track.');
           if (clip.type === 'caption' && track !== 'Titles') throw new Error('Title clips must remain on the Titles track.');
           if (['video','image'].includes(clip.type) && !['Video 1', 'Video 2'].includes(track)) throw new Error('Video and image clips can only move to video tracks.');
@@ -209,14 +209,14 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
         }
         if (action.type === 'set_duration') {
           const duration = Number(action.duration);
-          if (!Number.isFinite(duration) || duration <= 0 || duration > 86400) throw new Error('The plan contains an invalid duration.');
+          if (!Number.isFinite(duration) || duration <= 0 || duration > 3600 || clip.timelineStart + duration > 3600) throw new Error('The plan contains an invalid duration. Timeline edits must remain within the one-hour project limit.');
           if (clip.type === 'caption' && duration > 600) throw new Error('Title duration cannot exceed 600 seconds.');
           return { type: action.type, clipId: clip.id, duration };
         }
         if (action.type === 'set_source_start') {
           const sourceStart = Number(action.sourceStart);
           if (clip.type === 'caption') throw new Error('Title clips do not have a media source to trim.');
-          if (!Number.isFinite(sourceStart) || sourceStart < 0 || sourceStart > 86400) throw new Error('The plan contains an invalid source trim.');
+          if (!Number.isFinite(sourceStart) || sourceStart < 0 || sourceStart > 3600 || sourceStart + clip.duration > 3600) throw new Error('The plan contains an invalid source trim. Timeline edits must remain within the one-hour project limit.');
           return { type: action.type, clipId: clip.id, sourceStart };
         }
         if (action.type === 'remove_clip') return { type: action.type, clipId: clip.id };
@@ -231,13 +231,18 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       if (safe.some(action => action.clipId && removedIds.has(action.clipId) && action.type !== 'remove_clip')) throw new Error('The plan edits a clip after removing it. Ask for a simpler plan and try again.');
       const splitIds = safe.filter(action => action.type === 'split_clip').map(action => action.clipId);
       if (new Set(splitIds).size !== splitIds.length) throw new Error('The plan splits the same clip more than once; review a simpler plan.');
-      setEditPlan({ actions: safe, summary: String(parsed.summary || 'Review the proposed timeline edits below.').slice(0, 500) });
+      setEditPlan({ actions: safe, baseSignature: JSON.stringify(projectRef.current), summary: String(parsed.summary || 'Review the proposed timeline edits below.').slice(0, 500) });
     } catch (error) { setNotice('Could not plan timeline edits: ' + (error.message || String(error))); }
     finally { setPlanningEdit(false); }
   }
   function applyTimelineEditPlan() {
     if (!editPlan) return;
-    // The timeline may have changed while the user reviewed the proposal. Refuse stale plans.
+    // Refuse any stale plan, including edits to existing clips while the proposal was open.
+    if (JSON.stringify(projectRef.current) !== editPlan.baseSignature) {
+      setEditPlan(null);
+      setNotice('Timeline changed while the plan was open. The stale plan was discarded; generate a fresh plan.');
+      return;
+    }
     const currentIds = new Set(projectRef.current.clips.map(clip => clip.id));
     const referencedIds = editPlan.actions.filter(action => action.clipId).map(action => action.clipId);
     if (referencedIds.some(id => !currentIds.has(id))) {
