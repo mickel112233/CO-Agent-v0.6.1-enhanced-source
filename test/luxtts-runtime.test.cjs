@@ -67,7 +67,7 @@ test('LuxTTS worker rejects malformed reference-audio requests without loading m
       child.stderr.on('data', chunk => { stderr += chunk; });
       child.once('error', reject);
       child.once('close', code => {
-        const lines = stdout.trim().split(/\\r?\\n/).filter(Boolean);
+        const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
         try {
           assert.ok(lines.length > 0, 'worker should emit a structured JSON error');
           const value = JSON.parse(lines.at(-1));
