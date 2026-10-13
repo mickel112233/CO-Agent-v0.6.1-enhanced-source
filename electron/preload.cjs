@@ -9,7 +9,7 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('coAgent', Object.freeze({
   app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),
-  imports: Object.freeze({ scanZip: invoke('imports:scan-zip'), getPathForFile: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } } }),
+  imports: Object.freeze({ scanZip: invoke('imports:scan-zip'), installNodeDependencies: invoke('imports:install-node-dependencies'), getPathForFile: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } } }),
   chatHistory: Object.freeze({ load: invoke('chat-history:load'), save: invoke('chat-history:save') }),
   agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step') }),
   workspace: Object.freeze({ getRoot: invoke('workspace:get-root'), chooseRoot: invoke('workspace:choose-root'), listFiles: invoke('workspace:list-files'), readFile: invoke('workspace:read-file'), applyChanges: invoke('workspace:apply-changes') }),
