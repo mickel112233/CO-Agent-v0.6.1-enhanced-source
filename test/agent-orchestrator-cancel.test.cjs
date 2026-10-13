@@ -62,6 +62,7 @@ test('agent-step cancellation is exposed through validated request-scoped IPC an
   assert.match(main, /handle\('agents:run-step-cancel'/);
   assert.match(main, /Agent step request ID is missing or invalid/);
   assert.match(preload, /cancelStep: invoke\('agents:run-step-cancel'\)/);
+  assert.match(ui, /delete next\\[step\\.id\\]/);
   assert.match(ui, /Cancel agent/);
   assert.match(ui, /desktop\.agents\.cancelStep\(requestId\)/);
 });
