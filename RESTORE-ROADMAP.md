@@ -17,6 +17,8 @@ This repository is an active reconstruction. The current source now includes pra
 - Public HTTPS GitHub repository import with optional ref pinning, manifest detection, managed removal, and explicit opt-in for SKILL.md content in local Ollama chat.
 - Security checks for GitHub-only URLs, ref validation, safe process argument passing, imported manifest symlink rejection, and bounded skill content.
 - Local model selection/management UI and runtime diagnostics.
+- **Minimal Manus-inspired desktop shell:** light neutral surfaces, a primary sidebar for Chat, Video Studio, Integrations, Pets, and Settings, and secondary setup/agent/computer-use/help links within Settings.
+- **Pets screen:** reuses the complete pinned AI-Desktop-Pet submodule, displays its included sprite, exposes the existing overlay show/hide controls, and reports native executable readiness truthfully. Native launch continues to require the existing confirmation and Windows executable.
 - **Multi-agent harness:** local-model workflow planner, specialist role prompts, twenty-six built-in skills, dependency-aware step execution, structured results, reviewable file proposals, and user-approved file writes with backups.
 - **In-app developer terminal:** live output and fixed test/build/Git/audit presets, native command confirmation, timeout/output bounds, and explicit cancellation.
 - Workspace file tools with selected-context reads, symlink/path-traversal protection, secret-file filtering, change-size limits, and persisted project-folder selection.
@@ -40,9 +42,9 @@ Local Ollama can now propose a short plan (up to eight click/type/key actions) f
 
 ## Multi-track video editor behavior and boundaries
 
-Video Studio opens the timeline editor by default. It supports video/image overlays at timeline positions, audio clips on a separate audio track, caption/title clips, source trim-in, duration, track reassignment, moving, splitting at the playhead, removal, project save/load, local preview, and FFmpeg MP4 rendering. Project files keep source paths; they do not bundle media.
+Video Studio opens the timeline editor by default, now arranged as a ChatCut-inspired edit assistant and media-asset column alongside the actual preview and multitrack timeline. It supports video/image overlays at timeline positions, audio clips on a separate audio track, caption/title clips, source trim-in, duration, track reassignment, moving, splitting at the playhead, removal, project save/load, local preview, and FFmpeg MP4 rendering. Project files keep source paths; they do not bundle media.
 
-Still unfinished: transitions, keyframes, effects, transforms, advanced audio routing, audio from video clips in the timeline mix, waveforms, snapping, drag-and-drop trim handles, undo/redo, proxy media, automatic transcription/captions/voiceover, color grading, render progress/cancel, and full original-editor parity. The current renderer should be tested against the codecs and media files a user intends to edit.
+Still unfinished: transitions, keyframes, effects, transforms, advanced audio routing, audio from video clips in the timeline mix, waveforms, snapping, drag-and-drop trim handles, proxy media, automatic transcription/captions/voiceover, color grading, render progress/cancel, and full original-editor parity. Undo/redo is available. The current renderer should be tested against the codecs and media files a user intends to edit.
 
 ## Download and test
 
