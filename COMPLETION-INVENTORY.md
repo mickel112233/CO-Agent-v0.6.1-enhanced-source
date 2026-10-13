@@ -31,7 +31,7 @@
 - [x] LuxTTS setup has a cancellable request ID, progress UI, Python version preflight (3.10/3.11 only), and post-install import/version verification. Real voice-cloning synthesis still requires a reference-audio fixture and model download before marking synthesis end-to-end verified.
 - [x] API keys remain in renderer memory only, are passed only to the selected provider call, and chat-history validation persists role/content only. Request IDs isolate streamed chunks and AbortController cancellation is wired to the active model request; orchestration-wide recovery still needs acceptance testing.
 - [x] Chat history writes are serialized and atomic in the main process; history is bounded/validated, loaded on startup, and save errors surface in the UI. New conversations receive unique timestamp IDs. Multi-window crash/restart and interactive switching still need desktop acceptance.
-- [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head. GitHub Actions currently runs the test suite, renderer build, package verifier, and Windows ZIP/NSIS startup smoke checks; final head results are pending.
+- [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head. Added a Node `--check` regression gate over every Electron and script JavaScript file so main-process syntax errors are caught by CI. GitHub Actions currently runs the test suite, renderer build, package verifier, and Windows ZIP/NSIS startup smoke checks; final head results are pending.
 
 ## P1 — desktop pets
 

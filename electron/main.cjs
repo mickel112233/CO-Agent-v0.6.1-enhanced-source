@@ -93,7 +93,7 @@ async function ollamaChat(payload = {}, requestSignal, onChunk) {
     const streamed = await providerStream.streamOllamaChat(status.baseUrl, model, chatMessages, onChunk, fetch, requestSignal);
     return { ok: true, model, message: streamed.message, interrupted: streamed.interrupted, cancelled: streamed.cancelled, streamError: streamed.error };
   }
-  const response = await fetch(status.baseUrl + '/api/chat',
+  const response = await fetch(status.baseUrl + '/api/chat', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model, stream: false, messages: chatMessages }),
     signal: requestSignal ? AbortSignal.any([requestSignal, AbortSignal.timeout(180000)]) : AbortSignal.timeout(180000)
