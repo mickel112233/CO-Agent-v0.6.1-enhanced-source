@@ -139,6 +139,6 @@ function createPetOverlay({ preloadPath, onMessage, onClose, app: appApi = app, 
   screenApi.on('display-metrics-changed', displayChanged);
   screenApi.on('display-removed', displayChanged);
   screenApi.on('display-added', displayChanged);
-  return Object.freeze({ show, hide, toggle, destroy, restore, flush: () => writeQueue, sendStatus, isVisible, getBounds: () => win && !win.isDestroyed() ? win.getBounds() : preferences.bounds });
+  return Object.freeze({ show, hide, toggle, destroy, restore, flush: () => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; persistPreferences().catch(() => {}); } return writeQueue; }, sendStatus, isVisible, getBounds: () => win && !win.isDestroyed() ? win.getBounds() : preferences.bounds });
 }
 module.exports = { createPetOverlay, clampBounds };
