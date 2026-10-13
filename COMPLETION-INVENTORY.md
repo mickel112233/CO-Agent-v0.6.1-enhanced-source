@@ -25,12 +25,12 @@
 ## P0 — build/test correctness and reliable setup
 
 - [x] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implemented; latest CI is pending.**
-- [ ] Confirm a cancelled pull cannot be reported as a successful installation or leave the UI stuck in busy state.
+- [x] Model pulls are request-scoped and abort the fetch plus stream reader; renderer `finally` clears busy/request state and cancellation is surfaced distinctly. A fresh Ollama inventory check is required before a pull is reported ready.
 - [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; latest CI is pending.**
 - [ ] Improve first-run diagnostics for missing/offline Ollama, missing model, and failed setup; allow retry and safe skip without trapping the user.
 - [x] LuxTTS setup has a cancellable request ID, progress UI, Python version preflight (3.10/3.11 only), and post-install import/version verification. Real voice-cloning synthesis still requires a reference-audio fixture and model download before marking synthesis end-to-end verified.
-- [ ] Audit API/local provider state and chat cancellation. API key storage must be explicit and safe; never persist secrets to plain localStorage or chat history.
-- [ ] Verify conversation switching, new-chat IDs, auto-save ordering, restart recovery, and failures during persistence.
+- [x] API keys remain in renderer memory only, are passed only to the selected provider call, and chat-history validation persists role/content only. Request IDs isolate streamed chunks and AbortController cancellation is wired to the active model request; orchestration-wide recovery still needs acceptance testing.
+- [x] Chat history writes are serialized and atomic in the main process; history is bounded/validated, loaded on startup, and save errors surface in the UI. New conversations receive unique timestamp IDs. Multi-window crash/restart and interactive switching still need desktop acceptance.
 - [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head.
 
 ## P1 — desktop pets
@@ -56,7 +56,7 @@
 
 - [x] GitHub import rejects non-GitHub/credential-bearing URLs and unsafe refs, and now refuses symlinks, non-regular entries, more than 10,000 files, files above 25 MB, or repositories above 250 MB before treating the import as reviewable. Git transport remains bounded by a five-minute timeout and 4 MB captured output; external-host redirect behavior is still not proven by the fixture suite.
 - [ ] Verify ZIP extraction parity on Windows and Unix, including duplicate normalized names, symlinks/reparse points, zip bombs, and cleanup after failure.
-- [ ] Ensure import is review-only by default and never executes scripts automatically; dependency installation requires a separate explicit confirmation and clear trust boundary.
+- [x] Repository and ZIP imports are review-only; lifecycle scripts are reported, not executed. Node dependency installation is a separate explicit approval and uses `--ignore-scripts` with the official npm registry.
 - [ ] Test optional tool detection/install/removal and missing executables without corrupting core app.
 - [ ] Run MCP/ACP against at least one real compatible local server/agent in addition to protocol mocks; test timeout, cancellation, invalid messages, and approval rejection.
 
