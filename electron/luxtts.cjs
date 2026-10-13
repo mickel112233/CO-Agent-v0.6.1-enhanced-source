@@ -69,7 +69,8 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS request ID is missing or invalid.');
   if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
   return new Promise((resolve, reject) => {
-    const proc = spawn(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const spawnWorker = options.spawn || spawn;
+    const proc = spawnWorker(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
     activeJobs.set(jobId, proc);
@@ -89,7 +90,19 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
       if (code !== 0 || !result?.ok) { finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
       const outStat = await fs.stat(output).catch(() => null);
       if (!outStat?.isFile() || outStat.size < 44) { finish(new Error('LuxTTS reported success but no valid WAV output was created.')); return; }
-      finish(null, { ok: true, output, sampleRate: 48000, bytes: outStat.size, model: MODEL_ID });
+      let metadata;
+      try { metadata = await require('./studio.cjs').probe(output); }
+      catch (error) { await fs.rm(output, { force: true }).catch(() => {}); finish(new Error('LuxTTS output failed FFprobe validation: ' + String(error.message || error).slice(0, 800))); return; }
+      const audio = Array.isArray(metadata?.streams) ? metadata.streams.find(stream => stream.codec_type === 'audio') : null;
+      const formatNames = String(metadata?.format?.format_name || '').split(',');
+      const sampleRate = Number(audio?.sample_rate);
+      const duration = Number(metadata?.format?.duration);
+      if (!formatNames.includes('wav') || !audio || audio.codec_name !== 'pcm_s16le' || sampleRate !== 48000 || !Number.isFinite(duration) || duration <= 0) {
+        await fs.rm(output, { force: true }).catch(() => {});
+        finish(new Error('LuxTTS output failed FFprobe validation: expected a playable 48 kHz PCM WAV with a positive duration.'));
+        return;
+      }
+      finish(null, { ok: true, output, sampleRate, duration, codec: audio.codec_name, verified: true, bytes: outStat.size, model: MODEL_ID });
     });
     proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
   });
