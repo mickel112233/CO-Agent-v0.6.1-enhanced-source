@@ -98,7 +98,8 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
   const screen = new EventEmitter();
   let display = { id: 1, workArea: { x: 0, y: 0, width: 1000, height: 800 } };
   screen.getPrimaryDisplay = () => display;
-  screen.getDisplayMatching = () => display;
+  let matchCalls = 0;
+  screen.getDisplayMatching = () => { matchCalls++; return display; };
   const windows = [];
   class FakeWindow extends EventEmitter {
     constructor(options) {
@@ -121,7 +122,8 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
     loadFile() { return Promise.resolve(); }
   }
   const app = { getPath: () => dir, isPackaged: false };
-  const overlay = createPetOverlay({ app, BrowserWindow: FakeWindow, screen, fs: require('node:fs/promises'), preloadPath: path.join(dir, 'preload.cjs') });
+  const receivedMessages = [];
+  const overlay = createPetOverlay({ app, BrowserWindow: FakeWindow, screen, fs: require('node:fs/promises'), preloadPath: path.join(dir, 'preload.cjs'), onMessage: text => receivedMessages.push(text) });
   try {
     const restored = await overlay.restore();
     assert.equal(restored.visible, true);
@@ -131,8 +133,16 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
     assert.equal(windows[0].options.webPreferences.nodeIntegration, false);
     windows[0].bounds = { x: 990, y: 790, width: 340, height: 240 };
     screen.emit('display-removed');
+    assert.ok(matchCalls > 0, 'display change must use the injected screen API');
     assert.ok(windows[0].bounds.x + windows[0].bounds.width <= 992);
     assert.ok(windows[0].bounds.y + windows[0].bounds.height <= 792);
+    windows[0].webContents.emit('ipc-message', {}, 'pet:message', '  ' + 'x'.repeat(4500) + '  ');
+    assert.equal(receivedMessages.length, 1);
+    assert.equal(receivedMessages[0].length, 4000);
+    assert.ok(!receivedMessages[0].startsWith(' '));
+    windows[0].webContents.emit('ipc-message', {}, 'pet:close');
+    assert.equal(overlay.isVisible(), false, 'companion close control hides the overlay');
+    overlay.show();
     overlay.hide();
     await overlay.flush();
     assert.equal(JSON.parse(fs.readFileSync(prefs, 'utf8')).visible, false);
