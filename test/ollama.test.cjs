@@ -49,3 +49,21 @@ test('parses streamed pull progress and reports completion', async () => {
     assert.equal(progress.at(-1).status, 'success');
   });
 });
+
+
+test('cancels a model pull by aborting the in-flight fetch and stream reader', async () => {
+  const controller = new AbortController();
+  let observedSignal;
+  const fetchImpl = async (_url, options) => {
+    observedSignal = options.signal;
+    return new Response(new ReadableStream({
+      start(stream) { stream.enqueue(new TextEncoder().encode('{"status":"downloading","total":100,"completed":1}\\n')); },
+      cancel() {}
+    }), { status: 200, headers: { 'content-type': 'application/x-ndjson' } });
+  };
+  const pending = pullOllamaModel('qwen3.5:2b', () => {}, 'http://127.0.0.1:11434', fetchImpl, controller.signal);
+  await new Promise(resolve => setImmediate(resolve));
+  controller.abort();
+  await assert.rejects(pending, /cancel/i);
+  assert.equal(observedSignal, controller.signal);
+});
