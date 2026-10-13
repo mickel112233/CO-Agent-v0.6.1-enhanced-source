@@ -31,6 +31,20 @@ test('ZIP scanner identifies manifests, lifecycle scripts, and risky files witho
   }
 });
 
+test('approved npm install rejects external folders, scripts-only projects, and URL dependencies', async () => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-install-'));
+  const root = path.join(userData, 'import-review', 'sample');
+  try {
+    await fs.mkdir(root, { recursive: true });
+    await assert.rejects(() => zipImport.installNodeDependencies(root, userData), /package\.json/i);
+    await fs.writeFile(path.join(root, 'package.json'), JSON.stringify({ name: 'review-only', dependencies: { unsafe: 'git+https://example.com/unsafe.git' } }));
+    await assert.rejects(() => zipImport.installNodeDependencies(root, userData), /plain registry version range/i);
+    await fs.writeFile(path.join(root, '.npmrc'), 'registry=https://example.invalid/');
+    await fs.writeFile(path.join(root, 'package.json'), JSON.stringify({ name: 'review-only', dependencies: { safe: '^1.2.3' } }));
+    await assert.rejects(() => zipImport.installNodeDependencies(root, userData), /\.npmrc/i);
+  } finally { await fs.rm(userData, { recursive: true, force: true }); }
+});
+
 test('ZIP scanner skips dependency/build trees and never follows symlinks', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-zip-link-'));
   const outside = path.join(root, 'outside.txt');
