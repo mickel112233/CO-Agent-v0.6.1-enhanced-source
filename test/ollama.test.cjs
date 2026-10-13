@@ -1,7 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const { getOllamaStatus, pullOllamaModel, validateModelName } = require('../electron/ollama.cjs');
+const { getOllamaStatus, pullOllamaModel, validateModelName, normalizeBaseUrl } = require('../electron/ollama.cjs');
+
+
+test('allows insecure HTTP only for loopback Ollama and rejects unsafe remote URLs', () => {
+  assert.equal(normalizeBaseUrl('http://127.0.0.1:11434'), 'http://127.0.0.1:11434');
+  assert.equal(normalizeBaseUrl('http://localhost:11434'), 'http://localhost:11434');
+  assert.equal(normalizeBaseUrl('https://ollama.example.com:11434'), 'https://ollama.example.com:11434');
+  assert.throws(() => normalizeBaseUrl('http://ollama.example.com:11434'), /must use HTTPS/);
+  assert.throws(() => normalizeBaseUrl('http://192.168.1.5:11434'), /must use HTTPS/);
+  assert.throws(() => normalizeBaseUrl('http://user:pass@127.0.0.1:11434'), /credentials/);
+  assert.throws(() => normalizeBaseUrl('http://127.0.0.1:11434?token=secret'), /query parameters or fragments/);
+  assert.throws(() => normalizeBaseUrl('https://ollama.example.com/#fragment'), /query parameters or fragments/);
+  assert.throws(() => normalizeBaseUrl('not a URL'), /valid Ollama URL/);
+});
 
 async function withServer(handler, run) {
   const server = http.createServer(handler);
