@@ -173,3 +173,67 @@ test('voiceover UI requires FFprobe readiness before enabling generation', async
   assert.match(source, /ffprobeReady: Boolean\(capabilities\?\.ffprobe\)/);
   assert.match(source, /!voiceStatus\.ffprobeReady/);
 });
+
+
+test('LuxTTS cancellation is honored during reference-audio preflight', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-luxtts-preflight-cancel-'));
+  const reference = path.join(dir, 'reference.wav');
+  const output = path.join(dir, 'cancelled.wav');
+  await fs.writeFile(reference, 'reference fixture');
+  let probeStartedResolve, finishProbe;
+  const probeStarted = new Promise(resolve => { probeStartedResolve = resolve; });
+  const probe = () => {
+    probeStartedResolve();
+    return new Promise(resolve => { finishProbe = resolve; });
+  };
+  try {
+    const pending = lux.generate(
+      { text: 'hello', referenceAudio: reference, outputPath: output, requestId: 'preflight-cancel' },
+      { probe }
+    );
+    await probeStarted;
+    assert.deepEqual(lux.cancel('preflight-cancel'), { ok: true, cancelled: true });
+    finishProbe({ streams: [{ codec_type: 'audio' }], format: { duration: '1' } });
+    await assert.rejects(pending, /cancelled by user/i);
+    assert.deepEqual(lux.cancel('preflight-cancel'), { ok: true, cancelled: false });
+    await assert.rejects(fs.stat(output), { code: 'ENOENT' });
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+test('LuxTTS cancellation kills the worker and removes partial WAV output', async () => {
+  const { EventEmitter } = require('node:events');
+  const { PassThrough } = require('node:stream');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-luxtts-worker-cancel-'));
+  const userDataPath = path.join(dir, 'data'), resourcesPath = path.join(dir, 'resources');
+  const python = path.join(userDataPath, 'runtime', 'luxtts', 'venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
+  const reference = path.join(dir, 'reference.wav'), output = path.join(dir, 'partial.wav');
+  await fs.mkdir(path.dirname(python), { recursive: true });
+  await fs.mkdir(path.join(dir, 'third_party', 'LuxTTS'), { recursive: true });
+  await fs.mkdir(path.join(dir, 'scripts'), { recursive: true });
+  await fs.writeFile(python, 'fixture');
+  await fs.writeFile(path.join(dir, 'scripts', 'luxtts-worker.py'), '# fixture worker');
+  await fs.writeFile(reference, 'reference fixture');
+  let spawnResolve;
+  const spawnStarted = new Promise(resolve => { spawnResolve = resolve; });
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.stdin = { end: requestText => { const request = JSON.parse(requestText); require('node:fs').writeFileSync(request.outputPath, Buffer.alloc(64)); } };
+    child.kill = () => { child.__coAgentCancelled = true; setImmediate(() => child.emit('close', 1)); };
+    spawnResolve();
+    return child;
+  };
+  try {
+    const pending = lux.generate(
+      { text: 'hello', referenceAudio: reference, outputPath: output, requestId: 'worker-cancel' },
+      { appPath: dir, userDataPath, resourcesPath, probe: async () => ({ streams: [{ codec_type: 'audio' }], format: { duration: '1' } }), spawn: fakeSpawn }
+    );
+    await spawnStarted;
+    assert.deepEqual(lux.cancel('worker-cancel'), { ok: true, cancelled: true });
+    await assert.rejects(pending, /cancelled by user/i);
+    await assert.rejects(fs.stat(output), { code: 'ENOENT' });
+  } finally {
+    lux.cancel('worker-cancel');
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
