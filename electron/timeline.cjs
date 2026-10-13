@@ -11,6 +11,7 @@ try { ffprobePath = require('ffprobe-static').path; } catch {}
 const MAX_CLIPS = 120;
 const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 const MAX_DURATION = 60 * 60;
+const activeRenders = new Map();
 const TYPES = new Set(['video', 'audio', 'image', 'caption']);
 function number(value, label, min, max) {
   const n = Number(value);
