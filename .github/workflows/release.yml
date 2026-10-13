@@ -1,5 +1,7 @@
 name: Tagged release
 
+# Windows artifacts must pass ZIP and installed-app startup checks before upload.
+
 on:
   push:
     tags:
