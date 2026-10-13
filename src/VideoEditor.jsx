@@ -21,6 +21,9 @@ export default function VideoEditor() {
   const [hyperStatus, setHyperStatus] = useState({ available: false, error: 'Checking Hyperframes…' });
   const [hyperProject, setHyperProject] = useState('');
   const [hyperBusy, setHyperBusy] = useState(false);
+  const [compositionTitle, setCompositionTitle] = useState('A New Beginning');
+  const [compositionDescription, setCompositionDescription] = useState('A bold cinematic title sequence with a calm, hopeful tone.');
+  const [compositionBusy, setCompositionBusy] = useState(false);
   const current = files[selected];
   const duration = useMemo(() => {
     const d = Number(probe?.format?.duration);
@@ -110,6 +113,20 @@ export default function VideoEditor() {
       if (dir) setHyperProject(dir);
     } catch (e) { setNotice(e.message || String(e)); }
   }
+  async function createHyperframesComposition() {
+    setCompositionBusy(true); setNotice('');
+    try {
+      const dir = await desktop.dialog.chooseDirectory();
+      if (!dir) return;
+      const result = await desktop.studio.hyperframesCreateComposition({ title: compositionTitle, description: compositionDescription, outputDir: dir });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Composition generation failed.');
+      setHyperProject(result.projectDir);
+      setNotice(result.message + ' Project folder: ' + result.projectDir);
+      if (hyperStatus.available && window.confirm('Composition created. Run Hyperframes lint now?')) await runHyperframes('lint');
+    } catch (error) { setNotice('Composition generation failed: ' + (error.message || String(error))); }
+    finally { setCompositionBusy(false); }
+  }
+
   async function runHyperframes(action) {
     if (!hyperProject) { setNotice('Choose a Hyperframes project folder containing index.html first.'); return; }
     setHyperBusy(true); setNotice('');
@@ -148,6 +165,13 @@ export default function VideoEditor() {
       <p className="studio-footnote">Extract readable text from screenshots, scanned pages, and still images. Tesseract must be installed separately; OCR runs locally on this device.</p>
       <div className="export-row"><button className="secondary-button" disabled={ocrBusy || !ocrStatus.available} onClick={runOCR}><ScanText size={14}/>{ocrBusy ? 'Reading image…' : 'Choose image & extract text'}</button><span className="tool-hint">{ocrStatus.available ? ocrStatus.version : ocrStatus.error}</span></div>
       {ocrText && <><textarea className="ocr-result" aria-label="Extracted OCR text" readOnly value={ocrText}/><button className="secondary-button" onClick={() => navigator.clipboard?.writeText(ocrText).then(() => setNotice('OCR text copied.')).catch(() => setNotice('Clipboard access was unavailable.'))}>Copy extracted text</button></>}
+    </div>
+    <div className="timeline-panel tool-integration-panel">
+      <div className="panel-heading"><strong><Sparkles size={16}/> Generate a motion-graphics composition</strong><span>Prompt → editable HTML/CSS project</span></div>
+      <p className="studio-footnote">Create a self-contained animated title composition from your direction. It is saved as HTML/CSS in a new folder; if Hyperframes is installed, lint and render it to MP4 below. Existing files are never overwritten.</p>
+      <label>Composition title<input value={compositionTitle} onChange={e => setCompositionTitle(e.target.value)} maxLength={160} placeholder="Title for your video"/></label>
+      <label>Creative direction<textarea value={compositionDescription} onChange={e => setCompositionDescription(e.target.value)} rows={3} maxLength={4000} placeholder="Mood, message, pacing, visual style…"/></label>
+      <button className="primary-button" disabled={compositionBusy || !compositionTitle.trim()} onClick={createHyperframesComposition}><Clapperboard size={14}/>{compositionBusy ? 'Creating composition…' : 'Generate Hyperframes composition'}</button>
     </div>
     <div className="timeline-panel tool-integration-panel">
       <div className="panel-heading"><strong><Clapperboard size={16}/> Hyperframes video renderer</strong><span>HTML / CSS / animation → MP4</span></div>
