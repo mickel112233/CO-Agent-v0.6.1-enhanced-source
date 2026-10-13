@@ -59,63 +59,89 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   if (!Number.isFinite(speed) || speed < 0.5 || speed > 2) throw new Error('LuxTTS speed must be between 0.5 and 2.');
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > MAX_TIMEOUT_MS) throw new Error('LuxTTS timeout must be between 1 second and 15 minutes.');
   const reference = path.resolve(referenceAudio);
-  const stat = await fs.stat(reference).catch(() => null);
-  if (!stat?.isFile()) throw new Error('Reference audio must be an existing regular file.');
   const output = path.resolve(outputPath);
   if (path.extname(output).toLowerCase() !== '.wav') throw new Error('LuxTTS output path must end in .wav.');
-  const existingOutput = await fs.lstat(output).catch(() => null);
-  if (existingOutput) throw new Error('LuxTTS will not overwrite an existing file. Choose a new output path.');
-  if (stat.size > 100 * 1024 * 1024) throw new Error('Reference audio exceeds the 100 MB safety limit.');
-  const referenceMetadata = await require('./studio.cjs').probe(reference);
-  const referenceStream = Array.isArray(referenceMetadata?.streams) ? referenceMetadata.streams.find(stream => stream.codec_type === 'audio') : null;
-  const referenceDuration = Number(referenceMetadata?.format?.duration);
-  if (!referenceStream || !Number.isFinite(referenceDuration) || referenceDuration < 0.25 || referenceDuration > 600) throw new Error('Reference audio must contain a playable audio stream between 0.25 seconds and 10 minutes.');
-  await fs.mkdir(path.dirname(output), { recursive: true });
-  const runtime = await status(options);
-  if (!runtime.installed) throw new Error(runtime.message);
   const jobId = String(requestId || '');
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS request ID is missing or invalid.');
-  if (activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
-  return new Promise((resolve, reject) => {
-    const spawnWorker = options.spawn || spawn;
-    const proc = spawnWorker(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
-    let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
-    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (activeJobs.get(jobId) === proc) activeJobs.delete(jobId); error ? reject(error) : resolve(value); };
-    activeJobs.set(jobId, proc);
-    timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
-    proc.stdout.on('data', chunk => {
-      const value = chunk.toString(); stdout = (stdout + value).slice(-100000); lineBuffer += value;
-      const lines = lineBuffer.split(/\r?\n/); lineBuffer = lines.pop() || '';
-      for (const line of lines) { try { const event = JSON.parse(line); if (event?.stage) onProgress({ requestId: jobId, ...event }); } catch {} }
+  const validJobId = /^[A-Za-z0-9_-]{1,100}$/.test(jobId);
+  if (jobId && !validJobId) throw new Error('LuxTTS request ID is missing or invalid.');
+  if (validJobId && activeJobs.has(jobId)) throw new Error('A LuxTTS request with this ID is already running.');
+  const job = validJobId ? { cancelled: false, timedOut: false, proc: null } : null;
+  if (job) activeJobs.set(jobId, job);
+  const throwIfCancelled = () => { if (job?.cancelled) throw new Error('LuxTTS generation cancelled by user.'); };
+  try {
+    const stat = await fs.stat(reference).catch(() => null);
+    if (!stat?.isFile()) throw new Error('Reference audio must be an existing regular file.');
+    throwIfCancelled();
+    const existingOutput = await fs.lstat(output).catch(() => null);
+    if (existingOutput) throw new Error('LuxTTS will not overwrite an existing file. Choose a new output path.');
+    throwIfCancelled();
+    if (stat.size > 100 * 1024 * 1024) throw new Error('Reference audio exceeds the 100 MB safety limit.');
+    const probe = options.probe || require('./studio.cjs').probe;
+    const referenceMetadata = await probe(reference);
+    throwIfCancelled();
+    const referenceStream = Array.isArray(referenceMetadata?.streams) ? referenceMetadata.streams.find(stream => stream.codec_type === 'audio') : null;
+    const referenceDuration = Number(referenceMetadata?.format?.duration);
+    if (!referenceStream || !Number.isFinite(referenceDuration) || referenceDuration < 0.25 || referenceDuration > 600) throw new Error('Reference audio must contain a playable audio stream between 0.25 seconds and 10 minutes.');
+    await fs.mkdir(path.dirname(output), { recursive: true });
+    throwIfCancelled();
+    const runtime = await status(options);
+    throwIfCancelled();
+    if (!validJobId) throw new Error('LuxTTS request ID is missing or invalid.');
+    return await new Promise((resolve, reject) => {
+      const spawnWorker = options.spawn || spawn;
+      const proc = spawnWorker(runtime.python, ['-u', runtime.worker], { cwd: runtime.source, env: { ...process.env, PYTHONPATH: [runtime.source, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+      job.proc = proc;
+      let stdout = '', stderr = '', lineBuffer = '', settled = false, timer;
+      const finish = async (error, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) await fs.rm(output, { force: true }).catch(() => {});
+        if (activeJobs.get(jobId) === job) activeJobs.delete(jobId);
+        error ? reject(error) : resolve(value);
+      };
+      timer = setTimeout(() => {
+        job.timedOut = true;
+        try { proc.kill(); } catch {}
+        finish(new Error('LuxTTS generation timed out after 15 minutes.'));
+      }, timeoutMs);
+      proc.stdout.on('data', chunk => {
+        const value = chunk.toString(); stdout = (stdout + value).slice(-100000); lineBuffer += value;
+        const lines = lineBuffer.split(/\r?\n/); lineBuffer = lines.pop() || '';
+        for (const line of lines) { try { const event = JSON.parse(line); if (event?.stage) onProgress({ requestId: jobId, ...event }); } catch {} }
+      });
+      proc.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8000); });
+      proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
+      proc.once('close', async code => {
+        if (settled) return;
+        if (job.timedOut) { await finish(new Error('LuxTTS generation timed out after 15 minutes.')); return; }
+        if (job.cancelled || proc.__coAgentCancelled) { await finish(new Error('LuxTTS generation cancelled by user.')); return; }
+        let result;
+        try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
+        if (code !== 0 || !result?.ok) { await finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
+        const outStat = await fs.stat(output).catch(() => null);
+        if (!outStat?.isFile() || outStat.size < 44) { await finish(new Error('LuxTTS reported success but no valid WAV output was created.')); return; }
+        let metadata;
+        try { metadata = await probe(output); }
+        catch (error) { await finish(new Error('LuxTTS output failed FFprobe validation: ' + String(error.message || error).slice(0, 800))); return; }
+        const audio = Array.isArray(metadata?.streams) ? metadata.streams.find(stream => stream.codec_type === 'audio') : null;
+        const formatNames = String(metadata?.format?.format_name || '').split(',');
+        const sampleRate = Number(audio?.sample_rate);
+        const duration = Number(metadata?.format?.duration);
+        if (!formatNames.includes('wav') || !audio || audio.codec_name !== 'pcm_s16le' || sampleRate !== 48000 || !Number.isFinite(duration) || duration <= 0) {
+          await finish(new Error('LuxTTS output failed FFprobe validation: expected a playable 48 kHz PCM WAV with a positive duration.'));
+          return;
+        }
+        await finish(null, { ok: true, output, sampleRate, duration, codec: audio.codec_name, verified: true, bytes: outStat.size, model: MODEL_ID });
+      });
+      proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
     });
-    proc.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8000); });
-    proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
-    proc.once('close', async code => {
-      if (settled) return;
-      if (proc.__coAgentCancelled) { finish(new Error('LuxTTS generation cancelled by user.')); return; }
-      let result;
-      try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
-      if (code !== 0 || !result?.ok) { finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
-      const outStat = await fs.stat(output).catch(() => null);
-      if (!outStat?.isFile() || outStat.size < 44) { finish(new Error('LuxTTS reported success but no valid WAV output was created.')); return; }
-      let metadata;
-      try { metadata = await require('./studio.cjs').probe(output); }
-      catch (error) { await fs.rm(output, { force: true }).catch(() => {}); finish(new Error('LuxTTS output failed FFprobe validation: ' + String(error.message || error).slice(0, 800))); return; }
-      const audio = Array.isArray(metadata?.streams) ? metadata.streams.find(stream => stream.codec_type === 'audio') : null;
-      const formatNames = String(metadata?.format?.format_name || '').split(',');
-      const sampleRate = Number(audio?.sample_rate);
-      const duration = Number(metadata?.format?.duration);
-      if (!formatNames.includes('wav') || !audio || audio.codec_name !== 'pcm_s16le' || sampleRate !== 48000 || !Number.isFinite(duration) || duration <= 0) {
-        await fs.rm(output, { force: true }).catch(() => {});
-        finish(new Error('LuxTTS output failed FFprobe validation: expected a playable 48 kHz PCM WAV with a positive duration.'));
-        return;
-      }
-      finish(null, { ok: true, output, sampleRate, duration, codec: audio.codec_name, verified: true, bytes: outStat.size, model: MODEL_ID });
-    });
-    proc.stdin.end(JSON.stringify({ text: input, referenceAudio: reference, outputPath: output, numSteps, speed }));
-  });
+  } catch (error) {
+    if (job && activeJobs.get(jobId) === job) activeJobs.delete(jobId);
+    if (job?.cancelled) throw new Error('LuxTTS generation cancelled by user.');
+    throw error;
+  }
 }
-
 function cancelSetup(requestId) {
   const job = activeSetupJobs.get(String(requestId || ''));
   if (!job) return { ok: true, cancelled: false };
@@ -126,12 +152,15 @@ function cancelSetup(requestId) {
 
 function cancel(requestId) {
   const id = String(requestId || '');
-  const proc = activeJobs.get(id);
-  if (!proc) return { ok: true, cancelled: false };
-  try { proc.__coAgentCancelled = true; proc.kill(); return { ok: true, cancelled: true }; }
-  catch (error) { return { ok: false, cancelled: false, error: String(error.message || error) }; }
+  const job = activeJobs.get(id);
+  if (!job) return { ok: true, cancelled: false };
+  job.cancelled = true;
+  if (job.proc) {
+    try { job.proc.__coAgentCancelled = true; job.proc.kill(); }
+    catch (error) { return { ok: false, cancelled: false, error: String(error.message || error) }; }
+  }
+  return { ok: true, cancelled: true };
 }
-
 function runSetupCommand(file, args, options, onProgress) {
   return new Promise((resolve, reject) => {
     const { jobId, activeSetupJobs: jobs, ...spawnOptions } = options;
