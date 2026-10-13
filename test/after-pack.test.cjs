@@ -51,4 +51,9 @@ test('packaged smoke mode checks renderer, pet assets/licenses, and critical IPC
   assert.match(main, /studio:render-timeline/);
   assert.match(workflow, /Smoke-test standalone ZIP package/);
   assert.match(workflow, /Install and smoke-test NSIS installer/);
+  const pkg = JSON.parse(await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const extra = pkg.build.extraResources;
+  assert.ok(extra.some(item => item.from === 'integrations/AI-Desktop-Pet/LICENSE' && item.to === 'pet-assets/LICENSE'));
+  assert.ok(extra.some(item => item.from === 'integrations/AI-Desktop-Pet/licenses' && item.to === 'pet-assets/licenses'));
+  assert.ok(extra.some(item => item.from === 'THIRD-PARTY-NOTICES.md' && item.to === 'THIRD-PARTY-NOTICES.txt'));
 });
