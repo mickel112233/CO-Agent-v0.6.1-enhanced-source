@@ -24,6 +24,7 @@ export default function Agents() {
   const [selectedExternalSkills, setSelectedExternalSkills] = useState(() => readSavedState('co-agent:agent-external-skills', []));
   const [workflow, setWorkflow] = useState(() => readSavedState('co-agent:agent-workflow', null));
   const [busy, setBusy] = useState('');
+  const [activeStepRequestId, setActiveStepRequestId] = useState('');
   const [notice, setNotice] = useState('');
   const [agentCatalog, setAgentCatalog] = useState({ agents: [], skills: [] });
   const [results, setResults] = useState(() => readSavedState('co-agent:agent-results', {}));
@@ -139,6 +140,8 @@ export default function Agents() {
     if (!workflow || busy) return;
     const pendingDependencies = (step.dependsOn || []).filter(id => workflow.pipeline.find(item => item.id === id)?.status !== 'done');
     if (pendingDependencies.length) { setNotice('Complete the prerequisite steps first.'); return; }
+    const requestId = 'agent-step-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    setActiveStepRequestId(requestId);
     setBusy(step.id); setNotice('Running ' + step.role + ' agent with the ' + step.skill + ' skill…');
     setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'running' } : item) }));
     try {
@@ -157,7 +160,7 @@ export default function Agents() {
         if (loadedSkills?.ok === false || loadedSkills?.error) throw new Error(loadedSkills.error || 'Could not load selected repository skills.');
         externalSkills = Array.isArray(loadedSkills) ? loadedSkills : [];
       }
-      const result = await desktop.agents.runStep({ goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
+      const result = await desktop.agents.runStep({ requestId, goal: workflow.goal, step, priorResults, contextFiles, externalSkills, model });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Agent step failed.');
       if (result.files?.length) {
         result.files = await Promise.all(result.files.map(async file => {
@@ -173,7 +176,17 @@ export default function Agents() {
     } catch (error) {
       setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'blocked', result: errorText(error) } : item) }));
       setNotice(errorText(error));
-    } finally { setBusy(''); }
+    } finally { setBusy(''); setActiveStepRequestId(''); }
+  };
+
+  const cancelActiveStep = async () => {
+    const requestId = activeStepRequestId;
+    if (!requestId) return;
+    try {
+      const result = await desktop.agents.cancelStep(requestId);
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Could not cancel agent step.');
+      setNotice(result?.cancelled ? 'Cancelling the active agent step…' : 'The agent step is no longer running.');
+    } catch (error) { setNotice(errorText(error)); }
   };
 
   const applyProposals = async stepId => {
@@ -263,7 +276,7 @@ export default function Agents() {
                 {step.dependsOn?.length > 0 && <small className="agents-dependencies">Depends on: {step.dependsOn.join(', ')}</small>}
                 {step.status === 'review' && result && <div className="agents-checkpoint"><strong><ShieldCheck size={14}/> Review checkpoint</strong>{step.acceptanceCriteria?.length ? <ul>{step.acceptanceCriteria.map((criterion, criterionIndex) => <li key={criterionIndex}><label><input type="checkbox" checked={(result.reviewChecks || []).includes(criterionIndex)} onChange={event => toggleCriterion(step.id, criterionIndex, event.target.checked)}/><span>{criterion}</span></label></li>)}</ul> : <p>Review the summary, findings, risks, and any proposed changes before confirming this step.</p>}<button className="primary-button" disabled={!!busy || (step.acceptanceCriteria || []).some((_, criterionIndex) => !(result.reviewChecks || []).includes(criterionIndex))} onClick={() => confirmCheckpoint(step.id)}><ShieldCheck size={13}/> Confirm checkpoint &amp; unlock next step</button></div>}
                 <div className="agents-step-actions">
-                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>
+                  <button className="secondary-button" disabled={!!busy || step.status === 'running' || blockedBy.length > 0} onClick={() => runStep(step)}><Play size={13}/>{busy === step.id ? 'Running…' : step.status === 'done' ? 'Run again' : 'Run agent step'}</button>{busy === step.id && activeStepRequestId && <button className="secondary-button" onClick={cancelActiveStep}>Cancel agent</button>}
                   {result && <button className="text-link" onClick={() => setActiveResult(activeResult === step.id ? '' : step.id)}>{activeResult === step.id ? 'Hide result' : 'View result'}</button>}
                   {blockedBy.length > 0 && <small>Finish dependencies first</small>}
                 </div>
