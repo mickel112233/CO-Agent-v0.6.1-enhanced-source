@@ -10,7 +10,7 @@
     "start": "npm run build && node electron/launch-local.cjs",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux AppImage",
-    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:win": "npm run build && electron-builder --win nsis zip",
     "dist:mac": "npm run build && electron-builder --mac dmg",
     "test": "node --test --test-concurrency=1 test/*.test.cjs",
     "build:pet:win": "npm ci --prefix integrations/AI-Desktop-Pet && npm run build --prefix integrations/AI-Desktop-Pet && cargo build --release --manifest-path integrations/AI-Desktop-Pet/src-tauri/Cargo.toml",
