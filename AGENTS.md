@@ -9,6 +9,7 @@ Read this file before changing code. It is a fast orientation guide for coding a
 - Stack: Electron + React + Vite, local Ollama chat/model management, FFmpeg/FFprobe media helpers, optional Tesseract OCR, optional Hyperframes CLI.
 - This branch is a **reconstruction**, not a byte-for-byte restoration of the recovered archive. Consult [RESTORE-ROADMAP.md](../RESTORE-ROADMAP.md) before describing completeness.
 - Never claim a test/build passed unless you ran it or the GitHub Actions run is green.
+- Read [PROJECT-CONTEXT-FROM-CHAT.md](PROJECT-CONTEXT-FROM-CHAT.md) for imported user requirements and the prioritized pending-work checklist; treat it as intent/planning, not implementation evidence.
 
 ## Repository map
 
