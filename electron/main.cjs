@@ -150,8 +150,7 @@ function registerIpc() {
       if ((payload?.provider || 'ollama') === 'ollama') return await ollamaChat(payload, controller.signal);
       const provider = payload.providerConfig;
       if (!provider || !['openai','anthropic','gemini'].includes(provider.protocol)) throw new Error('Choose a supported API provider and configure its endpoint/model.');
-      const answer = await agentRuntime.readOnlySubagent(provider, payload.apiKey || '', { name: 'CO-Agent', instructions: 'Answer the user accurately and clearly.' }, { title: 'User conversation', prompt: (payload.messages || []).map(m => (m.role || 'user') + ': ' + (m.content || '')).join('\n').slice(-12000) }, fetch, controller.signal);
-      return { ok: true, model: provider.model, message: answer };
+      return await agentRuntime.chatWithProvider(provider, payload.apiKey || '', payload.messages || [], fetch, controller.signal);
     } finally { activeChatRequests.delete(requestId); }
   });
   handle('computer:allowed-apps', () => computer.allowedApps);
