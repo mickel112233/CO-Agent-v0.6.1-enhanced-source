@@ -74,7 +74,7 @@
 - [x] Provider adapters validate protocol/configuration and surface connection errors; stream parser tests and Video Studio provider tests cover wiring. A live credential-backed smoke test is intentionally not claimed.
 - [ ] Verify keyboard navigation, focus management, accessible status/progress, responsive layout, and no blank/white screen in packaged builds.
 - [ ] Run a clean Windows install → launch → setup → chat → pet → media export → upgrade/repair → uninstall smoke test. CI now builds and packages the actual pet executable, checks required assets/licenses, starts the app from ZIP and NSIS install, and uninstalls; interactive setup/chat/pet/media and upgrade/repair acceptance still require a desktop session.
-- [ ] Attach passing CI logs and artifact links to a versioned GitHub Release; run dependency audit and document each accepted finding. Workflow artifacts are not a published signed release.
+- [ ] Attach passing CI logs and artifact links to a versioned GitHub Release; review dependency-audit report findings and document any accepted exceptions. Both CI and Windows-download workflows generate and upload an npm audit JSON report; audit findings have not yet been reviewed or signed off.
 - [x] README streaming and Computer Use limitation claims reconciled with the current implementation; CI still needs to pass on the updated head.
 
 ## External verification limits

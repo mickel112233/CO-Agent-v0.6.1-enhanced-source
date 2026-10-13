@@ -26,6 +26,9 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Generate dependency audit report
+        run: npm audit --json > npm-audit-report.json
+        continue-on-error: true
       - name: Run tests
         run: npm test
       - name: Build renderer
@@ -54,6 +57,14 @@ jobs:
         run: npx electron-builder --win nsis zip --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ matrix.os }}-${{ github.sha }}
+          path: npm-audit-report.json
+          if-no-files-found: warn
+
       - name: Verify release artifacts
         if: runner.os == 'Windows'
         run: npm run verify:release

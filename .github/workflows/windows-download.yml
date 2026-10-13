@@ -31,7 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run automated tests
+      - name: Generate dependency audit report
+        run: npm audit --json > npm-audit-report.json
+        continue-on-error: true
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ github.sha }}
+          path: npm-audit-report.json
+          if-no-files-found: warn
+
         run: npm test
 
       - name: Build renderer
