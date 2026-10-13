@@ -65,23 +65,28 @@ test('LuxTTS cancellation removes partial output and never reports a cancelled j
   await fs.writeFile(worker, '# test worker');
   await fs.writeFile(python, 'test python');
   await fs.writeFile(reference, Buffer.from('RIFF0000WAVE'));
+  let spawnResolve;
+  const spawnStarted = new Promise(resolve => { spawnResolve = resolve; });
   const child = new EventEmitter();
   child.exitCode = null;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.stdin = { end(payload) { const request = JSON.parse(payload); fsSync.writeFileSync(request.outputPath, 'partial output'); } };
   child.kill = () => { child.exitCode = 1; queueMicrotask(() => child.emit('close', 1)); return true; };
+  let pending;
   try {
-    const pending = lux.generate(
+    pending = lux.generate(
       { text: 'hello', referenceAudio: reference, outputPath: output, requestId: 'voice-cancel-test' },
-      { appPath: dir, resourcesPath: path.join(dir, 'resources'), userDataPath, spawn: () => child }
+      { appPath: dir, resourcesPath: path.join(dir, 'resources'), userDataPath, spawn: () => { spawnResolve(); return child; } }
     );
-    await new Promise(resolve => setImmediate(resolve));
+    await spawnStarted;
     assert.deepEqual(lux.cancel('voice-cancel-test'), { ok: true, cancelled: true });
     await assert.rejects(pending, /cancelled by user/i);
     await assert.rejects(fs.stat(output), { code: 'ENOENT' });
     assert.deepEqual(lux.cancel('voice-cancel-test'), { ok: true, cancelled: false });
   } finally {
+    lux.cancel('voice-cancel-test');
+    if (pending) await pending.catch(() => {});
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
