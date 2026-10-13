@@ -167,3 +167,9 @@ test('LuxTTS rejects invalid worker output and only returns verified WAV metadat
     await assert.rejects(() => fs.stat(badPath), { code: 'ENOENT' });
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('voiceover UI requires FFprobe readiness before enabling generation', async () => {
+  const source = await fs.readFile(path.join(__dirname, '..', 'src', 'TimelineEditor.jsx'), 'utf8');
+  assert.match(source, /ffprobeReady: Boolean\(capabilities\?\.ffprobe\)/);
+  assert.match(source, /!voiceStatus\.ffprobeReady/);
+});
