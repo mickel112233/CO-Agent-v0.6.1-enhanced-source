@@ -250,6 +250,27 @@ export default function App() {
     finally { setBusy(false); }
   }
 
+  function canonicalModelName(value) {
+    const name = String(value || '').trim().toLowerCase();
+    if (!name) return '';
+    const lastSlash = name.lastIndexOf('/');
+    const colon = name.lastIndexOf(':');
+    return colon > lastSlash ? name : name + ':latest';
+  }
+
+  async function verifyModelReady(model) {
+    const status = await desktop.runtime.ollamaStatus();
+    if (!status?.available) throw new Error('Ollama stopped responding after the download. Restart Ollama and check the model list before retrying.');
+    const expected = canonicalModelName(model);
+    const installed = Array.isArray(status.models) ? status.models : [];
+    const found = installed.some(item => canonicalModelName(item?.name || item?.model) === expected);
+    if (!found) {
+      const names = installed.map(item => item?.name || item?.model).filter(Boolean);
+      throw new Error('Ollama finished the pull but did not list ' + model + ' as installed. ' + (names.length ? 'Installed models: ' + names.join(', ') : 'No installed models were reported.') + ' Refresh the model list and retry if needed.');
+    }
+    return status;
+  }
+
   async function installSetupModel(model) {
     const requestId = 'model-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     setActiveModelPullId(requestId); setModelToInstall(model); setBusy(true);
@@ -258,7 +279,8 @@ export default function App() {
     try {
       const result = await desktop.runtime.pullModel({ model, requestId });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Model download failed.');
-      setSelectedModel(model); setNotice('Model is ready: ' + model);
+      await verifyModelReady(model);
+      setSelectedModel(model); setNotice('Model is ready and confirmed in Ollama: ' + model);
       await refreshRuntime();
     } catch (error) { const message = error.message || String(error); setNotice(/cancel/i.test(message) ? 'Model download cancelled. You can resume it later.' : 'Model setup failed: ' + message + '. You can retry; Ollama may resume existing layers.'); }
     finally { setBusy(false); setActiveModelPullId(''); }
@@ -282,7 +304,8 @@ export default function App() {
     try {
       const result = await desktop.runtime.pullModel({ model: modelToInstall.trim(), requestId });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Model download failed.');
-      setNotice('Model download completed: ' + modelToInstall.trim());
+      await verifyModelReady(modelToInstall.trim());
+      setNotice('Model download completed and Ollama confirmed it is installed: ' + modelToInstall.trim());
       setDownloadProgress({ model: modelToInstall.trim(), status: 'Success', percent: 100, completed: 0, total: 0 });
       setSelectedModel(modelToInstall.trim());
       await refreshRuntime();
