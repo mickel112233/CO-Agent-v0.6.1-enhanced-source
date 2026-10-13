@@ -21,6 +21,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   const [assets, setAssets] = useState([]);
   const [captionText, setCaptionText] = useState('Your title here');
   const [busy, setBusy] = useState('');
+  const renderRequestRef = useRef('');
   const [notice, setNotice] = useState('');
   const [outputDir, setOutputDir] = useState('');
   const [filename, setFilename] = useState('co-agent-timeline.mp4');
@@ -308,16 +309,29 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
     finally { setBusy(''); }
   }
   async function exportTimeline() {
-    setBusy('render'); setNotice('');
+    if (!project.clips.length) return;
+    let dir = outputDir;
+    if (!dir) { dir = await desktop.dialog.chooseDirectory(); if (!dir) return; setOutputDir(dir); }
+    const requestId = 'timeline-render-' + Date.now().toString(36);
+    renderRequestRef.current = requestId;
+    setBusy('render'); setNotice('Rendering and verifying MP4…');
     try {
-      let dir = outputDir;
-      if (!dir) { dir = await desktop.dialog.chooseDirectory(); if (!dir) return; setOutputDir(dir); }
-      const result = await desktop.studio.renderTimeline({ project, outputDir: dir, filename });
-      if (result?.ok === false || result?.error) throw new Error(result.error || 'Render failed.');
-      setNotice('Render complete: ' + result.output + ' (' + result.duration.toFixed(1) + ' sec).');
-    } catch (error) { setNotice(error.message || String(error)); }
-    finally { setBusy(''); }
+      const result = await desktop.studio.renderTimeline({ project, outputDir: dir, filename, requestId });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Timeline render failed.');
+      setNotice('Export verified: ' + result.output + ' (' + (result.fileSize / 1e6).toFixed(1) + ' MB)');
+    } catch (error) {
+      setNotice(/cancel/i.test(error.message || '') ? 'Export cancelled. Any partial output was removed; existing exports were preserved.' : 'Export failed: ' + (error.message || String(error)));
+    } finally { renderRequestRef.current = ''; setBusy(''); }
   }
+  async function cancelTimelineExport() {
+    const requestId = renderRequestRef.current;
+    if (!requestId) return;
+    try {
+      const result = await desktop.studio.cancelTimelineRender(requestId);
+      setNotice(result?.cancelled ? 'Stopping export…' : 'No active export was found.');
+    } catch (error) { setNotice('Could not cancel export: ' + (error.message || String(error))); }
+  }
+
   const previewUrl = selected?.file ? (selected.file.startsWith('file:') ? selected.file : 'file://' + selected.file.replace(/\\/g, '/')) : '';
   const PreviewIcon = selected?.type === 'audio' ? Music2 : selected?.type === 'image' ? Image : Film;
 
@@ -353,7 +367,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       {generationProgress && <p className="tool-hint" role="status">{generationProgress}</p>}
       <div className="export-row"><label>Sound effect<select value={soundPreset} onChange={e => setSoundPreset(e.target.value)}><option value="impact">Impact / hit</option><option value="sweep">Rising sweep</option><option value="ambient">Soft ambient noise</option><option value="beep">UI notification</option></select></label><label>Duration (seconds)<input type="number" min="0.25" max="12" step="0.25" value={soundDuration} onChange={e => setSoundDuration(Math.max(0.25, Math.min(12, Number(e.target.value) || 2)))}/></label><button className="secondary-button" disabled={!!busy} onClick={generateSoundEffect}><Sparkles size={14}/>{busy === 'sound' ? 'Generating…' : 'Generate SFX & add to timeline'}</button></div>
     </div>
-    <div className="timeline-export"><div><strong>Export timeline</strong><p>FFmpeg renders video/image overlays and title cards, plus audio clips on the Audio 1 track. This is a functional editor foundation; transitions, keyframes, color grading, and waveform rendering are not included yet.</p></div><div className="timeline-export-controls"><label>Filename<input value={filename} onChange={e => setFilename(e.target.value)} /></label><button className="secondary-button" onClick={async () => { const dir = await desktop.dialog.chooseDirectory(); if (dir) setOutputDir(dir); }}><FolderOpen size={14}/>{outputDir ? baseName(outputDir) : 'Output folder'}</button><button className="primary-button" disabled={!!busy || !project.clips.length} onClick={exportTimeline}><Download size={14}/>{busy === 'render' ? 'Rendering…' : 'Render MP4'}</button></div></div>
+    <div className="timeline-export"><div><strong>Export timeline</strong><p>FFmpeg renders video/image overlays and title cards, plus audio clips on the Audio 1 track. This is a functional editor foundation; transitions, keyframes, color grading, and waveform rendering are not included yet.</p></div><div className="timeline-export-controls"><label>Filename<input value={filename} onChange={e => setFilename(e.target.value)} /></label><button className="secondary-button" onClick={async () => { const dir = await desktop.dialog.chooseDirectory(); if (dir) setOutputDir(dir); }}><FolderOpen size={14}/>{outputDir ? baseName(outputDir) : 'Output folder'}</button><button className="primary-button" disabled={!!busy || !project.clips.length} onClick={exportTimeline}><Download size={14}/>{busy === 'render' ? 'Rendering…' : 'Render MP4'}</button>{busy === 'render' && <button className="secondary-button" onClick={cancelTimelineExport}>Cancel export</button>}</div></div>
     {notice && <p className="studio-notice" role="status">{notice}</p>}
     <p className="computer-footnote">Project files store source paths, trim points, track assignment, captions, and timeline positions. Media remains in its original location; keep source files available when reopening a project.</p>
   </section>;

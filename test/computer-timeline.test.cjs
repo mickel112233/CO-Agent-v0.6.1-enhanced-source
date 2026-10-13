@@ -46,6 +46,10 @@ test('timeline projects save and load only the explicit CO-Agent project format'
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
 
+test('timeline export cancellation reports unknown requests safely', () => {
+  assert.deepEqual(timeline.cancelRender('missing-render'), { ok: true, cancelled: false });
+});
+
 test('export verification rejects missing video streams and invalid duration metadata', () => {
   assert.deepEqual(timeline.validateExportMetadata({ format: { duration: '12.5' }, streams: [{ codec_type: 'video' }, { codec_type: 'audio' }] }, 2048), { duration: 12.5, hasAudio: true, size: 2048 });
   assert.throws(() => timeline.validateExportMetadata({ format: { duration: '0' }, streams: [{ codec_type: 'video' }] }, 2048), /duration/i);

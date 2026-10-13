@@ -49,7 +49,7 @@
 - [ ] Generate LuxTTS voiceover using a real reference audio fixture and verify the WAV with FFprobe before adding it to the timeline.
 - [ ] Generate each sound-effect preset and verify duration, sample rate, channels, and WAV readability.
 - [x] Added a deterministic integration test that generates a video fixture and SFX, exports an MP4, checks video/audio streams and duration, and decodes the export. A real Windows run is still required for final acceptance.
-- [ ] Verify export cancellation, cleanup of partial files, preservation of a prior export, error messages, and output-path collisions.
+- [x] Timeline export supports request-scoped cancellation, renders to a unique temporary file, verifies before publishing, cleans partial output, and refuses to overwrite an existing export. CI tests the cancellation endpoint; packaged media acceptance remains.
 - [ ] Add timeline media fixture regression tests; a helper/unit test or source inspection is not an end-to-end export.
 
 ## P1 — secure imports and integrations

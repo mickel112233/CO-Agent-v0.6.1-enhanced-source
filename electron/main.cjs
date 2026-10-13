@@ -253,7 +253,8 @@ function registerIpc() {
   handle('studio:generate-sound-effect', args => studio.generateSoundEffect(args));
   handle('studio:save-project', args => timeline.saveProject(args?.path, args?.project));
   handle('studio:load-project', args => timeline.loadProject(args?.path));
-  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename));
+  handle('studio:render-timeline', args => timeline.render(args?.project, args?.outputDir, args?.filename, args?.requestId));
+  handle('studio:cancel-timeline-render', requestId => timeline.cancelRender(requestId));
   handle('studio:ocr-status', () => ocr.getStatus());
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
