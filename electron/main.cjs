@@ -12,6 +12,7 @@ const studio = require('./studio.cjs');
 const timeline = require('./timeline.cjs');
 const piper = require('./piper.cjs');
 const petRuntime = require('./pet-runtime.cjs');
+const { createPetOverlay } = require('./pet-overlay.cjs');
 const luxTTS = require('./luxtts.cjs');
 const agentRuntime = require('./agent-runtime.cjs');
 const agentOrchestrator = require('./agent-orchestrator.cjs');
@@ -26,6 +27,7 @@ const auditModule = require('./audit-log.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
+let petOverlay;
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
@@ -283,6 +285,9 @@ function registerIpc() {
   handle('integrations:get-skills', slugs => integrations.getSkillContents(slugs, app.getPath('userData')));
   handle('integrations:install-repo', args => integrations.installRepo(args, app.getPath('userData')));
   handle('integrations:remove-repo', slug => integrations.removeRepo(slug, app.getPath('userData')));
+  handle('pet:show-overlay', () => { petOverlay?.show(); return { ok: true, visible: !!petOverlay?.isVisible() }; });
+  handle('pet:hide-overlay', () => { petOverlay?.hide(); return { ok: true, visible: false }; });
+  handle('pet:toggle-overlay', () => { petOverlay?.toggle(); return { ok: true, visible: !!petOverlay?.isVisible() }; });
   handle('pet:status', () => petRuntime.status({ appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }));
   handle('pet:launch', async () => {
     if (!await confirmComputerAction('Launch the CO-Agent desktop pet?', 'This starts the separately built AI-Desktop-Pet desktop application. It receives no chat history or API keys from CO-Agent.')) throw new Error('Desktop pet launch cancelled by user.');
@@ -354,7 +359,9 @@ app.whenReady().then(async () => {
   } catch {}
   registerIpc();
   createWindow();
+  petOverlay = createPetOverlay({ onMessage: text => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pet:incoming-message', { text }); } });
+  petOverlay.show();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => { petRuntime.stop(); });
+app.on('before-quit', () => { petRuntime.stop(); petOverlay?.destroy(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
