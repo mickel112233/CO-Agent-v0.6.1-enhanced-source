@@ -130,6 +130,14 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
     assert.equal(windows[0].options.webPreferences.sandbox, true);
     assert.equal(windows[0].options.webPreferences.nodeIntegration, false);
     windows[0].bounds = { x: 990, y: 790, width: 340, height: 240 };
+    windows[0].emit('move');
+    windows[0].bounds = { x: 500, y: 400, width: 330, height: 230 };
+    windows[0].emit('resize');
+    await overlay.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(prefs, 'utf8')).bounds, windows[0].bounds);
+    screen.emit('display-metrics-changed');
+    screen.emit('display-added', display);
+    windows[0].bounds = { x: 990, y: 790, width: 340, height: 240 };
     screen.emit('display-removed');
     assert.ok(windows[0].bounds.x + windows[0].bounds.width <= 992);
     assert.ok(windows[0].bounds.y + windows[0].bounds.height <= 792);
@@ -142,6 +150,14 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
     assert.equal(overlay.isVisible(), true);
     overlay.destroy();
     await overlay.flush();
+    const restarted = createPetOverlay({ app, BrowserWindow: FakeWindow, screen, fs: require('node:fs/promises'), preloadPath: path.join(dir, 'preload.cjs') });
+    const afterRestart = await restarted.restore();
+    assert.equal(afterRestart.visible, true, 'visible pet should restore after application restart');
+    assert.equal(restarted.isVisible(), true);
+    restarted.hide();
+    await restarted.flush();
+    restarted.destroy();
+    await restarted.flush();
   } finally {
     overlay.destroy();
     fs.rmSync(dir, { recursive: true, force: true });

@@ -38,7 +38,7 @@
 - [x] Upstream pet license/attribution and referenced asset filenames are documented; license and notice resources are included in package configuration. The Windows package workflow checks the executable, sprite, and license paths. Full interactive asset rendering remains a manual acceptance item.
 - [ ] Exercise overlay launch, hide/show, close, tray menu, dragging, resize, saved coordinates, restart restoration, display add/remove, DPI scaling, and off-screen recovery in a Windows desktop session.
 - [x] Pet messages now subscribe once for the renderer lifetime, acknowledge the queue only after subscribing, and route through the same normal chat send/provider/cancellation/approval path; while busy, requests are placed in the composer instead of duplicated or lost. Desktop-session acceptance remains.
-- [ ] Verify pet executable discovery, duplicate launch handling, missing binary, crash/restart, clean install, upgrade, and uninstall.
+- [x] Automated tests cover fixed executable discovery paths, missing-binary messaging, duplicate-launch prevention, and recovery after an unexpected child exit. Windows CI verifies packaged executable presence and clean install/start/uninstall; upgrade/repair and interactive desktop acceptance remain manual.
 - [x] Added a behavioral pet-overlay test with injected fake Electron windows/screens and a temporary preferences file; it checks restore, sandbox settings, display clamping, visibility persistence, show/hide, and teardown. Actual desktop-session acceptance remains.
 - [x] Windows CI builds the pet executable and packages it into NSIS and ZIP; the ZIP smoke test checks executable and sprite/license resources, and the installed-app smoke test checks startup. Latest CI result is the gate.
 

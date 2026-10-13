@@ -56,3 +56,30 @@ test('pet launch fails clearly until its Tauri executable is packaged', async ()
     await assert.rejects(() => pet.launch({ platform: 'win32', appPath: dir, resourcesPath: path.join(dir, 'none') }), /not built yet/);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('pet runtime can relaunch after an unexpected child-process exit', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-pet-crash-'));
+  const exe = path.join(dir, 'pet', 'convai-desktop-pet.exe');
+  await fs.mkdir(path.dirname(exe), { recursive: true });
+  await fs.writeFile(exe, 'test executable placeholder');
+  const children = [];
+  const spawn = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.kill = () => { child.exitCode = 0; child.emit('exit', 0); return true; };
+    children.push(child);
+    queueMicrotask(() => child.emit('spawn'));
+    return child;
+  };
+  const options = { platform: 'win32', appPath: dir, resourcesPath: dir, spawn };
+  try {
+    await pet.launch(options);
+    children[0].exitCode = 1;
+    children[0].emit('exit', 1);
+    assert.equal((await pet.status(options)).running, false);
+    const restarted = await pet.launch(options);
+    assert.equal(restarted.alreadyRunning, false);
+    assert.equal(children.length, 2);
+    pet.stop();
+  } finally { pet.stop(); await fs.rm(dir, { recursive: true, force: true }); }
+});
