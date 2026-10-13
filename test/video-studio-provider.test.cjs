@@ -1,0 +1,22 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+const root = path.join(__dirname, '..');
+
+test('Video Studio passes the selected local or API provider into chat-driven timeline planning', async () => {
+  const app = await fs.readFile(path.join(root, 'src', 'App.jsx'), 'utf8');
+  const video = await fs.readFile(path.join(root, 'src', 'VideoEditor.jsx'), 'utf8');
+  const timeline = await fs.readFile(path.join(root, 'src', 'TimelineEditor.jsx'), 'utf8');
+
+  assert.match(app, /<VideoEditor chatConfig=\{chatProvider === 'ollama'/);
+  assert.match(app, /providerConfig: \{ protocol: apiProtocol, baseUrl: apiBaseUrl\.trim\(\), model: apiModel\.trim\(\) \}, apiKey: apiKey\.trim\(\)/);
+  assert.match(video, /function VideoEditor\(\{ chatConfig = \{ provider: 'ollama' \} \}\)/);
+  assert.match(video, /<TimelineEditor chatConfig=\{chatConfig\}/);
+  assert.match(timeline, /chatConfig\?\.provider === 'api' \? 'api' : 'ollama'/);
+  assert.match(timeline, /providerConfig: chatConfig\.providerConfig, apiKey: chatConfig\.apiKey/);
+  assert.match(timeline, /model: String\(chatConfig\?\.model \|\| ''\)\.trim\(\)/);
+  assert.match(timeline, /Add your Cloud API key in Models & settings/);
+});
