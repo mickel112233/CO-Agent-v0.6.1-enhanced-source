@@ -147,3 +147,15 @@ test('pet overlay restores saved visibility and bounds, clamps display changes, 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('pet animation frames and upstream license notices exist in the pinned submodule', () => {
+  const petRoot = path.join(root, 'integrations', 'AI-Desktop-Pet');
+  const assets = path.join(petRoot, 'public', 'assets', 'albedo');
+  for (const frame of ['id1_1.png', 'id2_1.png', 'walk1.png', 'walk2.png', 'walk3.png']) {
+    assert.ok(fs.statSync(path.join(assets, frame)).isFile(), 'missing pet animation frame ' + frame);
+  }
+  assert.ok(fs.statSync(path.join(petRoot, 'LICENSE')).isFile(), 'upstream root license is required');
+  for (const notice of ['licence.txt', 'originallicense.txt', 'ライセンス.txt']) {
+    assert.ok(fs.statSync(path.join(petRoot, 'licenses', notice)).isFile(), 'missing upstream license notice ' + notice);
+  }
+});

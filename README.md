@@ -29,7 +29,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | Multi-agent workflows | Local-model task planner, sixteen specialist roles, dependency-aware pipeline, reviewer/tester steps, structured results, and twenty-six built-in skills | Each step is started by the user; local Ollama required; agent file proposals require separate approval |
 | Workspace file tools | Select a project folder, browse/read context files, preview model-proposed full-file changes, and back up existing files before applying | Only selected files are sent to the local model; path traversal, symlinks, common secret files, and protected build/dependency folders are blocked |
 | In-app terminal | Run project tests, renderer build, Git status/diff check, and dependency audit with live output | Fixed command presets only; native confirmation each run; project scripts still execute with your user permissions |
-| Model management | Pull, list, and remove Ollama models | Downloads can be large; pull progress is not fully surfaced |
+| Model management | Pull, list, and remove Ollama models | Downloads can be large; progress and cancellation are shown when Ollama supports them |
 | Video Studio | Multi-track timeline, captions, clip trim/split/move, project save/load, FFmpeg render, and reviewable Ollama-planned timeline edits | AI edit plans require explicit Apply; no transitions, keyframes, waveform editing, advanced color tools, or full original timeline parity |
 | Image text extraction | Local Tesseract OCR for PNG/JPEG/TIFF/BMP/WebP | Optional Tesseract installation and language data |
 | HTML-to-video | Hyperframes lint, preview, and MP4 rendering | Optional external Hyperframes CLI and FFmpeg |
@@ -69,7 +69,7 @@ npm run build
 npm run dev
 ```
 
-Start Ollama separately and install a model, for example:
+Start Ollama separately and install a model, for example `qwen2.5:1.5b` for a smaller starting point or `gemma3:4b` for a larger model:
 
 ```bash
 ollama pull gemma3:4b
@@ -120,7 +120,7 @@ Open **Computer Use** from the sidebar to capture your desktop, inspect top-leve
 
 Video Studio opens the timeline editor first. Import local video, audio, and image files, add assets to video/audio tracks, add title/caption clips, adjust source in-points and durations, move clips, split at the playhead, save/load `.coagent-project.json` project files, and render an MP4 through the bundled FFmpeg runtime when available.
 
-The current renderer composites video and image clips on the timeline and mixes audio clips on the dedicated audio track. Source media stays where it is; project files store paths rather than copying all media into a project package. Keep source files available when reopening a project. This is a practical timeline MVP, not a claim of parity with Premiere/DaVinci or the recovered original editor: transitions, keyframes, effects, automatic captions/transcription, audio waveforms, undo/redo, and advanced color grading are still not implemented.
+The current renderer composites video and image clips on the timeline and mixes audio clips on the dedicated audio track. Source media stays where it is; project files store paths rather than copying all media into a project package. Keep source files available when reopening a project. This is a practical timeline MVP, not a claim of parity with Premiere/DaVinci or the recovered original editor: transitions, keyframes, effects, automatic transcription/captions, audio waveforms, and advanced color grading are still not implemented; undo/redo is available for project edits.
 
 ## 🧩 Integrations & optional tools
 
@@ -280,7 +280,7 @@ A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`
 
 - Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
 - Computer Use is a Windows-only, one-action-at-a-time MVP; it has screenshot-grounded planning and model-assisted verification helpers, but no autonomous action loop. Verify the visible result manually before continuing.
-- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
+- The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, advanced effects, and automatic transcription/captions are not yet implemented; undo/redo is available.
 - Chat streams text incrementally for supported local/API providers. Stream completion can still be interrupted by provider/network failures; incomplete responses are marked. Ollama model-pull progress is surfaced when the server reports it.
 - The multi-track editor is not yet a full professional NLE; see the video-editor limitations above.
 - Full API-provider configuration/credential management is incomplete.
