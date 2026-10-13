@@ -8,7 +8,9 @@ const integrations = require('../electron/integrations.cjs');
 test('integration catalog keeps optional tools optional', () => {
   assert.equal(integrations.TOOLS.tesseract.required, false);
   assert.equal(integrations.TOOLS.hyperframes.required, false);
-  assert.equal(integrations.TOOLS.piper.required, false);
+  assert.equal(integrations.TOOLS.ollama.required, true);
+  assert.equal(integrations.TOOLS.luxtts.required, false);
+  assert.equal(Object.hasOwn(integrations.TOOLS, 'piper'), false);
   assert.equal(integrations.TOOLS.hyperframes.install, 'npm');
 });
 
