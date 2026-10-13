@@ -130,6 +130,13 @@ export default function App() {
         const summary = 'ZIP extracted and scanned for review: **' + report.archive + '**\\n\\n- Files inspected: ' + report.fileCount + '\\n- Extracted files: ' + report.extraction?.extracted + '\\n- Manifest files: ' + manifestList + '\\n- Executable/script flags: ' + risky + '\\n- Install-related scripts: ' + (scripts || 'No package.json lifecycle scripts detected.') + '\\n\\n**Safety status:** review-only import saved at ' + report.destination + '. No scripts were executed and no dependencies were installed. Review the manifest/script report before deciding whether to install anything.';
         setMessages(old => [...old, { role: 'user', content: 'Scan ZIP project: ' + report.archive }, { role: 'assistant', content: summary }]);
         setNotice('ZIP scan complete. Imported files remain in a review-only folder.');
+        const packageRoot = Array.isArray(report.packageProjects) ? report.packageProjects[0] : '';
+        if (packageRoot && window.confirm('This ZIP contains a Node.js package.json. Install its declared dependencies in the review copy?\\n\\nCO-Agent will use the official npm registry and disable lifecycle scripts. The imported app will not be launched.')) {
+          const installed = await desktop?.imports?.installNodeDependencies?.(packageRoot);
+          if (!installed || installed.ok === false || installed.error) throw new Error(installed?.error || 'Approved dependency installation failed.');
+          setMessages(old => [...old, { role: 'assistant', content: 'Approved dependency installation completed for ' + report.archive + '.\\n\\n- Declared dependencies: ' + installed.dependencies + '\\n- Lifecycle scripts executed: no\\n- Project launched: no\\n- Review folder: ' + installed.projectPath }]);
+          setNotice('Dependencies installed with lifecycle scripts disabled. The project was not launched.');
+        }
       } catch (error) { setNotice('ZIP import failed: ' + (error.message || String(error))); }
       finally { setBusy(false); }
     }
