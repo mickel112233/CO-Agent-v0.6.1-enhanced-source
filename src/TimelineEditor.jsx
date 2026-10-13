@@ -98,7 +98,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       if (!dir) return;
       if (!outputDir) setOutputDir(dir);
       const sep = dir.includes('\\') ? '\\' : '/';
-      const target = dir.replace(/[\\\\/]+$/, '') + sep + 'co-agent-voiceover-' + Date.now() + '.wav';
+      const target = dir.replace(/[\\/]+$/, '') + sep + 'co-agent-voiceover-' + Date.now() + '.wav';
       const requestId = 'studio-tts-' + Date.now().toString(36);
       voiceRequestRef.current = requestId;
       setGenerationProgress('Starting voice generation…');
