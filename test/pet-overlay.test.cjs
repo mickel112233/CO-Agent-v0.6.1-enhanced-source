@@ -32,7 +32,7 @@ test('main process wires pet messages into the primary renderer and exposes cont
   const app = fs.readFileSync(path.join(root, 'src', 'App.jsx'), 'utf8');
   assert.match(main, /createPetOverlay/);
   assert.match(main, /pet:incoming-message/);
-  assert.match(main, /handle\\('pet:show-overlay'/);
+  assert.match(main, /handle\('pet:show-overlay'/);
   assert.match(preload, /onIncomingMessage/);
   assert.match(app, /desktop\?\.pet\?\.onIncomingMessage/);
 });
