@@ -38,10 +38,16 @@ async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.e
   const name = validateModelName(model);
   const base = normalizeBaseUrl(baseUrl);
   if (signal?.aborted) throw new Error('Model download cancelled.');
-  const response = await fetchImpl(`${base}/api/pull`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: name, stream: true }), signal
-  });
+  let response;
+  try {
+    response = await fetchImpl(`${base}/api/pull`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: name, stream: true }), signal
+    });
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw new Error('Model download cancelled.');
+    throw error;
+  }
   if (!response.ok) throw await readError(response);
   if (!response.body) throw new Error('Ollama did not return a model-download progress stream.');
 
@@ -76,6 +82,9 @@ async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.e
   if (signal?.aborted) throw new Error('Model download cancelled.');
   if (!last || last.status !== 'success') throw new Error(last?.status || 'Ollama ended the pull before reporting success.');
   return { model: name, status: 'success' };
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw new Error('Model download cancelled.');
+    throw error;
   } finally { signal?.removeEventListener('abort', abortReader); }
 }
 
