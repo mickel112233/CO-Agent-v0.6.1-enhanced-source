@@ -10,7 +10,9 @@ function normalizeBaseUrl(value = DEFAULT_OLLAMA_URL) {
   const host = url.hostname.toLowerCase();
   const loopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
   if (url.protocol === 'http:' && !loopback) throw new Error('Remote Ollama endpoints must use HTTPS. Plain HTTP is allowed only for localhost.');
-  return url.toString().replace(/\\/+$/, '');
+  let normalized = url.toString();
+  while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+  return normalized;
 }
 function validateModelName(value) {
   const name = String(value || '').trim();
