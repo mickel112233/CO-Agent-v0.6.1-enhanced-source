@@ -19,4 +19,10 @@ test('Video Studio passes the selected local or API provider into chat-driven ti
   assert.match(timeline, /providerConfig: chatConfig\.providerConfig, apiKey: chatConfig\.apiKey/);
   assert.match(timeline, /model: String\(chatConfig\?\.model \|\| ''\)\.trim\(\)/);
   assert.match(timeline, /Add your Cloud API key in Models & settings/);
+  assert.match(timeline, /baseSignature: JSON\.stringify\(projectRef\.current\)/);
+  assert.match(timeline, /JSON\.stringify\(projectRef\.current\) !== editPlan\.baseSignature/);
+  assert.match(timeline, /start \+ duration > 3600/);
+  assert.match(timeline, /start \+ clip\.duration > 3600/);
+  assert.match(timeline, /clip\.timelineStart \+ duration > 3600/);
+  assert.match(timeline, /sourceStart \+ clip\.duration > 3600/);
 });
