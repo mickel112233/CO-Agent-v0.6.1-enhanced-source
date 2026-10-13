@@ -10,4 +10,39 @@ function run(file,args,options={}){return new Promise((resolve,reject)=>{const p
 async function extractArchive(archivePath,destination,{platform=process.platform}={}){const archive=path.resolve(String(archivePath||'')),st=await fs.stat(archive).catch(()=>null);if(!st?.isFile()||path.extname(archive).toLowerCase()!=='.zip')throw Error('Choose an existing .zip archive');if(st.size>100*1024*1024)throw Error('ZIP archive exceeds 100 MB');const dest=path.resolve(destination);await fs.mkdir(path.dirname(dest),{recursive:true});const raw=platform==='win32'?await run(process.env.ComSpec||'cmd.exe',['/d','/s','/c','powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand '+Buffer.from(PS,'utf16le').toString('base64')],{env:{...process.env,CO_AGENT_ZIP_ARCHIVE:archive,CO_AGENT_ZIP_DEST:dest}}):await run(process.env.PYTHON||'python3',['-c',PY,archive,dest]);let result;try{result=JSON.parse(raw.split(/\r?\n/).filter(Boolean).at(-1)||'{}')}catch{throw Error('ZIP scanner returned invalid output')}if(!result.ok)throw Error(result.error||'ZIP rejected');return result}
 async function scanDirectory(root){const files=[],manifests=[],riskyFiles=[],installScripts=[];async function walk(dir,depth=0){if(depth>12)return;for(const e of await fs.readdir(dir,{withFileTypes:true}).catch(()=>[])){if(SKIP.has(e.name.toLowerCase()))continue;const f=path.join(dir,e.name);if(e.isSymbolicLink()){riskyFiles.push('Symlink: '+path.relative(root,f));continue}if(e.isDirectory()){await walk(f,depth+1);continue}if(!e.isFile())continue;const rel=path.relative(root,f).replace(/\\/g,'/'),base=e.name.toLowerCase();files.push(rel);if(MANIFEST.has(base)){manifests.push(rel);if(base==='package.json'){try{const p=JSON.parse(await fs.readFile(f,'utf8'));const scripts=Object.entries(p.scripts||{});if(scripts.length)installScripts.push({file:rel,scripts:Object.fromEntries(scripts.map(([k,v])=>[k,String(v).slice(0,500)]))})}catch{riskyFiles.push('Invalid package.json: '+rel)}}}if(RISK.test(base))riskyFiles.push('Executable/script file: '+rel);if(files.length>10000)throw Error('Project contains too many files')}}await walk(root);return {files:files.slice(0,500),fileCount:files.length,manifests:manifests.slice(0,100),installScripts:installScripts.slice(0,50),riskyFiles:riskyFiles.slice(0,200),root}}
 async function scanZip(archive,userDataPath,options={}){const slug=path.basename(archive,path.extname(archive)).toLowerCase().replace(/[^a-z0-9._-]+/g,'-').slice(0,60)||'import',destination=path.join(path.resolve(userDataPath),'import-review',slug+'-'+Date.now().toString(36));const extraction=await extractArchive(archive,destination,options);try{return {ok:true,archive:path.basename(archive),destination,extraction:{entries:extraction.entries,extracted:extraction.extracted,expandedBytes:extraction.expandedBytes},...await scanDirectory(destination),reviewOnly:true,installAllowed:false}}catch(e){await fs.rm(destination,{recursive:true,force:true}).catch(()=>{});throw e}}
-module.exports={normalizeEntryName,scanDirectory,extractArchive,scanZip};
+async function installNodeDependencies(projectPath,userDataPath,{platform=process.platform}={}) {
+ const root=path.resolve(userDataPath,'import-review'),dir=path.resolve(String(projectPath||''));
+ const relative=path.relative(root,dir);
+ if(!relative||relative.startsWith('..')||path.isAbsolute(relative))throw Error('Choose a project folder inside CO-Agent import-review.');
+ const stat=await fs.lstat(dir).catch(()=>null);
+ if(!stat?.isDirectory()||stat.isSymbolicLink())throw Error('Imported project folder is missing or unsafe.');
+ const manifestPath=path.join(dir,'package.json'),manifestStat=await fs.lstat(manifestPath).catch(()=>null);
+ if(!manifestStat?.isFile()||manifestStat.isSymbolicLink()||manifestStat.size>2*1024*1024)throw Error('A small, regular package.json is required for dependency installation.');
+ if(await fs.access(path.join(dir,'.npmrc')).then(()=>true).catch(()=>false))throw Error('This project includes .npmrc. Remove it from the reviewed copy before installing to avoid untrusted registry configuration.');
+ const manifest=JSON.parse(await fs.readFile(manifestPath,'utf8'));
+ const deps={...(manifest.dependencies||{}),...(manifest.devDependencies||{}),...(manifest.optionalDependencies||{}),...(manifest.peerDependencies||{})};
+ if(!Object.keys(deps).length)throw Error('package.json declares no npm dependencies.');
+ for(const [name,version] of Object.entries(deps)) {
+   if(!/^(?:@?[a-zA-Z0-9._/-]+)$/.test(name)||typeof version!=='string'||!/^([~^*<>=|0-9xXv.\-\s]|\*)+$/.test(version)||/^(?:file:|link:|workspace:|git\+|git:|https?:|github:|\.)/i.test(version)) throw Error('Dependency is not a plain registry version range: '+name+'. Review and remove URL, Git, workspace, or local dependencies before installation.');
+ }
+ const lockPath=path.join(dir,'package-lock.json');
+ if(await fs.access(lockPath).then(()=>true).catch(()=>false)) {
+   const lockStat=await fs.stat(lockPath);
+   if(lockStat.size>15*1024*1024)throw Error('package-lock.json exceeds the 15 MB review limit.');
+   const lock=JSON.parse(await fs.readFile(lockPath,'utf8'));
+   const packages=Object.values(lock.packages||{});
+   for(const pkg of packages) if(pkg?.resolved && !/^https:\/\/registry\.npmjs\.org\//i.test(pkg.resolved)) throw Error('Lockfile includes a non-default package source. Review/remove package-lock.json before installing.');
+ }
+ const npm=platform==='win32'?'npm.cmd':'npm';
+ const args=['install','--ignore-scripts','--no-audit','--no-fund'];
+ const command=platform==='win32'?(process.env.ComSpec||'cmd.exe'):npm;
+ const commandArgs=platform==='win32'?['/d','/s','/c','npm.cmd install --ignore-scripts --no-audit --no-fund']:args;
+ const log=await new Promise((resolve,reject)=>{
+   const child=spawn(command,commandArgs,{cwd:dir,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe'],env:{...process.env,npm_config_ignore_scripts:'true',npm_config_audit:'false',npm_config_fund:'false',npm_config_registry:'https://registry.npmjs.org/'}});
+   let output='',settled=false;const timer=setTimeout(()=>{child.kill();finish(Error('Dependency installation timed out after 10 minutes.'));},10*60*1000);
+   function finish(error,value){if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value)}
+   child.stdout.on('data',chunk=>output=(output+chunk.toString()).slice(-12000));child.stderr.on('data',chunk=>output=(output+chunk.toString()).slice(-12000));child.once('error',finish);child.once('close',code=>code===0?finish(null,output):finish(Error('npm dependency install failed. Lifecycle scripts were disabled. '+output.slice(-2500))));
+ });
+ return {ok:true,projectPath:dir,dependencies:Object.keys(deps).length,output:log.slice(-6000),scriptsExecuted:false};
+}
+module.exports={normalizeEntryName,scanDirectory,extractArchive,scanZip,installNodeDependencies};
