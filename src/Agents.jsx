@@ -143,7 +143,8 @@ export default function Agents() {
     const requestId = 'agent-step-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     setActiveStepRequestId(requestId);
     setBusy(step.id); setNotice('Running ' + step.role + ' agent with the ' + step.skill + ' skill…');
-    setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'running' } : item) }));
+    setResults(old => { const next = { ...old }; delete next[step.id]; return next; });
+    setWorkflow(old => ({ ...old, pipeline: old.pipeline.map(item => item.id === step.id ? { ...item, status: 'running', result: null } : item) }));
     try {
       const contextFiles = [];
       for (const relativePath of selectedPaths.slice(0, 8)) {
