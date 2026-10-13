@@ -12,6 +12,9 @@ test('ZIP entry validation rejects traversal and absolute paths', () => {
   assert.throws(() => zipImport.normalizeEntryName('folder\\\\..\\\\outside.txt'), /unsafe ZIP path|path-traversal/i);
   assert.throws(() => zipImport.normalizeEntryName('C:/Windows/system.ini'), /unsafe ZIP path|path-traversal/i);
   assert.throws(() => zipImport.normalizeEntryName('/rooted.txt'), /unsafe ZIP path|path-traversal/i);
+  assert.throws(() => zipImport.normalizeEntryName('folder/file.txt:stream'), /unsafe ZIP path/i);
+  assert.throws(() => zipImport.normalizeEntryName('folder/CON.txt'), /unsafe ZIP path/i);
+  assert.throws(() => zipImport.normalizeEntryName('folder/trailing. '), /unsafe ZIP path/i);
 });
 
 test('ZIP scanner identifies manifests, lifecycle scripts, and risky files without executing them', async () => {
