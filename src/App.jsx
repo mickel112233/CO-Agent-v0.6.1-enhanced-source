@@ -208,6 +208,9 @@ export default function App() {
       setNotice('Pet request received. Review it in chat before approving any computer actions.');
       void send(text);
     });
+    // Subscribe before acknowledging readiness so requests sent while the renderer
+    // was starting are delivered instead of disappearing during app startup.
+    desktop?.pet?.markBridgeReady?.().catch?.(() => {});
     return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
   }, [send, busy]);
 
