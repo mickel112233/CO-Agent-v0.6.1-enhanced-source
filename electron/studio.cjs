@@ -95,4 +95,26 @@ async function concat(inputs, outputDir, filename = 'export.mp4') {
   } finally { await fs.rm(list, { force: true }); }
   return { ok: true, output: target };
 }
-module.exports = { probe, extractAudio, concat, ensureDir, validateMediaPath, getCapabilities: () => ({ ffmpeg: !!ffmpegPath, ffprobe: !!ffprobePath }) };
+function buildSoundEffectArgs(preset, duration, outputPath) {
+  const allowed = new Set(['impact', 'sweep', 'ambient', 'beep']);
+  if (!allowed.has(preset)) throw new Error('Choose a supported sound-effect preset.');
+  const seconds = Number(duration);
+  if (!Number.isFinite(seconds) || seconds < 0.25 || seconds > 12) throw new Error('Sound-effect duration must be between 0.25 and 12 seconds.');
+  const output = validateMediaPath(outputPath, 'Sound-effect output path');
+  const d = String(seconds);
+  let source;
+  if (preset === 'impact') source = 'anoisesrc=color=pink:amplitude=0.75:duration=' + d + ',lowpass=f=1800,afade=t=out:st=0.03:d=' + Math.max(0.1, seconds - 0.03);
+  else if (preset === 'sweep') source = 'aevalsrc=0.55*sin(2*PI*(220*t+40*t*t)):s=48000:d=' + d + ',afade=t=out:st=' + Math.max(0, seconds - 0.2) + ':d=0.2';
+  else if (preset === 'ambient') source = 'anoisesrc=color=pink:amplitude=0.12:duration=' + d + ',lowpass=f=900,afade=t=in:st=0:d=' + Math.min(0.25, seconds / 3) + ',afade=t=out:st=' + Math.max(0, seconds - 0.3) + ':d=' + Math.min(0.3, seconds / 3);
+  else source = 'sine=frequency=880:sample_rate=48000:duration=' + d + ',afade=t=out:st=' + Math.max(0, seconds - 0.12) + ':d=' + Math.min(0.12, seconds);
+  return { output, args: ['-y', '-f', 'lavfi', '-i', source, '-vn', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2', output] };
+}
+async function generateSoundEffect({ preset = 'impact', duration = 2, outputPath } = {}) {
+  const plan = buildSoundEffectArgs(preset, duration, outputPath);
+  await fs.mkdir(path.dirname(plan.output), { recursive: true });
+  await run(ffmpegPath, plan.args, 2 * 60 * 1000);
+  const stat = await fs.stat(plan.output).catch(() => null);
+  if (!stat?.isFile() || stat.size < 44) throw new Error('FFmpeg did not create a valid sound-effect WAV file.');
+  return { ok: true, output: plan.output, preset, duration: Number(duration), bytes: stat.size, format: 'wav' };
+}
+module.exports = { probe, extractAudio, concat, generateSoundEffect, buildSoundEffectArgs, ensureDir, validateMediaPath, getCapabilities: () => ({ ffmpeg: !!ffmpegPath, ffprobe: !!ffprobePath }) };
