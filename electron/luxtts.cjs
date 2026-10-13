@@ -100,7 +100,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
       try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
       if (code !== 0 || !result?.ok) { await finish(new Error(String(result?.error || stderr || 'LuxTTS worker failed with exit code ' + code).slice(0, 1600))); return; }
       const outStat = await fs.stat(output).catch(() => null);
-      let header = Buffer.alloc(0);
+      let header = Buffer.alloc(12);
       if (outStat?.isFile() && outStat.size >= 44) {
         const handle = await fs.open(output, 'r').catch(() => null);
         if (handle) {
