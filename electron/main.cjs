@@ -158,6 +158,13 @@ function registerIpc() {
   handle('computer:open-path', filePath => computer.openPath(filePath));
   handle('computer-use:capture-screen', () => computerUse.captureScreen());
   handle('computer-use:inspect-accessibility', () => computerUse.inspectAccessibility());
+  handle('computer-use:invoke-control', async payload => {
+    const label = String(payload?.name || payload?.automationId || 'selected control').slice(0, 200);
+    const windowTitle = String(payload?.windowTitle || '').slice(0, 200);
+    if (!await confirmComputerAction('Allow Windows UI Automation to activate a control?', 'Target window: ' + windowTitle + '\\nControl: ' + label + '\\n\\nCO-Agent will invoke this exact accessible control; it will not fall back to coordinates.')) throw new Error('Accessibility action cancelled by user.');
+    return computerUse.invokeAccessibleControl({ ...payload, approved: true });
+  });
+  handle('computer-use:verify-outcome', payload => computerUse.verifyActionOutcome(payload));
   handle('computer-use:read-screen-text', async payload => {
     if (!await confirmComputerAction('Read text visible on your desktop?', 'This uses local Tesseract OCR on the selected screen capture. The image is processed on this computer.')) throw new Error('Screen OCR cancelled by user.');
     return computerUse.readScreenText({ ...payload, approved: true });
