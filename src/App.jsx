@@ -23,6 +23,8 @@ export default function App() {
   const historyRef = useRef([]);
   const [section, setSection] = useState('Chat');
   const [busy, setBusy] = useState(false);
+  const sendRef = useRef(null);
+  const busyRef = useRef(false);
   const [activeRequestId, setActiveRequestId] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const streamingTextRef = useRef('');
@@ -228,20 +230,23 @@ export default function App() {
     } finally { setBusy(false); setActiveRequestId(''); activeRequestIdRef.current = ''; streamingTextRef.current = ''; setStreamingText(''); }
   };
 
+  sendRef.current = send;
+  busyRef.current = busy;
+
   useEffect(() => {
     const unsubscribe = desktop?.pet?.onIncomingMessage?.(event => {
       const text = String(event?.text || '').trim();
       if (!text) return;
       setSection('Chat');
-      if (busy) { setMessage(text); setNotice('Pet request placed in the chat composer. Send it when the current request finishes.'); return; }
+      if (busyRef.current) { setMessage(text); setNotice('Pet request placed in the chat composer. Send it when the current request finishes.'); return; }
       setNotice('Pet request received. Review it in chat before approving any computer actions.');
-      void send(text);
+      void sendRef.current?.(text);
     });
     // Subscribe before acknowledging readiness so requests sent while the renderer
     // was starting are delivered instead of disappearing during app startup.
     desktop?.pet?.markBridgeReady?.().catch?.(() => {});
     return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
-  }, [send, busy]);
+  }, []);
 
   async function testApiConnection() {
     if (!apiKey.trim()) { setNotice('Enter an API key before testing the connection.'); return; }

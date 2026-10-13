@@ -61,6 +61,10 @@ test('pet requests queue during renderer startup and bridge readiness drains the
   assert.match(preload, /markBridgeReady: invoke\('pet:bridge-ready'\)/);
   assert.match(app, /markBridgeReady/);
   assert.match(app, /Subscribe before acknowledging readiness/);
+  assert.match(app, /sendRef\.current = send/);
+  assert.match(app, /busyRef\.current = busy/);
+  assert.match(app, /void sendRef\.current\?\.\(text\)/);
+  assert.match(app, /markBridgeReady\?\.\(\)\.catch\?\.\(\)/);
 });
 
 
