@@ -37,3 +37,13 @@ test('first-run model setup verifies Ollama inventory before reporting ready', a
   assert.match(app, /await verifyModelReady\(model\)/);
   assert.match(app, /await verifyModelReady\(modelToInstall\.trim\(\)\)/);
 });
+
+test('Video Studio offers request-scoped cancellation for LuxTTS voiceover', async () => {
+  const timeline = await fs.readFile(path.join(root, 'src', 'TimelineEditor.jsx'), 'utf8');
+  assert.match(timeline, /voiceRequestRef = useRef\(''\)/);
+  assert.match(timeline, /event\.requestId !== voiceRequestRef\.current/);
+  assert.match(timeline, /async function cancelVoiceover\(\)/);
+  assert.match(timeline, /desktop\.luxTTS\.cancel\(requestId\)/);
+  assert.match(timeline, /Cancel voiceover/);
+  assert.match(timeline, /Voiceover generation cancelled\. No new clip was added\./);
+});
