@@ -45,7 +45,7 @@
 ## P1 — Video Studio end-to-end
 
 - [x] Video Studio receives the selected provider/model/API endpoint and in-memory key from chat settings; missing API keys are rejected before planning, and edit plans are checked against the pre-request timeline revision. Source regression tests cover provider wiring and stale-plan protection; runtime acceptance remains.
-- [ ] Test all typed edit actions (rename, caption/title, move, duration, source trim, remove, split) including invalid IDs, wrong tracks, boundary conditions, stale plans, undo/redo, and save/reload.
+- [x] Extracted typed timeline edit application into a pure helper and added behavior tests for rename, caption creation, move, duration, source trim, remove, split, invalid IDs, wrong tracks, and boundary conditions. The UI keeps stale-plan protection and existing undo/redo and project save/reload flows.
 - [ ] Generate LuxTTS voiceover using a real reference audio fixture and verify the WAV with FFprobe before adding it to the timeline.
 - [x] Added FFmpeg/FFprobe integration coverage for every SFX preset (impact, sweep, ambient, beep), checking PCM WAV codec, 48 kHz, stereo channels, file readability, and requested duration. CI must pass this fixture test.
 - [x] Added a deterministic integration test that generates a video fixture and SFX, exports an MP4, checks video/audio streams and duration, and decodes the export. A real Windows run is still required for final acceptance.

@@ -239,50 +239,19 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   }
   function applyTimelineEditPlan() {
     if (!editPlan) return;
-    // Refuse any stale plan, including edits to existing clips while the proposal was open.
     if (JSON.stringify(projectRef.current) !== editPlan.baseSignature) {
       setEditPlan(null);
       setNotice('Timeline changed while the plan was open. The stale plan was discarded; generate a fresh plan.');
       return;
     }
-    const currentIds = new Set(projectRef.current.clips.map(clip => clip.id));
-    const referencedIds = editPlan.actions.filter(action => action.clipId).map(action => action.clipId);
-    if (referencedIds.some(id => !currentIds.has(id))) {
+    try {
+      const next = applyTimelineActions(projectRef.current, editPlan.actions, newId);
+      applyProject(next);
       setEditPlan(null);
-      setNotice('Timeline changed while the plan was open. The stale plan was discarded; generate a fresh plan.');
-      return;
+      setNotice('Applied ' + editPlan.actions.length + ' timeline edit(s). Use Undo to revert the entire plan.');
+    } catch (error) {
+      setNotice('The edit plan was not applied: ' + (error.message || String(error)));
     }
-    const idMap = new Map();
-    const actions = editPlan.actions;
-    updateProject(clips => {
-      let next = [...clips];
-      for (const action of actions) {
-        if (action.type === 'rename_project') continue;
-        if (action.type === 'add_caption') {
-          const id = newId(); idMap.set(id, id);
-          next.push({ id, type: 'caption', file: '', track: 'Titles', timelineStart: action.start, sourceStart: 0, duration: action.duration, text: action.text });
-        } else if (action.type === 'move_clip') next = next.map(clip => clip.id === action.clipId ? { ...clip, timelineStart: action.start, track: action.track } : clip);
-        else if (action.type === 'set_duration') next = next.map(clip => clip.id === action.clipId ? { ...clip, duration: action.duration } : clip);
-        else if (action.type === 'set_source_start') next = next.map(clip => clip.id === action.clipId ? { ...clip, sourceStart: action.sourceStart } : clip);
-        else if (action.type === 'remove_clip') next = next.filter(clip => clip.id !== action.clipId);
-        else if (action.type === 'split_clip') {
-          const clip = next.find(item => item.id === action.clipId);
-          if (!clip) continue;
-          const offset = action.at - clip.timelineStart;
-          next = next.flatMap(item => item.id !== clip.id ? [item] : [
-            { ...item, duration: offset },
-            { ...item, id: newId(), timelineStart: action.at, sourceStart: item.sourceStart + offset, duration: item.duration - offset }
-          ]);
-        }
-      }
-      return next;
-    });
-    const rename = actions.find(action => action.type === 'rename_project');
-    if (rename) {
-      const next = { ...projectRef.current, title: rename.title };
-      projectRef.current = next; setProject(next);
-    }
-    setEditPlan(null); setNotice('Applied ' + actions.length + ' timeline edit(s). Use Undo to revert the entire plan.');
   }
 
   async function saveProject() {
