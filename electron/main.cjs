@@ -37,6 +37,7 @@ const pendingPetMessages = [];
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
+const activeAgentStepRequests = new Map();
 const activeModelPulls = new Map();
 const activeAcpRuns = new Map();
 const mcpClients = new Map();
@@ -138,7 +139,21 @@ function registerIpc() {
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));
-  handle('agents:run-step', payload => agentOrchestrator.runWorkflowStep(payload));
+  handle('agents:run-step', async payload => {
+    const requestId = String(payload?.requestId || '');
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)) throw new Error('Agent step request ID is missing or invalid.');
+    if (activeAgentStepRequests.has(requestId)) throw new Error('An agent step with this ID is already running.');
+    const controller = new AbortController();
+    activeAgentStepRequests.set(requestId, controller);
+    try { return await agentOrchestrator.runWorkflowStep(payload, { signal: controller.signal }); }
+    finally { activeAgentStepRequests.delete(requestId); }
+  });
+  handle('agents:cancel-step', requestId => {
+    const controller = activeAgentStepRequests.get(String(requestId || ''));
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort();
+    return { ok: true, cancelled: true };
+  });
   handle('workspace:get-root', () => { try { return { ok: true, root: workspace.getRoot() }; } catch { return { ok: true, root: '' }; } });
   handle('workspace:choose-root', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { title: 'Choose a project workspace', properties: ['openDirectory'] });

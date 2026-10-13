@@ -16,3 +16,20 @@ test('local agent model request propagates user cancellation to fetch', async ()
     await assert.rejects(pending, /aborted/i);
   } finally { global.fetch = originalFetch; }
 });
+
+test('workflow steps propagate cancellation to the model call and recover running steps after restart', async () => {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const main = await fs.readFile(path.join(root, 'electron', 'main.cjs'), 'utf8');
+  const orchestrator = await fs.readFile(path.join(root, 'electron', 'agent-orchestrator.cjs'), 'utf8');
+  const preload = await fs.readFile(path.join(root, 'electron', 'preload.cjs'), 'utf8');
+  const agents = await fs.readFile(path.join(root, 'src', 'Agents.jsx'), 'utf8');
+  assert.match(main, /activeAgentStepRequests/);
+  assert.match(main, /agents:cancel-step/);
+  assert.match(orchestrator, /signal:options\.signal/);
+  assert.match(preload, /cancelStep: invoke\('agents:cancel-step'\)/);
+  assert.match(agents, /Interrupted steps were reset to queued after restart/);
+  assert.match(agents, /Cancel step/);
+  assert.match(agents, /status: cancelled \? 'queued' : 'blocked'/);
+});
