@@ -23,7 +23,7 @@ test('pet messages are bounded and exposed only through a narrow bridge', () => 
   assert.match(preload, /contextBridge\.exposeInMainWorld\('coAgentPet'/);
   assert.match(preload, /text\.trim\(\)\.slice\(0, 4000\)/);
   assert.doesNotMatch(preload, /require\(['"]node:|require\(['"]fs/);
-  assert.match(ui, /Tasks are handled in CO-Agent chat/);
+  assert.match(ui, /Your message opens in CO-Agent chat/);
 });
 
 test('main process wires pet messages into the primary renderer and exposes controls', () => {
@@ -32,7 +32,7 @@ test('main process wires pet messages into the primary renderer and exposes cont
   const app = fs.readFileSync(path.join(root, 'src', 'App.jsx'), 'utf8');
   assert.match(main, /createPetOverlay/);
   assert.match(main, /pet:incoming-message/);
-  assert.match(main, /handle\('pet:show'/);
+  assert.match(main, /handle\\('pet:show-overlay'/);
   assert.match(preload, /onIncomingMessage/);
   assert.match(app, /desktop\?\.pet\?\.onIncomingMessage/);
 });
