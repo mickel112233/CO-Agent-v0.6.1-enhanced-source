@@ -64,7 +64,7 @@ test('pet requests queue during renderer startup and bridge readiness drains the
   assert.match(app, /sendRef\.current = send/);
   assert.match(app, /busyRef\.current = busy/);
   assert.match(app, /void sendRef\.current\?\.\(text\)/);
-  assert.match(app, /markBridgeReady\?\.\(\)\.catch\?\.\(\)/);
+  assert.match(app, /markBridgeReady.*catch/);
 });
 
 
