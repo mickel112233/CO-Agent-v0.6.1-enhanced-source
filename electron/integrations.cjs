@@ -13,6 +13,32 @@ const TOOLS = Object.freeze({
   hyperframes: Object.freeze({ id: 'hyperframes', name: 'Hyperframes', kind: 'npm-cli', required: false, description: 'Create and render HTML/CSS/animation compositions as video.', install: 'npm', command: 'npm', args: ['install', '--global', 'hyperframes'], docs: 'https://hyperframes.app/docs/5-packages/cli' }),
   luxtts: Object.freeze({ id: 'luxtts', name: 'LuxTTS', kind: 'python-runtime', required: false, description: 'Local text-to-speech for generated voiceovers and audio assets. Use the dedicated CO-Agent LuxTTS setup flow.', install: null, command: null, args: [], docs: 'https://github.com/ysharma3501/LuxTTS' }),
 });
+const MAX_REPO_FILES = 10000;
+const MAX_REPO_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_REPO_TOTAL_BYTES = 250 * 1024 * 1024;
+async function validateRepositoryTree(root) {
+  const base = await fs.realpath(root);
+  const pending = [base];
+  let fileCount = 0, totalBytes = 0;
+  while (pending.length) {
+    const directory = pending.pop();
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (directory === base && entry.name === '.git') continue;
+      const full = path.join(directory, entry.name);
+      const stat = await fs.lstat(full);
+      if (stat.isSymbolicLink()) throw new Error('Imported repositories containing symbolic links are not accepted for review-only import: ' + path.relative(base, full).slice(0, 240));
+      if (stat.isDirectory()) { pending.push(full); continue; }
+      if (!stat.isFile()) throw new Error('Repository contains a non-regular filesystem entry: ' + path.relative(base, full).slice(0, 240));
+      fileCount++;
+      if (fileCount > MAX_REPO_FILES) throw new Error('Repository exceeds the 10,000-file review limit.');
+      if (stat.size > MAX_REPO_FILE_BYTES) throw new Error('Repository file exceeds 25 MB: ' + path.relative(base, full).slice(0, 240));
+      totalBytes += stat.size;
+      if (totalBytes > MAX_REPO_TOTAL_BYTES) throw new Error('Repository exceeds the 250 MB total review limit.');
+    }
+  }
+  return { fileCount, totalBytes };
+}
 const GITHUB_HTTPS = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
 const REF_RE = /^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._/-]{1,128}$/;
 function commandFor(name) {
@@ -132,7 +158,9 @@ async function installRepo({ url, ref = '' } = {}, userDataPath) {
     throw new Error('Could not clone the repository. Check the URL, branch/tag, Git installation, and network access. ' + String(error.stderr || error.message || '').slice(-1000));
   }
   try {
+    const size = await validateRepositoryTree(destination);
     const details = await inspectRepo(destination, cleanUrl, ref, slug);
+    details.reviewLimits = { ...size, maxFiles: MAX_REPO_FILES, maxFileBytes: MAX_REPO_FILE_BYTES, maxTotalBytes: MAX_REPO_TOTAL_BYTES };
     await fs.writeFile(path.join(destination, '.co-agent-source.json'), JSON.stringify({ url: cleanUrl, ref, importedAt: new Date().toISOString() }, null, 2), { flag: 'wx' });
     return { ok: true, repository: details };
   } catch (error) {

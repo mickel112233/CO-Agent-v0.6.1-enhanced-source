@@ -76,3 +76,24 @@ test('repository skill reader ignores symlinked skill files', async (t) => {
     await fs.rm(userData, { recursive: true, force: true });
   }
 });
+
+test('repository tree review rejects symlinks and oversized files before exposing imported content', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-repo-limits-'));
+  const outside = path.join(root, 'outside.txt');
+  const repo = path.join(root, 'repo');
+  await fs.mkdir(repo);
+  try {
+    await fs.writeFile(outside, 'private');
+    await fs.writeFile(path.join(repo, 'README.md'), 'safe');
+    assert.deepEqual(await integrations.validateRepositoryTree(repo), { fileCount: 1, totalBytes: 4 });
+    try { await fs.symlink(outside, path.join(repo, 'linked.txt'), 'file'); }
+    catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('Symlinks unavailable in this environment'); return; }
+      throw error;
+    }
+    await assert.rejects(() => integrations.validateRepositoryTree(repo), /symbolic links/i);
+    await fs.unlink(path.join(repo, 'linked.txt'));
+    await fs.writeFile(path.join(repo, 'large.bin'), Buffer.alloc(integrations.MAX_REPO_FILE_BYTES + 1));
+    await assert.rejects(() => integrations.validateRepositoryTree(repo), /exceeds 25 MB/i);
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});

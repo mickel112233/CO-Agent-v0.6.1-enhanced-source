@@ -54,7 +54,7 @@
 
 ## P1 — secure imports and integrations
 
-- [ ] Verify GitHub imports reject credentials, unsafe URLs/redirects, invalid refs, oversized responses, path traversal, symlinks, and malformed skill/manifests.
+- [x] GitHub import rejects non-GitHub/credential-bearing URLs and unsafe refs, and now refuses symlinks, non-regular entries, more than 10,000 files, files above 25 MB, or repositories above 250 MB before treating the import as reviewable. Git transport remains bounded by a five-minute timeout and 4 MB captured output; external-host redirect behavior is still not proven by the fixture suite.
 - [ ] Verify ZIP extraction parity on Windows and Unix, including duplicate normalized names, symlinks/reparse points, zip bombs, and cleanup after failure.
 - [ ] Ensure import is review-only by default and never executes scripts automatically; dependency installation requires a separate explicit confirmation and clear trust boundary.
 - [ ] Test optional tool detection/install/removal and missing executables without corrupting core app.
