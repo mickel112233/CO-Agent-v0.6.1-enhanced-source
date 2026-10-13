@@ -39,7 +39,7 @@
 - [ ] Exercise overlay launch, hide/show, close, tray menu, dragging, resize, saved coordinates, restart restoration, display add/remove, DPI scaling, and off-screen recovery in a Windows desktop session.
 - [ ] Verify pet requests are delivered once across renderer startup and route through the same provider/runtime, cancellation and approval UI as normal chat.
 - [ ] Verify pet executable discovery, duplicate launch handling, missing binary, crash/restart, clean install, upgrade, and uninstall.
-- [ ] Add behavioral tests with mocked Electron window/screen/fs objects; source-regex checks alone are insufficient.
+- [x] Added a behavioral pet-overlay test with injected fake Electron windows/screens and a temporary preferences file; it checks restore, sandbox settings, display clamping, visibility persistence, show/hide, and teardown. Actual desktop-session acceptance remains.
 - [ ] Verify packaging includes the pet executable and sprites in both NSIS and ZIP artifacts, and that a clean machine does not depend on developer-only paths.
 
 ## P1 — Video Studio end-to-end

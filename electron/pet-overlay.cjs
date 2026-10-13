@@ -16,17 +16,17 @@ function clampBounds(bounds, display) {
   const y = Math.min(Math.max(rawY, area.y + 8), area.y + area.height - height - 8);
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
 }
-function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
+function createPetOverlay({ preloadPath, onMessage, onClose, app: appApi = app, BrowserWindow: BrowserWindowApi = BrowserWindow, screen: screenApi = screen, fs: fsApi = fs } = {}) {
   let win = null;
   let enabled = true;
   let destroying = false;
   let preferences = { ...DEFAULTS };
   let writeQueue = Promise.resolve();
   let saveTimer = null;
-  const preferencesPath = () => path.join(app.getPath('userData'), 'pet-overlay.json');
+  const preferencesPath = () => path.join(appApi.getPath('userData'), 'pet-overlay.json');
   async function loadPreferences() {
     try {
-      const raw = JSON.parse(await fs.readFile(preferencesPath(), 'utf8'));
+      const raw = JSON.parse(await fsApi.readFile(preferencesPath(), 'utf8'));
       const bounds = raw?.bounds;
       const validBounds = bounds && ['x','y','width','height'].every(key => Number.isFinite(Number(bounds[key])));
       preferences = {
@@ -46,12 +46,12 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
     preferences = snapshot;
     writeQueue = writeQueue.catch(() => {}).then(async () => {
       const file = preferencesPath();
-      await fs.mkdir(path.dirname(file), { recursive: true });
+      await fsApi.mkdir(path.dirname(file), { recursive: true });
       const temp = file + '.tmp-' + process.pid;
       try {
-        await fs.writeFile(temp, JSON.stringify(snapshot), { encoding: 'utf8', mode: 0o600 });
-        await fs.rename(temp, file);
-      } finally { await fs.rm(temp, { force: true }).catch(() => {}); }
+        await fsApi.writeFile(temp, JSON.stringify(snapshot), { encoding: 'utf8', mode: 0o600 });
+        await fsApi.rename(temp, file);
+      } finally { await fsApi.rm(temp, { force: true }).catch(() => {}); }
     });
     return writeQueue;
   }
@@ -61,7 +61,7 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
   }
   function createBounds() {
     const saved = preferences.bounds;
-    const display = saved ? screen.getDisplayMatching(saved) : screen.getPrimaryDisplay();
+    const display = saved ? screenApi.getDisplayMatching(saved) : screenApi.getPrimaryDisplay();
     return clampBounds(saved || {}, display);
   }
   function show() {
@@ -73,7 +73,7 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
     }
     const bounds = createBounds();
     destroying = false;
-    win = new BrowserWindow({
+    win = new BrowserWindowApi({
       ...bounds, show: false, frame: false, transparent: true,
       backgroundColor: '#00000000', alwaysOnTop: true, resizable: true,
       skipTaskbar: true, title: 'CO-Agent Pet',
@@ -94,7 +94,7 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
       if (!destroying) { enabled = false; persistPreferences().catch(() => {}); }
       onClose?.();
     });
-    const assetDir = app.isPackaged ? path.join(process.resourcesPath, 'pet-assets', 'albedo') : path.join(__dirname, '..', 'integrations', 'AI-Desktop-Pet', 'public', 'assets', 'albedo');
+    const assetDir = appApi.isPackaged ? path.join(process.resourcesPath, 'pet-assets', 'albedo') : path.join(__dirname, '..', 'integrations', 'AI-Desktop-Pet', 'public', 'assets', 'albedo');
     const assetRoot = pathToFileURL(assetDir + path.sep).href;
     win.loadFile(path.join(__dirname, 'pet-overlay.html'), { query: { assetRoot } }).then(() => { if (enabled && win && !win.isDestroyed()) win.showInactive(); }).catch(() => {});
     persistPreferences().catch(() => {});
@@ -136,9 +136,9 @@ function createPetOverlay({ preloadPath, onMessage, onClose } = {}) {
     if (safe.x !== current.x || safe.y !== current.y || safe.width !== current.width || safe.height !== current.height) win.setBounds(safe);
     scheduleSave();
   };
-  screen.on('display-metrics-changed', displayChanged);
-  screen.on('display-removed', displayChanged);
-  screen.on('display-added', displayChanged);
+  screenApi.on('display-metrics-changed', displayChanged);
+  screenApi.on('display-removed', displayChanged);
+  screenApi.on('display-added', displayChanged);
   return Object.freeze({ show, hide, toggle, destroy, restore, flush: () => writeQueue, sendStatus, isVisible, getBounds: () => win && !win.isDestroyed() ? win.getBounds() : preferences.bounds });
 }
 module.exports = { createPetOverlay, clampBounds };

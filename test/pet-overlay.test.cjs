@@ -84,3 +84,62 @@ test('application waits for companion preferences to flush before final quit', (
   assert.match(main, /petOverlay\?\.flush\?\.\(\)/);
   assert.match(overlay, /flush: \(\) => writeQueue/);
 });
+
+test('pet overlay restores saved visibility and bounds, clamps display changes, and persists hide/show', async () => {
+  const { EventEmitter } = require('node:events');
+  const { createPetOverlay } = require('../electron/pet-overlay.cjs');
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'co-agent-pet-behavior-'));
+  const prefs = path.join(dir, 'pet-overlay.json');
+  fs.writeFileSync(prefs, JSON.stringify({ version: 1, visible: true, bounds: { x: 900, y: 700, width: 340, height: 240 } }));
+  const screen = new EventEmitter();
+  let display = { id: 1, workArea: { x: 0, y: 0, width: 1000, height: 800 } };
+  screen.getPrimaryDisplay = () => display;
+  screen.getDisplayMatching = () => display;
+  const windows = [];
+  class FakeWindow extends EventEmitter {
+    constructor(options) {
+      super(); this.bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
+      this.visible = false; this.destroyed = false; this.options = options;
+      this.webContents = new EventEmitter(); this.webContents.setWindowOpenHandler = fn => { this.openHandler = fn; };
+      this.webContents.send = (...args) => { this.lastSent = args; };
+      this.webContents.on = this.webContents.on.bind(this.webContents);
+      windows.push(this);
+    }
+    isDestroyed() { return this.destroyed; }
+    isVisible() { return this.visible; }
+    showInactive() { this.visible = true; }
+    hide() { this.visible = false; }
+    close() { this.destroyed = true; this.emit('closed'); }
+    getBounds() { return { ...this.bounds }; }
+    setBounds(bounds) { this.bounds = { ...bounds }; }
+    setAlwaysOnTop() {}
+    setVisibleOnAllWorkspaces() {}
+    loadFile() { return Promise.resolve(); }
+  }
+  const app = { getPath: () => dir, isPackaged: false };
+  const overlay = createPetOverlay({ app, BrowserWindow: FakeWindow, screen, fs: require('node:fs/promises'), preloadPath: path.join(dir, 'preload.cjs') });
+  try {
+    const restored = await overlay.restore();
+    assert.equal(restored.visible, true);
+    assert.equal(windows.length, 1);
+    assert.equal(windows[0].isVisible(), true);
+    assert.equal(windows[0].options.webPreferences.sandbox, true);
+    assert.equal(windows[0].options.webPreferences.nodeIntegration, false);
+    windows[0].bounds = { x: 990, y: 790, width: 340, height: 240 };
+    screen.emit('display-removed');
+    assert.ok(windows[0].bounds.x + windows[0].bounds.width <= 992);
+    assert.ok(windows[0].bounds.y + windows[0].bounds.height <= 792);
+    overlay.hide();
+    await overlay.flush();
+    assert.equal(JSON.parse(fs.readFileSync(prefs, 'utf8')).visible, false);
+    overlay.show();
+    await overlay.flush();
+    assert.equal(JSON.parse(fs.readFileSync(prefs, 'utf8')).visible, true);
+    assert.equal(overlay.isVisible(), true);
+    overlay.destroy();
+    await overlay.flush();
+  } finally {
+    overlay.destroy();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
