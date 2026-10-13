@@ -319,6 +319,13 @@ function registerIpc() {
     return textAttachments.readTextAttachments(result.filePaths);
   });
   handle('imports:scan-zip', async archivePath => zipImport.scanZip(archivePath, app.getPath('userData')));
+  handle('imports:install-node-dependencies', async projectPath => {
+    if (!await confirmComputerAction('Install reviewed Node.js dependencies?', 'CO-Agent will run npm install with lifecycle scripts disabled and use the official npm registry. This downloads dependencies but does not run the imported project or its install scripts.\n\nProject: ' + String(projectPath || '').slice(0, 500))) throw new Error('Dependency installation cancelled by user.');
+    await recordAudit('zip.dependencies.install', 'approved', { project: path.basename(String(projectPath || '')) });
+    const result = await zipImport.installNodeDependencies(projectPath, app.getPath('userData'));
+    await recordAudit('zip.dependencies.install', 'success', { project: path.basename(String(projectPath || '')), dependencies: result.dependencies, scriptsExecuted: false });
+    return result;
+  });
   handle('dialog:open-files', async options => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: options?.multiple === false ? ['openFile'] : ['openFile','multiSelections'],
