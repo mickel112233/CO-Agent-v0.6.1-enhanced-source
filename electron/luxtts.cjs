@@ -124,6 +124,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
         let metadata;
         try { metadata = await probe(output); }
         catch (error) { await finish(new Error('LuxTTS output failed FFprobe validation: ' + String(error.message || error).slice(0, 800))); return; }
+        if (job.cancelled) { await finish(new Error('LuxTTS generation cancelled by user.')); return; }
         const audio = Array.isArray(metadata?.streams) ? metadata.streams.find(stream => stream.codec_type === 'audio') : null;
         const formatNames = String(metadata?.format?.format_name || '').split(',');
         const sampleRate = Number(audio?.sample_rate);
