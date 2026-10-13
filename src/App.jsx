@@ -310,8 +310,16 @@ export default function App() {
       await verifyModelReady(model);
       setSelectedModel(model); setNotice('Model is ready and confirmed in Ollama: ' + model);
       await refreshRuntime();
-    } catch (error) { const message = error.message || String(error); setNotice(/cancel/i.test(message) ? 'Model download cancelled. You can resume it later.' : 'Model setup failed: ' + message + '. You can retry; Ollama may resume existing layers.'); }
-    finally { setBusy(false); setActiveModelPullId(''); }
+    } catch (error) {
+      const message = error.message || String(error);
+      if (/cancel|abort/i.test(message)) {
+        setNotice('Model download cancelled. You can resume it later.');
+        setDownloadProgress(old => old ? { ...old, status: 'Cancelled', error: '' } : null);
+      } else {
+        setNotice('Model setup failed: ' + message + '. You can retry; Ollama may resume existing layers.');
+        setDownloadProgress(old => old ? { ...old, status: 'Failed', error: message } : null);
+      }
+    } finally { setBusy(false); setActiveModelPullId(''); }
   }
 
   async function setupLuxTTSFromSetup() {
@@ -350,8 +358,16 @@ export default function App() {
       setDownloadProgress({ model: modelToInstall.trim(), status: 'Success', percent: 100, completed: 0, total: 0 });
       setSelectedModel(modelToInstall.trim());
       await refreshRuntime();
-    } catch (error) { setNotice((error.message || String(error)) + ' You can retry the download; Ollama may resume existing layers.'); setDownloadProgress(old => old ? { ...old, status: 'Failed', error: error.message || String(error) } : null); }
-    finally { setBusy(false); setActiveModelPullId(''); }
+    } catch (error) {
+      const message = error.message || String(error);
+      if (/cancel|abort/i.test(message)) {
+        setNotice('Model download cancelled. You can resume it later.');
+        setDownloadProgress(old => old ? { ...old, status: 'Cancelled', error: '' } : null);
+      } else {
+        setNotice(message + ' You can retry the download; Ollama may resume existing layers.');
+        setDownloadProgress(old => old ? { ...old, status: 'Failed', error: message } : null);
+      }
+    } finally { setBusy(false); setActiveModelPullId(''); }
   }
   async function cancelModelPull() {
     if (!activeModelPullId) return;
