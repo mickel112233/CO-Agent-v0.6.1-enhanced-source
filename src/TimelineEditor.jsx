@@ -163,6 +163,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
     if (!instruction || planningEdit || busy) return;
     setPlanningEdit(true); setEditPlan(null); setNotice('');
     try {
+      const baseSignature = JSON.stringify(projectRef.current);
       const snapshot = { title: project.title, clips: project.clips.map(({ id, type, track, timelineStart, sourceStart, duration, text, file }) => ({ id, type, track, timelineStart, sourceStart, duration, text, name: baseName(file) })) };
       const prompt = [
         'You are the timeline-edit planner for CO-Agent Video Studio. Interpret the user request as natural-language editing intent.',
@@ -231,7 +232,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       if (safe.some(action => action.clipId && removedIds.has(action.clipId) && action.type !== 'remove_clip')) throw new Error('The plan edits a clip after removing it. Ask for a simpler plan and try again.');
       const splitIds = safe.filter(action => action.type === 'split_clip').map(action => action.clipId);
       if (new Set(splitIds).size !== splitIds.length) throw new Error('The plan splits the same clip more than once; review a simpler plan.');
-      setEditPlan({ actions: safe, baseSignature: JSON.stringify(projectRef.current), summary: String(parsed.summary || 'Review the proposed timeline edits below.').slice(0, 500) });
+      setEditPlan({ actions: safe, baseSignature, summary: String(parsed.summary || 'Review the proposed timeline edits below.').slice(0, 500) });
     } catch (error) { setNotice('Could not plan timeline edits: ' + (error.message || String(error))); }
     finally { setPlanningEdit(false); }
   }
