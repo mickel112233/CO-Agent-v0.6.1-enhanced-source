@@ -54,6 +54,8 @@ test('packaged smoke mode checks renderer, pet assets/licenses, and critical IPC
   assert.match(main, /runtime:ollama-pull-cancel/);
   assert.match(main, /studio:render-timeline/);
   assert.match(workflow, /Smoke-test standalone ZIP package/);
+  assert.match(main, /mainWindow\.on\('closed',[\s\S]*?\);\n  return load;/);
+  assert.doesNotMatch(main, /return load;\n  mainWindow\.webContents\.on\('did-fail-load'/);
   assert.match(workflow, /Install and smoke-test NSIS installer/);
   const pkg = JSON.parse(await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8'));
   const extra = pkg.build.extraResources;
