@@ -114,3 +114,51 @@ test('LuxTTS can generate and validate a real WAV from a deterministic reference
     assert.equal(result.sampleRate, 48000);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('LuxTTS rejects invalid worker output and only returns verified WAV metadata', async t => {
+  const studio = require('../electron/studio.cjs');
+  const { EventEmitter } = require('node:events');
+  const { PassThrough } = require('node:stream');
+  if (!studio.getCapabilities().ffprobe) { t.skip('FFprobe is unavailable in this runner.'); return; }
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-luxtts-verified-'));
+  try {
+    const appPath = dir, userDataPath = path.join(dir, 'data'), resourcesPath = path.join(dir, 'resources');
+    const python = path.join(userDataPath, 'runtime', 'luxtts', 'venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
+    await fs.mkdir(path.dirname(python), { recursive: true });
+    await fs.writeFile(python, 'fixture');
+    await fs.mkdir(path.join(appPath, 'third_party', 'LuxTTS'), { recursive: true });
+    await fs.mkdir(path.join(appPath, 'scripts'), { recursive: true });
+    await fs.writeFile(path.join(appPath, 'scripts', 'luxtts-worker.py'), '# fixture worker');
+    const validWav = Buffer.alloc(44 + 48000);
+    validWav.write('RIFF', 0); validWav.writeUInt32LE(validWav.length - 8, 4); validWav.write('WAVE', 8);
+    validWav.write('fmt ', 12); validWav.writeUInt32LE(16, 16); validWav.writeUInt16LE(1, 20);
+    validWav.writeUInt16LE(1, 22); validWav.writeUInt32LE(48000, 24); validWav.writeUInt32LE(96000, 28);
+    validWav.writeUInt16LE(2, 32); validWav.writeUInt16LE(16, 34); validWav.write('data', 36); validWav.writeUInt32LE(validWav.length - 44, 40);
+    const reference = path.join(dir, 'reference.wav');
+    await fs.writeFile(reference, validWav);
+    const fakeSpawn = (_file, _args, _spawnOptions) => {
+      const child = new EventEmitter();
+      child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.stdin = { end: requestText => {
+        setImmediate(async () => {
+          const request = JSON.parse(requestText);
+          const outputBytes = request.text === 'invalid' ? Buffer.alloc(64) : validWav;
+          await fs.writeFile(request.outputPath, outputBytes);
+          child.stdout.write(JSON.stringify({ ok: true, output: request.outputPath, sampleRate: 48000, bytes: outputBytes.length }) + '\n');
+          child.stdout.end(); child.stderr.end(); child.emit('close', 0);
+        });
+      } };
+      child.kill = () => { child.__coAgentCancelled = true; setImmediate(() => child.emit('close', 1)); };
+      return child;
+    };
+    const goodPath = path.join(dir, 'good.wav');
+    const result = await lux.generate({ text: 'verified', referenceAudio: reference, outputPath: goodPath, requestId: 'verified-wav' }, { appPath, userDataPath, resourcesPath, spawn: fakeSpawn });
+    assert.equal(result.verified, true);
+    assert.equal(result.codec, 'pcm_s16le');
+    assert.equal(result.sampleRate, 48000);
+    assert.ok(result.duration > 0);
+    const badPath = path.join(dir, 'bad.wav');
+    await assert.rejects(() => lux.generate({ text: 'invalid', referenceAudio: reference, outputPath: badPath, requestId: 'invalid-wav' }, { appPath, userDataPath, resourcesPath, spawn: fakeSpawn }), /FFprobe validation/i);
+    await assert.rejects(() => fs.stat(badPath), { code: 'ENOENT' });
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
