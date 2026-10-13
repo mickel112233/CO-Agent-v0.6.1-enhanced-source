@@ -61,10 +61,13 @@ export default function ComputerUse() {
     if (!current) return;
     const payload = action.type === 'click' ? { x: Math.round(action.x * (current.bounds?.width || current.width) / current.width), y: Math.round(action.y * (current.bounds?.height || current.height) / current.height), displayId: current.displayId } : action.type === 'type' ? { text: action.text } : { key: action.key };
     const summary = action.type === 'click' ? 'Click at screenshot coordinates ' + action.x + ', ' + action.y : action.type === 'type' ? 'Type suggested text: ' + action.text : 'Press suggested key: ' + action.key;
-    const success = await perform(action.type, payload, summary + '. Reason: ' + action.reason);
-    // The desktop may have changed after this action, so never keep executing
-    // coordinates from a plan grounded in the previous screenshot.
-    if (success) setPlan([]);
+    try {
+      await perform(action.type, payload, summary + '. Reason: ' + action.reason);
+    } finally {
+      // A failed input can still partially change the desktop. Never retain
+      // coordinates grounded in the old screenshot, even when dispatch fails.
+      setPlan([]);
+    }
   }
 
   async function inspect() {
