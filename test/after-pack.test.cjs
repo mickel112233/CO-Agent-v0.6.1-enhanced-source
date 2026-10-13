@@ -39,3 +39,16 @@ test('afterPack does not bundle the Windows executable into non-Windows packages
     await assert.rejects(fs.stat(path.join(appOutDir, 'resources', 'pet')), { code: 'ENOENT' });
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
+
+
+test('packaged smoke mode checks renderer, pet assets/licenses, and critical IPC handlers', async () => {
+  const main = await fs.readFile(path.join(__dirname, '..', 'electron', 'main.cjs'), 'utf8');
+  const workflow = await fs.readFile(path.join(__dirname, '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.match(main, /--co-agent-smoke-test/);
+  assert.match(main, /pet-assets.*albedo.*id1_1\.png/);
+  assert.match(main, /pet-assets.*licenses.*licence\.txt/);
+  assert.match(main, /runtime:ollama-pull-cancel/);
+  assert.match(main, /studio:render-timeline/);
+  assert.match(workflow, /Smoke-test standalone ZIP package/);
+  assert.match(workflow, /Install and smoke-test NSIS installer/);
+});
