@@ -1,9 +1,16 @@
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 
 function normalizeBaseUrl(value = DEFAULT_OLLAMA_URL) {
-  const url = new URL(value);
+  let url;
+  try { url = new URL(String(value || DEFAULT_OLLAMA_URL)); }
+  catch { throw new Error('Enter a valid Ollama URL.'); }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Ollama URL must use HTTP or HTTPS.');
-  return url.toString().replace(/\/+$/, '');
+  if (url.username || url.password) throw new Error('Ollama URL must not contain credentials.');
+  if (url.search || url.hash) throw new Error('Ollama URL must not contain query parameters or fragments.');
+  const host = url.hostname.toLowerCase();
+  const loopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  if (url.protocol === 'http:' && !loopback) throw new Error('Remote Ollama endpoints must use HTTPS. Plain HTTP is allowed only for localhost.');
+  return url.toString().replace(/\\/+$/, '');
 }
 function validateModelName(value) {
   const name = String(value || '').trim();
