@@ -55,6 +55,16 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     };
   }, [activeLuxRequest]);
 
+  async function togglePetOverlay() {
+    setBusy('pet-overlay');
+    try {
+      const result = await desktop.pet.toggleOverlay();
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Companion overlay toggle failed.');
+      setNotice(result.visible ? 'CO-Agent companion is visible on your desktop.' : 'CO-Agent companion hidden.');
+    } catch (error) { setNotice(formatError(error)); }
+    finally { setBusy(''); }
+  }
+
   async function launchPet() {
     setBusy('pet'); setNotice('');
     try { const result = await desktop.pet.launch(); if (result?.ok === false || result?.error) throw new Error(result.error || 'Pet launch failed.'); setNotice(result.alreadyRunning ? 'Desktop pet is already running.' : 'Desktop pet launched.'); setPetStatus(await desktop.pet.status()); }
@@ -211,9 +221,9 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     <div className="integration-cards">
       <article className="integration-card">
         <div className="integration-card-top"><span className="integration-icon"><Sparkles size={20}/></span><span className={'integration-state ' + (petStatus?.running ? 'ready' : 'optional')}>{petStatus?.running ? 'Running' : petStatus?.installed ? 'Ready' : 'Source only'}</span></div>
-        <h3>CO-Agent desktop pet</h3><p>Launch the separate Tauri desktop companion through an approved native process bridge.</p>
+        <h3>CO-Agent desktop companion</h3><p>The animated companion uses the original pet sprite assets and opens by default. Its prompt sends requests into CO-Agent chat; computer actions still require approval.</p>
         <div className="integration-card-meta"><span>{petStatus?.installed ? 'Windows executable detected' : 'Tauri 2 executable not packaged'}</span></div>
-        <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy || !petStatus?.installed} onClick={launchPet}>{busy === 'pet' ? 'Working…' : petStatus?.running ? 'Launch / focus' : 'Launch pet'}</button><button className="text-link" disabled={!!busy || !petStatus?.running} onClick={closePet}>Close tracked process</button></div>
+        <div className="integration-card-actions"><button className="primary-button" disabled={!!busy} onClick={togglePetOverlay}>{busy === 'pet-overlay' ? 'Working…' : 'Show / hide companion'}</button><button className="secondary-button" disabled={!!busy || !petStatus?.installed} onClick={launchPet}>{busy === 'pet' ? 'Working…' : 'Launch native pet'}</button><button className="text-link" disabled={!!busy || !petStatus?.running} onClick={closePet}>Close native pet</button></div>
         {!petStatus?.installed && <p className="integration-note">{petStatus?.message || 'Build and package convai-desktop-pet.exe before launching.'}</p>}
       </article>
       <article className="integration-card luxtts-card">
