@@ -168,6 +168,18 @@ export default function App() {
     } finally { setBusy(false); setActiveRequestId(''); }
   };
 
+  useEffect(() => {
+    const unsubscribe = desktop?.pet?.onIncomingMessage?.(event => {
+      const text = String(event?.text || '').trim();
+      if (!text) return;
+      setSection('Chat');
+      if (busy) { setMessage(text); setNotice('Pet request placed in the chat composer. Send it when the current request finishes.'); return; }
+      setNotice('Pet request received. Review it in chat before approving any computer actions.');
+      void send(text);
+    });
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, [send, busy]);
+
   async function testApiConnection() {
     if (!apiKey.trim()) { setNotice('Enter an API key before testing the connection.'); return; }
     setBusy(true); setNotice('Testing the selected API provider…');
