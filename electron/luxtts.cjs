@@ -62,6 +62,14 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   const stat = await fs.stat(reference).catch(() => null);
   if (!stat?.isFile()) throw new Error('Reference audio must be an existing regular file.');
   const output = path.resolve(outputPath);
+  if (path.extname(output).toLowerCase() !== '.wav') throw new Error('LuxTTS output path must end in .wav.');
+  const existingOutput = await fs.lstat(output).catch(() => null);
+  if (existingOutput) throw new Error('LuxTTS will not overwrite an existing file. Choose a new output path.');
+  if (stat.size > 100 * 1024 * 1024) throw new Error('Reference audio exceeds the 100 MB safety limit.');
+  const referenceMetadata = await require('./studio.cjs').probe(reference);
+  const referenceStream = Array.isArray(referenceMetadata?.streams) ? referenceMetadata.streams.find(stream => stream.codec_type === 'audio') : null;
+  const referenceDuration = Number(referenceMetadata?.format?.duration);
+  if (!referenceStream || !Number.isFinite(referenceDuration) || referenceDuration < 0.25 || referenceDuration > 600) throw new Error('Reference audio must contain a playable audio stream between 0.25 seconds and 10 minutes.');
   await fs.mkdir(path.dirname(output), { recursive: true });
   const runtime = await status(options);
   if (!runtime.installed) throw new Error(runtime.message);

@@ -151,6 +151,11 @@ test('LuxTTS rejects invalid worker output and only returns verified WAV metadat
       child.kill = () => { child.__coAgentCancelled = true; setImmediate(() => child.emit('close', 1)); };
       return child;
     };
+    const existingPath = path.join(dir, 'existing.wav');
+    await fs.writeFile(existingPath, 'preserve me');
+    await assert.rejects(() => lux.generate({ text: 'verified', referenceAudio: reference, outputPath: existingPath, requestId: 'existing-output' }, { appPath, userDataPath, resourcesPath, spawn: fakeSpawn }), /will not overwrite/i);
+    assert.equal(await fs.readFile(existingPath, 'utf8'), 'preserve me');
+    await assert.rejects(() => lux.generate({ text: 'verified', referenceAudio: reference, outputPath: path.join(dir, 'bad.mp3'), requestId: 'bad-extension' }, { appPath, userDataPath, resourcesPath, spawn: fakeSpawn }), /must end in \.wav/i);
     const goodPath = path.join(dir, 'good.wav');
     const result = await lux.generate({ text: 'verified', referenceAudio: reference, outputPath: goodPath, requestId: 'verified-wav' }, { appPath, userDataPath, resourcesPath, spawn: fakeSpawn });
     assert.equal(result.verified, true);
