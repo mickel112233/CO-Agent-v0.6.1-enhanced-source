@@ -134,9 +134,10 @@ function cancel(requestId) {
 
 function runSetupCommand(file, args, options, onProgress) {
   return new Promise((resolve, reject) => {
-    const { jobId, activeSetupJobs: jobs, ...spawnOptions } = options;
+    const { jobId, activeSetupJobs: jobs, spawn: spawnOverride, ...spawnOptions } = options;
     if (jobId && jobs?.get(jobId)?.cancelled) { reject(new Error('LuxTTS setup cancelled by user.')); return; }
-    const proc = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...spawnOptions });
+    const spawnCommand = spawnOverride || spawn;
+    const proc = spawnCommand(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...spawnOptions });
     if (jobId && jobs?.has(jobId)) jobs.get(jobId).proc = proc;
     let stderr = '', stdout = '', settled = false;
     const timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS setup command timed out.')); }, 30 * 60 * 1000);
@@ -172,7 +173,7 @@ async function setup({ pythonPath = '', requestId = '' } = {}, options = {}, onP
   const venvPython = path.join(venv, process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
   const bootstrap = String(pythonPath || (process.platform === 'win32' ? 'py' : 'python3'));
   const bootstrapArgs = !pythonPath && process.platform === 'win32' ? ['-3.11'] : [];
-  const probe = await runSetupCommand(bootstrap, [...bootstrapArgs, '--version'], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'python-check', message: chunk }));
+  const probe = await runSetupCommand(bootstrap, [...bootstrapArgs, '--version'], { jobId, activeSetupJobs, spawn: options.spawn }, chunk => onProgress({ requestId: jobId, stage: 'python-check', message: chunk }));
   const versionText = (probe.stdout + ' ' + probe.stderr).trim();
   const version = versionText.match(/Python\s+(\d+)\.(\d+)/i);
   if (!version || Number(version[1]) !== 3 || Number(version[2]) < 10 || Number(version[2]) > 11) throw new Error('LuxTTS requires Python 3.10 or 3.11. Detected: ' + (versionText || 'unknown version') + '. Install Python 3.11 and retry.');
@@ -181,7 +182,7 @@ async function setup({ pythonPath = '', requestId = '' } = {}, options = {}, onP
   await runSetupCommand(bootstrap, [...bootstrapArgs, '-m', 'venv', venv], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'venv', message: chunk }));
   onProgress({ requestId: jobId, stage: 'dependencies', message: 'Installing LuxTTS dependencies. This can take a while and may download several gigabytes…' });
   await runSetupCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
-  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source, jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source, jobId, activeSetupJobs, spawn: options.spawn }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
   // The upstream requirements do not declare soundfile directly, but the
   // isolated worker imports it to write a standards-compliant WAV file.
   await runSetupCommand(venvPython, ['-m', 'pip', 'install', 'soundfile'], { cwd: source, jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
