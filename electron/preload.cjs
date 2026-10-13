@@ -32,13 +32,19 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     ocrStatus: invoke('studio:ocr-status'), ocrImage: invoke('studio:ocr-image'),
     hyperframesStatus: invoke('studio:hyperframes-status'), hyperframesRun: invoke('studio:hyperframes-run')
   }),
+  audit: Object.freeze({ list: invoke('audit:list') }),
   integrations: Object.freeze({
     status: invoke('integrations:status'),
     installTool: invoke('integrations:install-tool'),
     listRepos: invoke('integrations:list-repos'),
     getSkills: invoke('integrations:get-skills'),
     installRepo: invoke('integrations:install-repo'),
-    removeRepo: invoke('integrations:remove-repo')
+    removeRepo: invoke('integrations:remove-repo'),
+    listMcpTools: invoke('integrations:mcp-tools'),
+    callMcpTool: invoke('integrations:mcp-call'),
+    runAcp: invoke('integrations:acp-run'),
+    cancelAcp: invoke('integrations:acp-cancel'),
+    onAcpUpdate: callback => subscribe('integrations:acp-update', callback)
   }),
   pet: Object.freeze({ status: invoke('pet:status'), launch: invoke('pet:launch'), close: invoke('pet:close') }),
   luxTTS: Object.freeze({ status: invoke('luxtts:status'), setup: invoke('luxtts:setup'), generate: invoke('luxtts:generate'), cancel: invoke('luxtts:cancel'), onSetupProgress: callback => subscribe('luxtts:setup-progress', callback), onGenerationProgress: callback => subscribe('luxtts:generation-progress', callback) }),
