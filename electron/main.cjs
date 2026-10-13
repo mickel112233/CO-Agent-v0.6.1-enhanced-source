@@ -426,7 +426,19 @@ async function runPackagedSmokeTest() {
   for (const channel of ['runtime:chat', 'runtime:ollama-pull-cancel', 'pet:show-overlay', 'studio:render-timeline', 'imports:scan-zip']) {
     if (!registered.has(channel)) throw new Error('Packaged smoke test missing IPC handler: ' + channel);
   }
-  process.stdout.write(JSON.stringify({ ok: true, version: app.getVersion(), renderer: true, preload: true, petExecutable: true, petAssetsAndLicenses: true, ipcHandlers: [...registered].length }) + '\n');
+  const rendererErrors = [];
+  const load = createWindow({ show: false });
+  mainWindow.webContents.on('console-message', (_event, details, legacyMessage) => {
+    const level = details && typeof details === 'object' ? details.level : details;
+    const message = details && typeof details === 'object' ? details.message : legacyMessage;
+    if (Number(level) >= 3) rendererErrors.push(String(message).slice(0, 500));
+  });
+  await load;
+  await mainWindow.webContents.executeJavaScript('new Promise(resolve => setTimeout(resolve, 500))');
+  const rendererState = await mainWindow.webContents.executeJavaScript("({ rootChildren: document.querySelector('#root')?.children.length || 0, bodyText: (document.body?.innerText || '').trim().slice(0, 500) })");
+  if (!rendererState.rootChildren || !rendererState.bodyText) throw new Error('Packaged renderer loaded a blank or unmounted UI.');
+  if (rendererErrors.length) throw new Error('Packaged renderer console errors: ' + rendererErrors.join(' | '));
+  process.stdout.write(JSON.stringify({ ok: true, version: app.getVersion(), renderer: 'mounted', rootChildren: rendererState.rootChildren, bodyText: rendererState.bodyText, preload: true, petExecutable: true, petAssetsAndLicenses: true, ipcHandlers: [...registered].length }) + '\n');
 }
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
@@ -453,9 +465,9 @@ function createTray() {
   tray.on('click', showMainWindow);
   return tray;
 }
-function createWindow() {
+function createWindow({ show = true } = {}) {
   mainWindow = new BrowserWindow({
-    width: 1440, height: 920, minWidth: 900, minHeight: 620,
+    show, width: 1440, height: 920, minWidth: 900, minHeight: 620,
     title: 'CO-Agent', backgroundColor: '#f8f8f6',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
@@ -470,6 +482,7 @@ function createWindow() {
   const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
   const load = isDev ? mainWindow.loadURL(devUrl) : mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   load.catch(error => console.error('CO-Agent renderer failed to load:', error));
+  return load;
   mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => console.error('Renderer load failed:', { code, description, url }));
   mainWindow.on('close', event => { if (!isQuitting) { event.preventDefault(); mainWindow.hide(); } });
   mainWindow.on('closed', () => { mainWindow = null; petMessageBridgeReady = false; });

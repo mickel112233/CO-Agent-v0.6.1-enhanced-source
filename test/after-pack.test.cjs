@@ -45,6 +45,10 @@ test('packaged smoke mode checks renderer, pet assets/licenses, and critical IPC
   const main = await fs.readFile(path.join(__dirname, '..', 'electron', 'main.cjs'), 'utf8');
   const workflow = await fs.readFile(path.join(__dirname, '..', '.github', 'workflows', 'ci.yml'), 'utf8');
   assert.match(main, /--co-agent-smoke-test/);
+  assert.match(main, /renderer: 'mounted'/);
+  assert.match(main, /document\.querySelector\('#root'\)/);
+  assert.match(main, /Packaged renderer loaded a blank or unmounted UI/);
+  assert.match(main, /createWindow\(\{ show: false \}\)/);
   assert.match(main, /pet-assets.*albedo.*id1_1\.png/);
   assert.match(main, /pet-assets.*licenses.*licence\.txt/);
   assert.match(main, /runtime:ollama-pull-cancel/);
