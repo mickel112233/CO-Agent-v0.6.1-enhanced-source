@@ -107,7 +107,7 @@ function buildSoundEffectArgs(preset, duration, outputPath) {
   else if (preset === 'sweep') source = 'aevalsrc=0.55*sin(2*PI*(220*t+40*t*t)):s=48000:d=' + d + ',afade=t=out:st=' + Math.max(0, seconds - 0.2) + ':d=0.2';
   else if (preset === 'ambient') source = 'anoisesrc=color=pink:amplitude=0.12:duration=' + d + ',lowpass=f=900,afade=t=in:st=0:d=' + Math.min(0.25, seconds / 3) + ',afade=t=out:st=' + Math.max(0, seconds - 0.3) + ':d=' + Math.min(0.3, seconds / 3);
   else source = 'sine=frequency=880:sample_rate=48000:duration=' + d + ',afade=t=out:st=' + Math.max(0, seconds - 0.12) + ':d=' + Math.min(0.12, seconds);
-  return { output, args: ['-y', '-f', 'lavfi', '-i', source, '-vn', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2', output] };
+  return { output, args: ['-n', '-f', 'lavfi', '-i', source, '-vn', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2', output] };
 }
 async function generateSoundEffect({ preset = 'impact', duration = 2, outputPath } = {}) {
   const plan = buildSoundEffectArgs(preset, duration, outputPath);
