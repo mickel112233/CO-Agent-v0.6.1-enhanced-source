@@ -85,7 +85,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
       error ? reject(error) : resolve(value);
     };
     activeJobs.set(jobId, proc);
-    timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
+    timer = setTimeout(() => { proc.__coAgentTimedOut = true; proc.kill(); finish(new Error('LuxTTS generation timed out after 15 minutes.')); }, timeoutMs);
     proc.stdout.on('data', chunk => {
       const value = chunk.toString(); stdout = (stdout + value).slice(-100000); lineBuffer += value;
       const lines = lineBuffer.split(/\r?\n/); lineBuffer = lines.pop() || '';
@@ -95,6 +95,7 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
     proc.once('error', error => finish(new Error('Could not start LuxTTS Python worker: ' + error.message)));
     proc.once('close', async code => {
       if (settled) return;
+      if (proc.__coAgentTimedOut) { await finish(new Error('LuxTTS generation timed out after 15 minutes.')); return; }
       if (proc.__coAgentCancelled) { await finish(new Error('LuxTTS generation cancelled by user.')); return; }
       let result;
       try { result = JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}'); } catch {}
