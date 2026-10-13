@@ -399,7 +399,7 @@ async function runPackagedSmokeTest() {
   for (const channel of ['runtime:chat', 'runtime:ollama-pull-cancel', 'pet:show-overlay', 'studio:render-timeline', 'imports:scan-zip']) {
     if (!registered.has(channel)) throw new Error('Packaged smoke test missing IPC handler: ' + channel);
   }
-  process.stdout.write(JSON.stringify({ ok: true, version: app.getVersion(), renderer: true, preload: true, petExecutable: true, petAssetsAndLicenses: true, ipcHandlers: [...registered].length }) + '\\n');
+  process.stdout.write(JSON.stringify({ ok: true, version: app.getVersion(), renderer: true, preload: true, petExecutable: true, petAssetsAndLicenses: true, ipcHandlers: [...registered].length }) + '\n');
 }
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
@@ -450,7 +450,7 @@ function createWindow() {
 app.whenReady().then(async () => {
   if (process.argv.includes('--co-agent-smoke-test')) {
     try { await runPackagedSmokeTest(); app.exit(0); }
-    catch (error) { process.stderr.write('CO-Agent packaged smoke test failed: ' + (error.message || String(error)) + '\\n'); app.exit(1); }
+    catch (error) { process.stderr.write('CO-Agent packaged smoke test failed: ' + (error.message || String(error)) + '\n'); app.exit(1); }
     return;
   }
   try {
