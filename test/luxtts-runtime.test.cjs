@@ -125,7 +125,7 @@ test('LuxTTS rejects and removes malformed output even when the worker claims su
   child.stdin = { end(payload) {
     const request = JSON.parse(payload);
     fsSync.writeFileSync(request.outputPath, Buffer.alloc(64, 0x41));
-    queueMicrotask(() => { child.stdout.emit('data', Buffer.from('{"ok":true}\\n')); child.emit('close', 0); });
+    queueMicrotask(() => { child.stdout.emit('data', Buffer.from('{"ok":true}\n')); child.emit('close', 0); });
   } };
   child.kill = () => { queueMicrotask(() => child.emit('close', 1)); return true; };
   let pending;
@@ -135,7 +135,7 @@ test('LuxTTS rejects and removes malformed output even when the worker claims su
       { appPath: dir, resourcesPath: path.join(dir, 'resources'), userDataPath, spawn: () => { spawnResolve(); return child; } }
     );
     await spawnStarted;
-    await assert.rejects(pending, /valid RIFF\\/WAVE/i);
+    await assert.rejects(pending, /valid RIFF\/WAVE/i);
     await assert.rejects(fs.stat(output), { code: 'ENOENT' });
   } finally {
     lux.cancel('voice-invalid-test');
