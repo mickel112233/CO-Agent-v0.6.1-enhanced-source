@@ -20,12 +20,24 @@ const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
 const textAttachments = require('./text-attachments.cjs');
+const mcpClient = require('./mcp-client.cjs');
+const acpClient = require('./acp-client.cjs');
+const auditModule = require('./audit-log.cjs');
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
+const activeAcpRuns = new Map();
+let auditLogStore;
+function getAuditLogStore() {
+  if (!auditLogStore) auditLogStore = auditModule.createAuditLog(path.join(app.getPath('userData'), 'audit-log.jsonl'));
+  return auditLogStore;
+}
+async function recordAudit(action, status, details = {}, target = '') {
+  try { await getAuditLogStore().append({ action, status, target, details }); } catch {}
+}
 function isTrustedIpcSender(event) {
   const frame = event?.senderFrame;
   if (!mainWindow || event?.sender !== mainWindow.webContents || !frame || frame !== event.sender.mainFrame) return false;
@@ -194,6 +206,71 @@ function registerIpc() {
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
   handle('studio:hyperframes-run', args => hyperframes.runAction(args?.action, args?.projectDir));
+  handle('audit:list', limit => getAuditLogStore().list(limit));
+  handle('integrations:acp-run', async payload => {
+    const runId = String(payload?.runId || '');
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(runId) || activeAcpRuns.has(runId)) throw new Error('ACP run ID is invalid or already active.');
+    const root = workspace.getRoot();
+    if (!root || !path.isAbsolute(root)) throw new Error('Choose a workspace folder before launching an external ACP agent.');
+    const command = String(payload?.command || '');
+    const args = acpClient.normalizeArgs(payload?.args);
+    const prompt = String(payload?.prompt || '');
+    if (!prompt.trim() || prompt.length > acpClient.MAX_PROMPT) throw new Error('ACP task must contain between 1 and 12,000 characters.');
+    await fs.access(command);
+    const detail = 'Executable: ' + command + '\nArguments: ' + JSON.stringify(args).slice(0, 800) + '\nWorkspace: ' + root + '\nTask: ' + prompt.slice(0, 1500) + '\n\nWARNING: This external process runs as your Windows user and may read or change files outside the workspace. ACP permissions are not an OS sandbox. Launch only an agent executable you trust.';
+    if (!await confirmComputerAction('Start external ACP agent?', detail)) { await recordAudit('acp.launch', 'denied', { executable: path.basename(command), argsCount: args.length }, runId); throw new Error('ACP agent launch cancelled by user.'); }
+    await recordAudit('acp.launch', 'approved', { executable: path.basename(command), argsCount: args.length, workspace: root }, runId);
+    const client = acpClient.createClient({
+      command, args, cwd: root,
+      onUpdate: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('integrations:acp-update', { runId, ...event }); },
+      onPermission: async request => {
+        const options = Array.isArray(request.options) ? request.options.slice(0, 6) : [];
+        if (!options.length || !mainWindow || mainWindow.isDestroyed()) return { outcome: 'cancelled' };
+        const buttons = ['Deny', ...options.map(option => String(option.name || option.label || option.optionId || 'Allow').slice(0, 100))];
+        const decision = await dialog.showMessageBox(mainWindow, {
+          type: 'warning', title: 'External agent permission request',
+          message: String(request.title || 'The ACP agent requests permission').slice(0, 300),
+          detail: (String(request.description || 'No explanation supplied.') + '\n\nSubject: ' + JSON.stringify(request.subject || {}).slice(0, 1500) + '\n\nChoose the exact permission option to grant.').slice(0, 3000),
+          buttons, defaultId: 0, cancelId: 0, noLink: true
+        });
+        if (decision.response <= 0) { await recordAudit('acp.permission', 'denied', { runId, optionCount: options.length }); return { outcome: 'cancelled' }; }
+        const selected = options[decision.response - 1];
+        await recordAudit('acp.permission', 'approved', { runId, optionId: selected.optionId });
+        return { outcome: 'selected', optionId: selected.optionId };
+      }
+    });
+    activeAcpRuns.set(runId, client);
+    try {
+      await client.initialize();
+      await client.newSession();
+      const result = await client.runPrompt(prompt);
+      await recordAudit('acp.launch', 'completed', { runId, stopReason: result.stopReason, outputChars: result.output.length }, path.basename(command));
+      return { ...result, runId };
+    } catch (error) {
+      await recordAudit('acp.launch', 'failed', { runId, errorType: error.name || 'Error' }, path.basename(command));
+      throw error;
+    } finally {
+      activeAcpRuns.delete(runId);
+      client.close();
+    }
+  });
+  handle('integrations:acp-cancel', async runId => {
+    const client = activeAcpRuns.get(String(runId || ''));
+    if (!client) return { ok: true, cancelled: false };
+    return { ok: true, ...(await client.cancel()) };
+  });
+  handle('integrations:mcp-tools', async serverUrl => mcpClient.createClient(serverUrl).listTools());
+  handle('integrations:mcp-call', async payload => {
+    const serverUrl = mcpClient.validateServerUrl(payload?.serverUrl);
+    const toolName = String(payload?.toolName || '');
+    const args = mcpClient.normalizeToolArguments(payload?.arguments);
+    const summary = JSON.stringify(args).slice(0, 1800);
+    const serverHost = new URL(serverUrl).host;
+    if (!await confirmComputerAction('Allow this MCP tool call?', 'Server: ' + serverUrl + '\nTool: ' + toolName + '\nArguments (untrusted input): ' + summary + '\n\nThe server may perform external actions. Only approve if you trust this server and understand the tool. CO-Agent does not automatically execute returned instructions.')) { await recordAudit('mcp.tool.call', 'denied', { serverHost, toolName }); throw new Error('MCP tool call cancelled by user.'); }
+    await recordAudit('mcp.tool.call', 'approved', { serverHost, toolName });
+    try { const result = await mcpClient.createClient(serverUrl).callTool(toolName, args); await recordAudit('mcp.tool.call', result.isError ? 'failed' : 'completed', { serverHost, toolName, isError: result.isError }); return result; }
+    catch (error) { await recordAudit('mcp.tool.call', 'failed', { serverHost, toolName, errorType: error.name || 'Error' }); throw error; }
+  });
   handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));
   handle('integrations:install-tool', id => integrations.installTool(id));
   handle('integrations:list-repos', () => integrations.listRepos(app.getPath('userData')));
