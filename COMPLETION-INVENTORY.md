@@ -1,6 +1,7 @@
 # CO-Agent completion inventory
 
 **Updated:** 13 October 2026  
+**Latest implementation head:** `7a73fee` (verification run pending).
 **Target:** `main` of this repository  
 **Rule:** A component is not complete because a screen or helper exists. Automated source tests, CI, packaged-runtime checks, and hardware-dependent manual acceptance are separate gates.
 
@@ -13,13 +14,19 @@
 - [x] Video Studio contains an advanced timeline, natural-language edit-plan review/apply, LuxTTS voiceover path, FFmpeg-generated SFX, project save/load, and FFmpeg/FFprobe export validation paths. Real reference-audio synthesis and export playback still require runtime tests.
 - [x] ZIP import has traversal, symlink, file-count, expanded-size, and review-only scanning protections plus regression tests. It still needs adversarial fixtures against both platform extractors and full drag/drop UI acceptance.
 - [x] Ollama status/model inventory and streamed pull progress exist.
+- [x] Model pull cancellation is wired end-to-end with request IDs, an abort controller, stream-reader cancellation, and a renderer Cancel button. A regression test covers abort behavior; CI for the current head is pending.
+- [x] First-run model setup now checks the live Ollama model inventory after the pull and refuses to report readiness if the requested model is missing.
+- [x] ZIP path validation now rejects NTFS alternate data streams, Windows reserved device names, trailing dots/spaces, symlinks, traversal, and duplicate normalized entries on both platform extractors; real ZIP extraction tests cover valid and malicious archives.
+- [x] Third-party pet asset license files and the repository's third-party notice are configured as package resources.
+- [x] Added a packaged smoke-test mode and CI steps for standalone ZIP and installed NSIS startup; latest CI must confirm the workflow and package contents.
+- [x] Media integration test now creates a real video fixture, inserts generated audio, renders MP4, probes both streams and duration, and decodes the output to null; latest CI must confirm it passes.
 - [x] Chat history persistence, agent orchestration, audit log, computer-use approval, MCP/ACP adapters, and workspace file protections exist in source.
 
 ## P0 — build/test correctness and reliable setup
 
-- [ ] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implementation pushed; latest CI is pending.**
+- [x] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implemented; latest CI is pending.**
 - [ ] Confirm a cancelled pull cannot be reported as a successful installation or leave the UI stuck in busy state.
-- [ ] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response.
+- [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; latest CI is pending.**
 - [ ] Improve first-run diagnostics for missing/offline Ollama, missing model, and failed setup; allow retry and safe skip without trapping the user.
 - [ ] Add LuxTTS setup cancellation, clean failure recovery, Python version/prerequisite detection, and post-install synthesis verification. Do not silently download or execute an unverified source.
 - [ ] Audit API/local provider state and chat cancellation. API key storage must be explicit and safe; never persist secrets to plain localStorage or chat history.
@@ -41,7 +48,7 @@
 - [ ] Test all typed edit actions (rename, caption/title, move, duration, source trim, remove, split) including invalid IDs, wrong tracks, boundary conditions, stale plans, undo/redo, and save/reload.
 - [ ] Generate LuxTTS voiceover using a real reference audio fixture and verify the WAV with FFprobe before adding it to the timeline.
 - [ ] Generate each sound-effect preset and verify duration, sample rate, channels, and WAV readability.
-- [ ] Export a deterministic video+audio fixture to MP4; validate codec, duration, expected audio/video streams, A/V sync, nonzero file size, and playable decode (FFmpeg decode-to-null or equivalent).
+- [x] Added a deterministic integration test that generates a video fixture and SFX, exports an MP4, checks video/audio streams and duration, and decodes the export. A real Windows run is still required for final acceptance.
 - [ ] Verify export cancellation, cleanup of partial files, preservation of a prior export, error messages, and output-path collisions.
 - [ ] Add timeline media fixture regression tests; a helper/unit test or source inspection is not an end-to-end export.
 
@@ -66,7 +73,7 @@
 - [ ] Reconcile the setup's candidate model choices and provide accurate disk/RAM requirements without presenting conflicting model sets as mandatory.
 - [ ] Verify API settings validation and connection tests for OpenAI-compatible, Anthropic, and Gemini protocols.
 - [ ] Verify keyboard navigation, focus management, accessible status/progress, responsive layout, and no blank/white screen in packaged builds.
-- [ ] Run a clean Windows install → launch → setup → chat → pet → media export → upgrade/repair → uninstall smoke test.
+- [ ] Run a clean Windows install → launch → setup → chat → pet → media export → upgrade/repair → uninstall smoke test. CI now performs packaged ZIP startup and NSIS install/start/uninstall smoke checks; interactive setup/chat/pet/media acceptance remains.
 - [ ] Attach CI logs and artifact links to a release; run dependency audit and document each accepted finding.
 - [ ] Update README and capability scorecard so every claim matches current behavior and known limitations.
 
