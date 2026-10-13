@@ -27,3 +27,13 @@ test('Video Studio passes the selected local or API provider into chat-driven ti
   assert.match(timeline, /clip\.timelineStart \+ duration > 3600/);
   assert.match(timeline, /sourceStart \+ clip\.duration > 3600/);
 });
+
+
+test('first-run model setup verifies Ollama inventory before reporting ready', async () => {
+  const app = await fs.readFile(path.join(root, 'src', 'App.jsx'), 'utf8');
+  assert.match(app, /async function verifyModelReady\(model\)/);
+  assert.match(app, /Ollama stopped responding after the download/);
+  assert.match(app, /did not list .* as installed/);
+  assert.match(app, /await verifyModelReady\(model\)/);
+  assert.match(app, /await verifyModelReady\(modelToInstall\.trim\(\)\)/);
+});
