@@ -59,7 +59,9 @@ async function localModel(modelName){
  return {status,model};
 }
 async function askLocal(model,messages,options={}){
- const response=await fetch(model.status.baseUrl+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:model.model,stream:false,format:'json',messages,options:{temperature:options.temperature??0.2,num_ctx:8192}}),signal:AbortSignal.timeout(options.timeoutMs||180000)});
+ const timeout=AbortSignal.timeout(options.timeoutMs||180000);
+ const signal=options.signal?AbortSignal.any([options.signal,timeout]):timeout;
+ const response=await fetch(model.status.baseUrl+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:model.model,stream:false,format:'json',messages,options:{temperature:options.temperature??0.2,num_ctx:8192}}),signal});
  if(!response.ok)throw new Error('Local agent request failed ('+response.status+'): '+(await response.text()).slice(0,1200));
  const data=await response.json();const content=data.message?.content;
  if(!content)throw new Error('The local model returned an empty agent response.');
@@ -132,4 +134,4 @@ async function runWorkflowStep(payload={}){
  const commands=Array.isArray(result.suggestedCommands)?result.suggestedCommands.filter(id=>['npm-test','npm-build','git-status','git-diff-check','npm-audit'].includes(id)).slice(0,5):[];
  return {ok:true,model:model.model,role:agent.name,skill:skill.name,summary:String(result.summary||'').slice(0,8000),findings:Array.isArray(result.findings)?result.findings.slice(0,12).map(x=>String(x).slice(0,1200)):[],risks:Array.isArray(result.risks)?result.risks.slice(0,10).map(x=>String(x).slice(0,1000)):[],files,suggestedCommands:commands,needsUserInput:!!result.needsUserInput,userQuestion:String(result.userQuestion||'').slice(0,1200)};
 }
-module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,normalizePipeline,planWorkflow,runWorkflowStep,parseJson};
+module.exports={BUILTIN_SKILLS,AGENT_PROFILES,getSkills,getAgents,normalizePipeline,planWorkflow,runWorkflowStep,parseJson,askLocal};
