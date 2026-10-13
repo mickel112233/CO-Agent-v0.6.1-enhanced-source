@@ -62,3 +62,16 @@ test('pet requests queue during renderer startup and bridge readiness drains the
   assert.match(app, /markBridgeReady/);
   assert.match(app, /Subscribe before acknowledging readiness/);
 });
+
+
+test('main window close hides to tray and tray exposes app and companion controls', () => {
+  const main = fs.readFileSync(path.join(root, 'electron', 'main.cjs'), 'utf8');
+  assert.match(main, /function createTray\(\)/);
+  assert.match(main, /new Tray\(icon\)/);
+  assert.match(main, /Open CO-Agent/);
+  assert.match(main, /Show companion/);
+  assert.match(main, /Hide companion/);
+  assert.match(main, /Quit CO-Agent/);
+  assert.match(main, /mainWindow\.on\('close', event => \{ if \(!isQuitting\)/);
+  assert.match(main, /tray\.destroy\(\)/);
+});
