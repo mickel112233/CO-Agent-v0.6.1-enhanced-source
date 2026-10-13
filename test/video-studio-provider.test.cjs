@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const fsSync = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
@@ -39,7 +40,7 @@ test('first-run model setup verifies Ollama inventory before reporting ready', a
 });
 
 test('Video Studio exposes request-scoped LuxTTS cancellation and ignores stale progress', () => {
-  const timeline = fs.readFileSync(path.join(root, 'src', 'TimelineEditor.jsx'), 'utf8');
+  const timeline = fsSync.readFileSync(path.join(root, 'src', 'TimelineEditor.jsx'), 'utf8');
   assert.match(timeline, /voiceRequestRef = useRef\(''\)/);
   assert.match(timeline, /event\.requestId !== voiceRequestRef\.current/);
   assert.match(timeline, /async function cancelVoiceover\(\)/);
