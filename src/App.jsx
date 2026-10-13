@@ -41,7 +41,6 @@ export default function App() {
   const [attachments, setAttachments] = useState([]);
   const [showComputerUse, setShowComputerUse] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState(() => { try { return localStorage.getItem('co-agent-setup-dismissed') === 'true'; } catch { return false; } });
-  const [showComputerUse, setShowComputerUse] = useState(false);
 
   const refreshRuntime = useCallback(async () => {
     if (!desktop?.runtime?.ollamaStatus) { setRuntime({ loading: false, available: false, models: [], error: 'Desktop bridge is unavailable. Open CO-Agent in Electron.' }); return; }
