@@ -59,6 +59,12 @@ test('generated sound effect can be inserted into a timeline and exported as a p
     assert.ok(metadata.streams.some(stream => stream.codec_type === 'audio'));
     assert.ok(Math.abs(Number(metadata.format.duration) - 1.5) < 0.5, 'export duration should stay aligned with the source fixture');
     await runFile(ffmpeg, ['-v', 'error', '-i', result.output, '-f', 'null', '-'], { timeout: 120000 });
+    const originalBytes = await fs.readFile(result.output);
+    await assert.rejects(() => timeline.render({
+      title: 'Must not overwrite',
+      clips: [{ id: 'source-video', type: 'video', file: sourceVideo, timelineStart: 0, sourceStart: 0, duration: 1.5, track: 'Video 1' }]
+    }, dir, 'verified-integration-export.mp4'), /already exists/i);
+    assert.deepEqual(await fs.readFile(result.output), originalBytes, 'a prior verified export must remain unchanged after a collision');
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }

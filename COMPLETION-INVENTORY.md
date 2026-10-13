@@ -47,7 +47,7 @@
 - [ ] Keep the selected Ollama/API provider and model configuration consistent across every chat-driven timeline action; ensure secrets are not persisted in projects or logs.
 - [ ] Test all typed edit actions (rename, caption/title, move, duration, source trim, remove, split) including invalid IDs, wrong tracks, boundary conditions, stale plans, undo/redo, and save/reload.
 - [ ] Generate LuxTTS voiceover using a real reference audio fixture and verify the WAV with FFprobe before adding it to the timeline.
-- [ ] Generate each sound-effect preset and verify duration, sample rate, channels, and WAV readability.
+- [x] Added FFmpeg/FFprobe integration coverage for every SFX preset (impact, sweep, ambient, beep), checking PCM WAV codec, 48 kHz, stereo channels, file readability, and requested duration. CI must pass this fixture test.
 - [x] Added a deterministic integration test that generates a video fixture and SFX, exports an MP4, checks video/audio streams and duration, and decodes the export. A real Windows run is still required for final acceptance.
 - [x] Timeline export supports request-scoped cancellation, renders to a unique temporary file, verifies before publishing, cleans partial output, and refuses to overwrite an existing export. CI tests the cancellation endpoint; packaged media acceptance remains.
 - [ ] Add timeline media fixture regression tests; a helper/unit test or source inspection is not an end-to-end export.
