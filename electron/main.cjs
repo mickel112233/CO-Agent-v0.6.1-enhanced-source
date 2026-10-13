@@ -30,6 +30,12 @@ const registered = new Set();
 let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
 const activeAcpRuns = new Map();
+const mcpClients = new Map();
+function getMcpClient(serverUrl) {
+  const endpoint = mcpClient.validateServerUrl(serverUrl);
+  if (!mcpClients.has(endpoint)) mcpClients.set(endpoint, mcpClient.createClient(endpoint));
+  return mcpClients.get(endpoint);
+}
 let auditLogStore;
 function getAuditLogStore() {
   if (!auditLogStore) auditLogStore = auditModule.createAuditLog(path.join(app.getPath('userData'), 'audit-log.jsonl'));
@@ -259,7 +265,7 @@ function registerIpc() {
     if (!client) return { ok: true, cancelled: false };
     return { ok: true, ...(await client.cancel()) };
   });
-  handle('integrations:mcp-tools', async serverUrl => mcpClient.createClient(serverUrl).listTools());
+  handle('integrations:mcp-tools', async serverUrl => getMcpClient(serverUrl).listTools());
   handle('integrations:mcp-call', async payload => {
     const serverUrl = mcpClient.validateServerUrl(payload?.serverUrl);
     const toolName = String(payload?.toolName || '');
@@ -268,7 +274,7 @@ function registerIpc() {
     const serverHost = new URL(serverUrl).host;
     if (!await confirmComputerAction('Allow this MCP tool call?', 'Server: ' + serverUrl + '\nTool: ' + toolName + '\nArguments (untrusted input): ' + summary + '\n\nThe server may perform external actions. Only approve if you trust this server and understand the tool. CO-Agent does not automatically execute returned instructions.')) { await recordAudit('mcp.tool.call', 'denied', { serverHost, toolName }); throw new Error('MCP tool call cancelled by user.'); }
     await recordAudit('mcp.tool.call', 'approved', { serverHost, toolName });
-    try { const result = await mcpClient.createClient(serverUrl).callTool(toolName, args); await recordAudit('mcp.tool.call', result.isError ? 'failed' : 'completed', { serverHost, toolName, isError: result.isError }); return result; }
+    try { const result = await getMcpClient(serverUrl).callTool(toolName, args); await recordAudit('mcp.tool.call', result.isError ? 'failed' : 'completed', { serverHost, toolName, isError: result.isError }); return result; }
     catch (error) { await recordAudit('mcp.tool.call', 'failed', { serverHost, toolName, errorType: error.name || 'Error' }); throw error; }
   });
   handle('integrations:status', async () => ({ ...(await integrations.getStatus()), extensionDirectory: path.join(app.getPath('userData'), 'extensions') }));

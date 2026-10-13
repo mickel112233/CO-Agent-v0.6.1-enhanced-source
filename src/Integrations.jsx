@@ -25,6 +25,11 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
   const [voiceOutput, setVoiceOutput] = useState('');
   const [luxProgress, setLuxProgress] = useState(null);
   const [activeLuxRequest, setActiveLuxRequest] = useState('');
+  const [mcpUrl, setMcpUrl] = useState('http://127.0.0.1:8000/mcp');
+  const [mcpTools, setMcpTools] = useState([]);
+  const [mcpToolName, setMcpToolName] = useState('');
+  const [mcpArguments, setMcpArguments] = useState('{}');
+  const [mcpServerInfo, setMcpServerInfo] = useState(null);
 
   const refresh = useCallback(async () => {
     setBusy('refresh'); setNotice('');
@@ -91,6 +96,32 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     if (!activeLuxRequest) return;
     try { const result = await desktop.luxTTS.cancel(activeLuxRequest); setNotice(result?.cancelled ? 'LuxTTS cancellation requested.' : 'LuxTTS job is no longer running.'); }
     catch (error) { setNotice(formatError(error)); }
+  }
+
+  async function discoverMcpTools() {
+    setBusy('mcp-discover'); setNotice('Connecting to the MCP server and reading its tool catalog…');
+    try {
+      const result = await desktop.integrations.listMcpTools(mcpUrl.trim());
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'MCP tool discovery failed.');
+      const tools = Array.isArray(result?.tools) ? result.tools : [];
+      setMcpTools(tools); setMcpToolName(tools[0]?.name || ''); setMcpServerInfo(result.serverInfo || null);
+      setNotice('Discovered ' + tools.length + ' MCP tool(s). Each tool call will require a separate approval.');
+    } catch (error) { setMcpTools([]); setNotice('MCP discovery failed: ' + formatError(error)); }
+    finally { setBusy(''); }
+  }
+
+  async function callMcpTool() {
+    if (!mcpToolName) { setNotice('Discover tools and select one first.'); return; }
+    let args;
+    try { args = JSON.parse(mcpArguments || '{}'); } catch { setNotice('Tool arguments must be valid JSON.'); return; }
+    if (!args || typeof args !== 'object' || Array.isArray(args)) { setNotice('Tool arguments must be a JSON object.'); return; }
+    setBusy('mcp-call'); setNotice('Waiting for approval and MCP response…');
+    try {
+      const result = await desktop.integrations.callMcpTool({ serverUrl: mcpUrl.trim(), toolName: mcpToolName, arguments: args });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'MCP tool call failed.');
+      setNotice('MCP result: ' + JSON.stringify(result).slice(0, 1800));
+    } catch (error) { setNotice('MCP tool call failed: ' + formatError(error)); }
+    finally { setBusy(''); }
   }
 
   async function installTool(tool) {
@@ -162,6 +193,19 @@ export default function Integrations({ selectedSkills = [], onSkillsChange = () 
     </div>
 
     <div className="integration-banner"><div className="integration-banner-icon"><ShieldCheck size={21}/></div><div><strong>Optional by design. Review before you trust.</strong><p>Chat works without these extras. OCR, video rendering, and voice add capabilities when you need them. Imported repositories are not executed automatically.</p></div></div>
+
+    <div className="integration-section-heading"><div><h2>Model Context Protocol (MCP)</h2><p>Connect an optional MCP server, inspect its advertised tools, and approve every tool call separately.</p></div></div>
+    <article className="integration-card mcp-card">
+      <label>MCP server URL<input value={mcpUrl} onChange={event => setMcpUrl(event.target.value)} placeholder="https://your-mcp-server.example/mcp" spellCheck={false}/></label>
+      <p className="integration-note">Use HTTPS for remote servers. Plain HTTP is accepted only for localhost/127.0.0.1. Do not include credentials, query parameters, or tokens in the URL.</p>
+      <div className="integration-card-actions"><button className="secondary-button" disabled={!!busy || !mcpUrl.trim()} onClick={discoverMcpTools}>{busy === 'mcp-discover' ? 'Discovering tools…' : 'Discover tools'}</button><span className="integration-note">{mcpServerInfo ? mcpServerInfo.name + (mcpServerInfo.version ? ' · ' + mcpServerInfo.version : '') : 'Not connected'}</span></div>
+      {mcpTools.length > 0 && <div className="mcp-tool-form">
+        <label>Tool<select value={mcpToolName} onChange={event => setMcpToolName(event.target.value)}>{mcpTools.map(tool => <option key={tool.name} value={tool.name}>{tool.name}</option>)}</select></label>
+        {mcpTools.find(tool => tool.name === mcpToolName)?.description && <p className="integration-note">{mcpTools.find(tool => tool.name === mcpToolName)?.description}</p>}
+        <label>Arguments (JSON object)<textarea value={mcpArguments} onChange={event => setMcpArguments(event.target.value)} rows={4} spellCheck={false}/></label>
+        <button className="primary-button" disabled={!!busy || !mcpToolName} onClick={callMcpTool}>{busy === 'mcp-call' ? 'Calling tool…' : 'Call tool with approval'}</button>
+      </div>}
+    </article>
 
     <div className="integration-section-heading"><div><h2>Desktop pet & local voice</h2><p>Optional companion overlay and local voice cloning. Setup is explicit and may download substantial dependencies.</p></div></div>
     <div className="integration-cards">
