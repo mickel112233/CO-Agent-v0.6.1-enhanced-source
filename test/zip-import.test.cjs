@@ -6,6 +6,43 @@ const os = require('node:os');
 const path = require('node:path');
 const zipImport = require('../electron/zip-import.cjs');
 
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function makeZip(entries) {
+  const local = [], central = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const data = Buffer.from(entry.data || '', 'utf8');
+    const crc = crc32(data);
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0); header.writeUInt16LE(20, 4);
+    header.writeUInt32LE(crc, 14); header.writeUInt32LE(data.length, 18);
+    header.writeUInt32LE(data.length, 22); header.writeUInt16LE(name.length, 26);
+    local.push(header, name, data);
+    const directory = Buffer.alloc(46);
+    directory.writeUInt32LE(0x02014b50, 0); directory.writeUInt16LE(20, 4);
+    directory.writeUInt16LE(20, 6); directory.writeUInt32LE(crc, 16);
+    directory.writeUInt32LE(data.length, 20); directory.writeUInt32LE(data.length, 24);
+    directory.writeUInt16LE(name.length, 28); directory.writeUInt32LE(offset, 42);
+    central.push(directory, name);
+    offset += header.length + name.length + data.length;
+  }
+  const centralBytes = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(centralBytes.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...local, centralBytes, end]);
+}
+
+
 test('ZIP entry validation rejects traversal and absolute paths', () => {
   assert.equal(zipImport.normalizeEntryName('folder/file.txt'), 'folder/file.txt');
   assert.throws(() => zipImport.normalizeEntryName('../outside.txt'), /unsafe ZIP path|path-traversal/i);
@@ -62,5 +99,31 @@ test('ZIP scanner skips dependency/build trees and never follows symlinks', asyn
     const report = await zipImport.scanDirectory(root);
     assert.ok(!report.files.some(file => file.startsWith('node_modules/')));
     assert.ok(report.riskyFiles.some(file => file.startsWith('Symlink:')));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
+
+test('ZIP extraction accepts a normal archive and rejects traversal and duplicate names', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-zip-extract-'));
+  try {
+    const validZip = path.join(root, 'valid.zip');
+    await fs.writeFile(validZip, makeZip([{ name: 'src/hello.txt', data: 'hello' }]));
+    const validDestination = path.join(root, 'valid-out');
+    const valid = await zipImport.extractArchive(validZip, validDestination);
+    assert.equal(valid.ok, true);
+    assert.equal(await fs.readFile(path.join(validDestination, 'src', 'hello.txt'), 'utf8'), 'hello');
+
+    for (const [name, entries, pattern] of [
+      ['traversal.zip', [{ name: '../outside.txt', data: 'nope' }], /unsafe|traversal/i],
+      ['duplicate.zip', [{ name: 'same.txt', data: 'one' }, { name: 'same.txt', data: 'two' }], /duplicate|exists/i],
+      ['windows-device.zip', [{ name: 'folder/CON.txt', data: 'nope' }], /unsafe|windows/i],
+      ['ads.zip', [{ name: 'folder/file.txt:stream', data: 'nope' }], /unsafe|windows/i]
+    ]) {
+      const archive = path.join(root, name);
+      await fs.writeFile(archive, makeZip(entries));
+      const destination = path.join(root, name + '-out');
+      await assert.rejects(() => zipImport.extractArchive(archive, destination), pattern);
+      assert.equal(await fs.access(destination).then(() => true).catch(() => false), false);
+    }
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
