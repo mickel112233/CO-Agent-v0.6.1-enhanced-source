@@ -214,7 +214,7 @@ export default function App() {
           try { localStorage.removeItem('co-agent-setup-dismissed'); } catch {}
         }
       }
-    }    } finally { setBusy(false); setActiveRequestId(''); activeRequestIdRef.current = ''; streamingTextRef.current = ''; setStreamingText(''); }
+    } finally { setBusy(false); setActiveRequestId(''); activeRequestIdRef.current = ''; streamingTextRef.current = ''; setStreamingText(''); }
   };
 
   useEffect(() => {
