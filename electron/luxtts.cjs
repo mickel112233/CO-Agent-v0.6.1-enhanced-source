@@ -8,6 +8,7 @@ const MODEL_ID = 'YatharthS/LuxTTS';
 const MAX_TEXT_LENGTH = 12000;
 const MAX_TIMEOUT_MS = 15 * 60 * 1000;
 const activeJobs = new Map();
+const activeSetupJobs = new Map();
 function runtimePaths({ appPath = process.cwd(), userDataPath = path.join(os.homedir(), '.co-agent'), resourcesPath = process.resourcesPath, platform = process.platform } = {}) {
   const pythonName = platform === 'win32' ? 'python.exe' : 'python';
   const sourceCandidates = [
@@ -94,6 +95,14 @@ async function generate({ text, referenceAudio, outputPath, numSteps = 4, speed 
   });
 }
 
+function cancelSetup(requestId) {
+  const job = activeSetupJobs.get(String(requestId || ''));
+  if (!job) return { ok: true, cancelled: false };
+  job.cancelled = true;
+  if (job.proc) { try { job.proc.kill(); } catch {} }
+  return { ok: true, cancelled: true };
+}
+
 function cancel(requestId) {
   const id = String(requestId || '');
   const proc = activeJobs.get(id);
@@ -104,21 +113,34 @@ function cancel(requestId) {
 
 function runSetupCommand(file, args, options, onProgress) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...options });
+    const { jobId, activeSetupJobs: jobs, ...spawnOptions } = options;
+    if (jobId && jobs?.get(jobId)?.cancelled) { reject(new Error('LuxTTS setup cancelled by user.')); return; }
+    const proc = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...spawnOptions });
+    if (jobId && jobs?.has(jobId)) jobs.get(jobId).proc = proc;
     let stderr = '', stdout = '', settled = false;
     const timer = setTimeout(() => { proc.kill(); finish(new Error('LuxTTS setup command timed out.')); }, 30 * 60 * 1000);
     function finish(error, result) {
       if (settled) return;
       settled = true; clearTimeout(timer);
+      if (jobId && jobs?.get(jobId)?.proc === proc) jobs.get(jobId).proc = null;
       error ? reject(error) : resolve(result);
     }
     proc.stdout.on('data', data => { const value = data.toString(); stdout = (stdout + value).slice(-12000); if (onProgress) onProgress(value.slice(-2000)); });
     proc.stderr.on('data', data => { const value = data.toString(); stderr = (stderr + value).slice(-12000); if (onProgress) onProgress(value.slice(-2000)); });
     proc.once('error', error => finish(error));
-    proc.once('close', code => code === 0 ? finish(null, { stdout, stderr }) : finish(new Error((stderr || stdout || 'Setup command failed with exit code ' + code).slice(-2000))));
+    proc.once('close', code => {
+      if (jobId && jobs?.get(jobId)?.cancelled) finish(new Error('LuxTTS setup cancelled by user.'));
+      else if (code === 0) finish(null, { stdout, stderr });
+      else finish(new Error((stderr || stdout || 'Setup command failed with exit code ' + code).slice(-2000)));
+    });
   });
 }
-async function setup({ pythonPath = '' } = {}, options = {}, onProgress = () => {}) {
+async function setup({ pythonPath = '', requestId = '' } = {}, options = {}, onProgress = () => {}) {
+  const jobId = String(requestId || '');
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(jobId)) throw new Error('LuxTTS setup request ID is missing or invalid.');
+  if (activeSetupJobs.has(jobId)) throw new Error('A LuxTTS setup with this ID is already running.');
+  activeSetupJobs.set(jobId, { cancelled: false, proc: null });
+  try {
   const paths = runtimePaths(options);
   const source = await firstDirectory(paths.sourceCandidates);
   if (!source) throw new Error('Pinned LuxTTS source was not found. Reinstall CO-Agent with submodules, or restore third_party/LuxTTS.');
@@ -129,18 +151,24 @@ async function setup({ pythonPath = '' } = {}, options = {}, onProgress = () => 
   const venvPython = path.join(venv, process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
   const bootstrap = String(pythonPath || (process.platform === 'win32' ? 'py' : 'python3'));
   const bootstrapArgs = !pythonPath && process.platform === 'win32' ? ['-3.11'] : [];
+  const probe = await runSetupCommand(bootstrap, [...bootstrapArgs, '--version'], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'python-check', message: chunk }));
+  const versionText = (probe.stdout + ' ' + probe.stderr).trim();
+  const version = versionText.match(/Python\s+(\d+)\.(\d+)/i);
+  if (!version || Number(version[1]) !== 3 || Number(version[2]) < 10 || Number(version[2]) > 11) throw new Error('LuxTTS requires Python 3.10 or 3.11. Detected: ' + (versionText || 'unknown version') + '. Install Python 3.11 and retry.');
   await fs.mkdir(path.dirname(venv), { recursive: true });
-  onProgress({ stage: 'venv', message: 'Creating managed Python environment…' });
-  await runSetupCommand(bootstrap, [...bootstrapArgs, '-m', 'venv', venv], {}, chunk => onProgress({ stage: 'venv', message: chunk }));
-  onProgress({ stage: 'dependencies', message: 'Installing LuxTTS dependencies. This can take a while and may download several gigabytes…' });
-  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {}, chunk => onProgress({ stage: 'dependencies', message: chunk }));
-  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source }, chunk => onProgress({ stage: 'dependencies', message: chunk }));
+  onProgress({ requestId: jobId, stage: 'venv', message: 'Creating managed Python environment…' });
+  await runSetupCommand(bootstrap, [...bootstrapArgs, '-m', 'venv', venv], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'venv', message: chunk }));
+  onProgress({ requestId: jobId, stage: 'dependencies', message: 'Installing LuxTTS dependencies. This can take a while and may download several gigabytes…' });
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', '-r', requirements], { cwd: source, jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
   // The upstream requirements do not declare soundfile directly, but the
   // isolated worker imports it to write a standards-compliant WAV file.
-  await runSetupCommand(venvPython, ['-m', 'pip', 'install', 'soundfile'], { cwd: source }, chunk => onProgress({ stage: 'dependencies', message: chunk }));
+  await runSetupCommand(venvPython, ['-m', 'pip', 'install', 'soundfile'], { cwd: source, jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'dependencies', message: chunk }));
   const result = await status({ ...options, userDataPath });
   if (!result.installed) throw new Error('LuxTTS setup finished but runtime verification failed: ' + result.message);
-  return { ok: true, python: result.python, source: result.source, message: 'LuxTTS Python environment installed and verified. Model weights are downloaded on first generation.' };
+  const verification = await runSetupCommand(result.python, ['-c', 'import sys, soundfile; print(sys.version); print(soundfile.__version__)'], { jobId, activeSetupJobs }, chunk => onProgress({ requestId: jobId, stage: 'verify', message: chunk }));
+  return { ok: true, python: result.python, source: result.source, message: 'LuxTTS Python environment installed and verified (' + verification.stdout.trim().split(/\r?\n/)[0] + '). Model weights are downloaded on first generation.' };
+  } finally { activeSetupJobs.delete(jobId); }
 }
 
-module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup, cancel };
+module.exports = { MODEL_ID, MAX_TEXT_LENGTH, MAX_TIMEOUT_MS, runtimePaths, status, generate, setup, cancel, cancelSetup };

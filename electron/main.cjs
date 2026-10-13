@@ -352,6 +352,7 @@ function registerIpc() {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:setup-progress', progress);
     });
   });
+  handle('luxtts:setup-cancel', requestId => luxTTS.cancelSetup(requestId));
   handle('luxtts:generate', args => luxTTS.generate(args, { appPath: path.join(__dirname, '..'), userDataPath: app.getPath('userData'), resourcesPath: process.resourcesPath }, progress => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('luxtts:generation-progress', progress);
   }));

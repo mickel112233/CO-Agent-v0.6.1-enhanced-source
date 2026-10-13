@@ -35,6 +35,9 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [modelToInstall, setModelToInstall] = useState('gemma3:4b');
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [luxSetupBusy, setLuxSetupBusy] = useState(false);
+  const [luxSetupProgress, setLuxSetupProgress] = useState('');
+  const luxSetupRequestRef = useRef('');
   const [activeModelPullId, setActiveModelPullId] = useState('');
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [chatProvider, setChatProvider] = useState('ollama');
@@ -69,6 +72,14 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = desktop?.runtime?.onPullProgress?.(progress => setDownloadProgress(progress));
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = desktop?.luxTTS?.onSetupProgress?.(progress => {
+      if (progress?.requestId && progress.requestId !== luxSetupRequestRef.current) return;
+      setLuxSetupProgress(String(progress?.message || progress?.stage || 'Installing LuxTTS…').slice(0, 240));
+    });
     return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
 
@@ -305,13 +316,26 @@ export default function App() {
 
   async function setupLuxTTSFromSetup() {
     if (!window.confirm('Set up LuxTTS local voice generation? This creates an isolated Python environment and may download several GB.')) return;
-    setBusy(true); setNotice('Preparing LuxTTS. Dependencies and model weights may take a while.');
+    const requestId = 'luxtts-setup-' + Date.now().toString(36);
+    luxSetupRequestRef.current = requestId;
+    setLuxSetupBusy(true); setBusy(true); setLuxSetupProgress('Checking Python prerequisites…'); setNotice('');
     try {
-      const result = await desktop.luxTTS.setup();
+      const result = await desktop.luxTTS.setup({ requestId });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS setup failed.');
       setNotice(result.message || 'LuxTTS setup completed.');
-    } catch (error) { setNotice('LuxTTS setup failed: ' + (error.message || String(error))); }
-    finally { setBusy(false); }
+    } catch (error) {
+      setNotice(/cancel/i.test(error.message || '') ? 'LuxTTS setup cancelled. You can retry it safely.' : 'LuxTTS setup failed: ' + (error.message || String(error)) + '. Fix the prerequisite or retry setup.');
+    } finally {
+      luxSetupRequestRef.current = ''; setLuxSetupBusy(false); setLuxSetupProgress(''); setBusy(false);
+    }
+  }
+  async function cancelLuxTTSSetup() {
+    const requestId = luxSetupRequestRef.current;
+    if (!requestId) return;
+    try {
+      const result = await desktop.luxTTS.cancelSetup(requestId);
+      setNotice(result?.cancelled ? 'Stopping LuxTTS setup…' : 'LuxTTS setup is not running.');
+    } catch (error) { setNotice('Could not cancel LuxTTS setup: ' + (error.message || String(error))); }
   }
 
   async function installModel() {
@@ -374,7 +398,7 @@ export default function App() {
       {section === 'Setup' ? <section className="settings-view setup-view"><div className="settings-heading"><p className="eyebrow">FIRST-RUN SETUP</p><h1>Set up CO-Agent</h1><p className="subhead">Prepare your local AI runtime first, choose a model, then optionally add local voice generation. You can skip setup and return later.</p></div>
       <div className="setup-step"><div className="setup-step-number">1</div><div className="setup-step-content"><h2>Install and start Ollama</h2><p>{runtime.available ? 'Ollama is responding at 127.0.0.1:11434.' : runtime.error || 'Ollama is not detected yet.'} The Windows one-click installer uses winget and asks for confirmation.</p><div className="settings-card-actions"><button className="primary-button" disabled={busy || runtime.available || desktop?.platform !== 'win32'} onClick={installOllama}>{busy ? 'Working…' : runtime.available ? 'Ollama connected' : 'Install Ollama for Windows'}</button><button className="secondary-button" onClick={refreshRuntime} disabled={busy}><RefreshCw size={14}/> Check again</button><button className="text-link" onClick={() => { try { window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer'); } catch {} }}>Official download page</button></div>{desktop?.platform !== 'win32' && <p className="integration-note">Automatic installation is currently Windows-only. Use the official download page for your operating system.</p>}</div></div>
       <div className="setup-step"><div className="setup-step-number">2</div><div className="setup-step-content"><h2>Choose a local model</h2><p>Install one model after Ollama is ready. Downloads use Ollama and can require several GB of disk space.</p><div className="quick-models setup-models">{['gemma3:4b','qwen2.5:3b','phi4-mini'].map(model => <button key={model} disabled={busy || !runtime.available} onClick={() => installSetupModel(model)}>{busy && modelToInstall === model ? 'Installing… ' + model : 'Install ' + model}</button>)}</div>{runtime.models.length > 0 && <p className="integration-note">Already installed: {runtime.models.map(model => model.name || model.model).join(', ')}</p>}{downloadProgress && <div className="download-progress" role="status"><strong>{downloadProgress.model}</strong><span>{downloadProgress.percent == null ? downloadProgress.status : downloadProgress.percent + '% · ' + downloadProgress.status}</span>{downloadProgress.percent != null && <progress max="100" value={downloadProgress.percent} />}{downloadProgress.error && <small className="download-error">{downloadProgress.error}</small>}{activeModelPullId && <button type="button" className="secondary-button" onClick={cancelModelPull}>Cancel download</button>}</div>}</div></div>
-      <div className="setup-step"><div className="setup-step-number">3</div><div className="setup-step-content"><h2>Optional local voice</h2><p>LuxTTS generates local voiceovers for creative work. It needs an isolated Python environment and may download several GB; it is not required for chat.</p><button className="secondary-button" disabled={busy} onClick={setupLuxTTSFromSetup}>{busy ? 'Working…' : 'Set up LuxTTS'}</button></div></div>
+      <div className="setup-step"><div className="setup-step-number">3</div><div className="setup-step-content"><h2>Optional local voice</h2><p>LuxTTS generates local voiceovers for creative work. It needs an isolated Python environment and may download several GB; it is not required for chat.</p><button className="secondary-button" disabled={busy} onClick={setupLuxTTSFromSetup}>{luxSetupBusy ? 'Installing…' : 'Set up LuxTTS'}</button>{luxSetupBusy && <><p className="tool-hint" role="status">{luxSetupProgress || 'Preparing isolated Python environment…'}</p><button className="text-link" onClick={cancelLuxTTSSetup}>Cancel setup</button></>}</div></div>
       <div className="setup-footer"><span>API providers are available in Models & settings if you prefer cloud inference.</span><button className="secondary-button" onClick={dismissSetup}>Skip setup and open chat</button></div>{notice && <p className="inline-notice" role="status">{notice}</p>}</section> : section === 'Agents' ? <Agents/> : section === 'Computer Use' ? <ComputerUse/> : section === 'Integrations' ? <Integrations selectedSkills={selectedSkills} onSkillsChange={setSelectedSkills}/> : section === 'Chat' ? <section className={"chat-view " + (draggingZip ? "zip-drop-active" : "")} onDragOver={e => { if (Array.from(e.dataTransfer?.items || []).some(item => item.kind === "file")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDraggingZip(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDraggingZip(false); }} onDrop={e => { e.preventDefault(); setDraggingZip(false); const paths = Array.from(e.dataTransfer?.files || []).map(file => desktop?.imports?.getPathForFile?.(file) || "").filter(Boolean); void scanZipPaths(paths); }}>
         {messages.length === 0 ? <div className="welcome"><div className="welcome-icon"><Sparkles size={22}/></div><p className="eyebrow">YOUR DESKTOP AI WORKSPACE</p><h1>What can we work on?</h1><p className="subhead">Chat, create, and plan your next task in one workspace.</p><div className="starter-grid">{starterPrompts.map(item => <button className="starter" key={item.title} onClick={() => send(item.text)}><strong>{item.title}</strong><span>{item.text}</span><ArrowUp size={15}/></button>)}</div>{!runtime.available && <p className="runtime-warning"><AlertCircle size={15}/> Ollama is not connected yet. Open Models & settings to diagnose it.</p>}</div> : <div className="messages">{messages.map((item, i) => <article className={'message ' + item.role} key={i}><div className="avatar">{item.role === 'user' ? 'You' : <Bot size={17}/>}</div><div className="message-content"><strong>{item.role === 'user' ? 'You' : 'CO-Agent'}</strong><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown></div></div></article>)}{failedPrompt && !busy && <button className="secondary-button retry-button" onClick={() => send(failedPrompt, true)}>Retry last request</button>}{busy && <article className="message assistant"><div className="avatar"><Bot size={17}/></div><div><strong>CO-Agent</strong>{streamingText ? <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown><p className="typing">Generating…</p></div> : <p className="typing">Working on it…</p>}</div></article>}</div>}
         {showComputerUse && <div className="chat-computer-use"><div className="chat-computer-use-heading"><div><strong>Computer use</strong><span>Review the screen, plan actions, and approve each input.</span></div><button type="button" className="tool-button" onClick={() => setShowComputerUse(false)} aria-label="Close computer use panel">×</button></div><ComputerUse/></div>}

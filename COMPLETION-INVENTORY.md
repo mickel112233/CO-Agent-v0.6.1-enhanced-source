@@ -28,7 +28,7 @@
 - [ ] Confirm a cancelled pull cannot be reported as a successful installation or leave the UI stuck in busy state.
 - [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; latest CI is pending.**
 - [ ] Improve first-run diagnostics for missing/offline Ollama, missing model, and failed setup; allow retry and safe skip without trapping the user.
-- [ ] Add LuxTTS setup cancellation, clean failure recovery, Python version/prerequisite detection, and post-install synthesis verification. Do not silently download or execute an unverified source.
+- [x] LuxTTS setup has a cancellable request ID, progress UI, Python version preflight (3.10/3.11 only), and post-install import/version verification. Real voice-cloning synthesis still requires a reference-audio fixture and model download before marking synthesis end-to-end verified.
 - [ ] Audit API/local provider state and chat cancellation. API key storage must be explicit and safe; never persist secrets to plain localStorage or chat history.
 - [ ] Verify conversation switching, new-chat IDs, auto-save ordering, restart recovery, and failures during persistence.
 - [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head.

@@ -51,7 +51,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     onAcpUpdate: callback => subscribe('integrations:acp-update', callback)
   }),
   pet: Object.freeze({ status: invoke('pet:status'), launch: invoke('pet:launch'), close: invoke('pet:close'), showOverlay: invoke('pet:show-overlay'), hideOverlay: invoke('pet:hide-overlay'), toggleOverlay: invoke('pet:toggle-overlay'), markBridgeReady: invoke('pet:bridge-ready'), onIncomingMessage: callback => subscribe('pet:incoming-message', callback) }),
-  luxTTS: Object.freeze({ status: invoke('luxtts:status'), setup: invoke('luxtts:setup'), generate: invoke('luxtts:generate'), cancel: invoke('luxtts:cancel'), onSetupProgress: callback => subscribe('luxtts:setup-progress', callback), onGenerationProgress: callback => subscribe('luxtts:generation-progress', callback) }),
+  luxTTS: Object.freeze({ status: invoke('luxtts:status'), setup: invoke('luxtts:setup'), cancelSetup: invoke('luxtts:setup-cancel'), generate: invoke('luxtts:generate'), cancel: invoke('luxtts:cancel'), onSetupProgress: callback => subscribe('luxtts:setup-progress', callback), onGenerationProgress: callback => subscribe('luxtts:generation-progress', callback) }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
   dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), openTextFiles: invoke('dialog:open-text-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
 }));

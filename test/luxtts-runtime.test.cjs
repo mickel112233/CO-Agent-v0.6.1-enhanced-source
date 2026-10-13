@@ -33,6 +33,10 @@ test('LuxTTS refuses nonexistent reference audio before launching worker', async
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
 
+test('LuxTTS setup cancellation is safe for unknown jobs', () => {
+  assert.deepEqual(lux.cancelSetup('missing-setup'), { ok: true, cancelled: false });
+});
+
 test('LuxTTS cancellation is safe for unknown or already-finished jobs', () => {
   assert.deepEqual(lux.cancel('missing-job'), { ok: true, cancelled: false });
   assert.deepEqual(lux.cancel(''), { ok: true, cancelled: false });
