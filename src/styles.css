@@ -449,3 +449,12 @@ html{scroll-behavior:smooth;scrollbar-gutter:stable}
 .timeline-edit-assistant .assistant-suggestions button:hover { border-color: var(--accent, #818cf8); color: var(--text, #111827); }
 .timeline-edit-assistant .review-banner { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 11px 12px; border-radius: 11px; background: rgba(99,102,241,.07); color: var(--muted, #6b7280); font-size: 12px; line-height: 1.5; }
 @media (max-width: 720px) { .timeline-edit-assistant { padding: 15px; } .timeline-edit-assistant h2 { font-size: 18px; } .timeline-edit-assistant .assistant-actions { align-items: stretch; } }
+
+
+/* Embedded computer-use controls for the chat workspace */
+.chat-computer-use{width:min(100%,980px);margin:0 auto 14px;border:1px solid var(--border,#e4e5df);border-radius:18px;background:var(--surface,#fff);overflow:hidden;box-shadow:0 8px 28px rgba(20,24,18,.06)}
+.chat-computer-use-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-bottom:1px solid var(--border,#e4e5df)}
+.chat-computer-use-heading>div{display:grid;gap:3px}.chat-computer-use-heading strong{font-size:13px}.chat-computer-use-heading span{font-size:12px;color:var(--muted,#73776f)}
+.chat-computer-use .computer-use-view{min-height:0;max-height:48vh;overflow:auto;padding:14px}
+.chat-computer-use .tool-button.active{background:var(--surface-strong,#e8eee4);border-color:var(--border-strong,#cbd6c4)}
+@media(max-width:680px){.chat-computer-use .computer-use-view{max-height:56vh;padding:9px}.chat-computer-use-heading{padding:11px}}
