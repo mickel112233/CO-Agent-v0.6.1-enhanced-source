@@ -173,3 +173,28 @@ test('voiceover UI requires FFprobe readiness before enabling generation', async
   assert.match(source, /ffprobeReady: Boolean\(capabilities\?\.ffprobe\)/);
   assert.match(source, /!voiceStatus\.ffprobeReady/);
 });
+
+test('LuxTTS setup cancellation kills the active prerequisite process and clears its job', async () => {
+  const { EventEmitter } = require('node:events');
+  const { PassThrough } = require('node:stream');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'co-agent-luxtts-setup-cancel-'));
+  let spawnedResolve;
+  const spawnedPromise = new Promise(resolve => { spawnedResolve = resolve; });
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.kill = () => { setImmediate(() => child.emit('close', 1)); return true; };
+    spawnedResolve(child);
+    return child;
+  };
+  try {
+    const source = path.join(dir, 'third_party', 'LuxTTS');
+    await fs.mkdir(source, { recursive: true });
+    await fs.writeFile(path.join(source, 'requirements.txt'), '');
+    const pending = lux.setup({ pythonPath: 'fixture-python', requestId: 'cancel-setup' }, { appPath: dir, userDataPath: path.join(dir, 'data'), resourcesPath: path.join(dir, 'resources'), spawn: fakeSpawn });
+    await spawnedPromise;
+    assert.deepEqual(lux.cancelSetup('cancel-setup'), { ok: true, cancelled: true });
+    await assert.rejects(pending, /cancelled by user/i);
+    assert.deepEqual(lux.cancelSetup('cancel-setup'), { ok: true, cancelled: false });
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
