@@ -27,6 +27,13 @@ export default function TimelineEditor({ onTools }) {
   const [editPrompt, setEditPrompt] = useState('');
   const [editPlan, setEditPlan] = useState(null);
   const [planningEdit, setPlanningEdit] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const [voiceReference, setVoiceReference] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState({ installed: false, message: 'Checking LuxTTS…' });
+  const [soundPreset, setSoundPreset] = useState('impact');
+  const [soundDuration, setSoundDuration] = useState(2);
+  const [generationProgress, setGenerationProgress] = useState('');
+
   const selected = project.clips.find(clip => clip.id === selectedId) || null;
   const duration = Math.max(10, ...project.clips.map(clip => clip.timelineStart + clip.duration));
   const orderedClips = useMemo(() => [...project.clips].sort((a, b) => a.timelineStart - b.timelineStart), [project.clips]);
@@ -61,6 +68,57 @@ export default function TimelineEditor({ onTools }) {
   };
   const updateProject = updater => applyProject(old => ({ ...old, clips: updater(old.clips) }));
   const patchClip = (id, patch) => updateProject(clips => clips.map(clip => clip.id === id ? { ...clip, ...patch } : clip));
+
+  async function refreshVoiceStatus() {
+    try { const status = await desktop?.luxTTS?.status?.(); if (status) setVoiceStatus(status); }
+    catch (error) { setVoiceStatus({ installed: false, message: error.message || String(error) }); }
+  }
+  React.useEffect(() => {
+    refreshVoiceStatus();
+    const unsubscribe = desktop?.luxTTS?.onGenerationProgress?.(event => setGenerationProgress(event?.message || event?.stage || 'Generating…'));
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
+  async function chooseVoiceReference() {
+    try {
+      const picked = await desktop.dialog.openFiles({ multiple: false, filters: [{ name: 'Reference voice audio', extensions: ['wav','mp3','m4a','flac','ogg'] }] });
+      if (picked?.[0]) setVoiceReference(picked[0]);
+    } catch (error) { setNotice(error.message || String(error)); }
+  }
+  async function generateVoiceover() {
+    if (!voiceText.trim()) { setNotice('Enter the voiceover text first.'); return; }
+    if (!voiceReference) { setNotice('Choose a reference voice recording first. LuxTTS uses it for voice cloning.'); return; }
+    setBusy('voice'); setNotice('Generating local LuxTTS voiceover…');
+    try {
+      const dir = outputDir || await desktop.dialog.chooseDirectory();
+      if (!dir) return;
+      if (!outputDir) setOutputDir(dir);
+      const sep = dir.includes('\\') ? '\\' : '/';
+      const target = dir.replace(/[\\/]+$/, '') + sep + 'co-agent-voiceover-' + Date.now() + '.wav';
+      const result = await desktop.luxTTS.generate({ text: voiceText.trim(), referenceAudio: voiceReference, outputPath: target, requestId: 'studio-tts-' + Date.now().toString(36), numSteps: 4, speed: 1 });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'LuxTTS generation failed.');
+      setAssets(old => [...new Set([...old, result.output])]);
+      addAsset(result.output, 'Audio 1');
+      setNotice('Voiceover generated and added to Audio 1: ' + result.output);
+      setGenerationProgress('');
+    } catch (error) { setNotice('Voiceover generation failed: ' + (error.message || String(error))); }
+    finally { setBusy(''); }
+  }
+  async function generateSoundEffect() {
+    setBusy('sound'); setNotice('Generating a local sound effect with FFmpeg…');
+    try {
+      const dir = outputDir || await desktop.dialog.chooseDirectory();
+      if (!dir) return;
+      if (!outputDir) setOutputDir(dir);
+      const sep = dir.includes('\\') ? '\\' : '/';
+      const target = dir.replace(/[\\/]+$/, '') + sep + 'co-agent-sfx-' + soundPreset + '-' + Date.now() + '.wav';
+      const result = await desktop.studio.generateSoundEffect({ preset: soundPreset, duration: soundDuration, outputPath: target });
+      if (result?.ok === false || result?.error) throw new Error(result.error || 'Sound effect generation failed.');
+      setAssets(old => [...new Set([...old, result.output])]);
+      addAsset(result.output, 'Audio 1');
+      setNotice('Generated sound effect added to Audio 1: ' + result.output);
+    } catch (error) { setNotice('Sound effect generation failed: ' + (error.message || String(error))); }
+    finally { setBusy(''); }
+  }
 
   async function importAssets() {
     try {
@@ -274,6 +332,15 @@ export default function TimelineEditor({ onTools }) {
       </div>
     </div>
     <div className="timeline-inspector"><div className="panel-heading"><strong><Layers3 size={15}/> Clip inspector</strong><span>{selected ? selected.type + ' · ' + selected.track : 'No clip selected'}</span></div>{selected ? <div className="timeline-inspector-fields"><label>Track<select value={selected.track} onChange={e => patchClip(selected.id, { track: e.target.value })}>{tracks.map(track => <option key={track}>{track}</option>)}</select></label><label>Timeline start (s)<input type="number" min="0" step=".1" value={selected.timelineStart} onChange={e => patchClip(selected.id, { timelineStart: Math.max(0, Number(e.target.value) || 0) })}/></label><label>Source in (s)<input type="number" min="0" step=".1" value={selected.sourceStart} onChange={e => patchClip(selected.id, { sourceStart: Math.max(0, Number(e.target.value) || 0) })}/></label><label>Duration (s)<input type="number" min=".1" step=".1" value={selected.duration} onChange={e => patchClip(selected.id, { duration: Math.max(.1, Number(e.target.value) || .1) })}/></label>{selected.type === 'caption' && <label className="timeline-caption-field">Caption text<input value={selected.text} onChange={e => patchClip(selected.id, { text: e.target.value })}/></label>}<div className="timeline-edit-buttons"><button className="secondary-button" onClick={() => patchClip(selected.id, { timelineStart: Math.max(0, selected.timelineStart - 1) })}><ArrowLeft size={14}/> Move −1s</button><button className="secondary-button" onClick={() => patchClip(selected.id, { timelineStart: selected.timelineStart + 1 })}><ArrowRight size={14}/> Move +1s</button><button className="secondary-button" onClick={() => patchClip(selected.id, { sourceStart: Math.max(0, selected.sourceStart - .5), duration: selected.duration + .5 })}>Extend start −0.5s</button><button className="secondary-button" onClick={() => patchClip(selected.id, { sourceStart: selected.sourceStart + .5, duration: Math.max(.1, selected.duration - .5) })}>Trim start +0.5s</button><button className="secondary-button" onClick={() => patchClip(selected.id, { duration: Math.max(.1, selected.duration - .5) })}>Trim end −0.5s</button><button className="secondary-button danger" onClick={removeSelected}><Trash2 size={14}/> Remove clip</button></div></div> : <p className="timeline-inspector-empty">Select a clip block to change its track, timing, trim, or title text.</p>}</div>
+    <div className="timeline-panel tool-integration-panel">
+      <div className="panel-heading"><strong><Sparkles size={16}/> Generate assets for this edit</strong><span>Local voice + sound effects</span></div>
+      <p className="studio-footnote">Voiceover uses LuxTTS voice cloning and a reference recording you choose. Sound effects are generated locally with FFmpeg and placed directly on Audio 1. Generated assets remain editable timeline clips.</p>
+      <label>Voiceover script<textarea value={voiceText} onChange={e => setVoiceText(e.target.value)} rows={3} maxLength={12000} placeholder="Write narration for this video…"/></label>
+      <div className="export-row"><button className="secondary-button" onClick={chooseVoiceReference}><FolderOpen size={14}/>{voiceReference ? baseName(voiceReference) : 'Choose reference voice'}</button><button className="primary-button" disabled={!!busy || !voiceStatus.installed || !voiceText.trim() || !voiceReference} onClick={generateVoiceover}><Music2 size={14}/>{busy === 'voice' ? 'Generating voice…' : 'Generate voiceover & add to timeline'}</button><button className="text-link" onClick={refreshVoiceStatus}>Refresh LuxTTS</button></div>
+      {!voiceStatus.installed && <p className="tool-hint">{voiceStatus.message || 'LuxTTS is not installed. Set it up from first-run setup or Integrations.'}</p>}
+      {generationProgress && <p className="tool-hint" role="status">{generationProgress}</p>}
+      <div className="export-row"><label>Sound effect<select value={soundPreset} onChange={e => setSoundPreset(e.target.value)}><option value="impact">Impact / hit</option><option value="sweep">Rising sweep</option><option value="ambient">Soft ambient noise</option><option value="beep">UI notification</option></select></label><label>Duration (seconds)<input type="number" min="0.25" max="12" step="0.25" value={soundDuration} onChange={e => setSoundDuration(Math.max(0.25, Math.min(12, Number(e.target.value) || 2)))}/></label><button className="secondary-button" disabled={!!busy} onClick={generateSoundEffect}><Sparkles size={14}/>{busy === 'sound' ? 'Generating…' : 'Generate SFX & add to timeline'}</button></div>
+    </div>
     <div className="timeline-export"><div><strong>Export timeline</strong><p>FFmpeg renders video/image overlays and title cards, plus audio clips on the Audio 1 track. This is a functional editor foundation; transitions, keyframes, color grading, and waveform rendering are not included yet.</p></div><div className="timeline-export-controls"><label>Filename<input value={filename} onChange={e => setFilename(e.target.value)} /></label><button className="secondary-button" onClick={async () => { const dir = await desktop.dialog.chooseDirectory(); if (dir) setOutputDir(dir); }}><FolderOpen size={14}/>{outputDir ? baseName(outputDir) : 'Output folder'}</button><button className="primary-button" disabled={!!busy || !project.clips.length} onClick={exportTimeline}><Download size={14}/>{busy === 'render' ? 'Rendering…' : 'Render MP4'}</button></div></div>
     {notice && <p className="studio-notice" role="status">{notice}</p>}
     <p className="computer-footnote">Project files store source paths, trim points, track assignment, captions, and timeline positions. Media remains in its original location; keep source files available when reopening a project.</p>
