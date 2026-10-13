@@ -25,6 +25,13 @@ async function main() {
       if (stat.size < 1024 * 1024) throw new Error('Windows installer is unexpectedly small: ' + installer.name + ' (' + stat.size + ' bytes)');
       process.stdout.write('Verified Windows installer: ' + installer.name + ' (' + stat.size + ' bytes)\n');
     }
+    const archives = entries.filter(entry => entry.isFile() && /^CO-Agent.*\.zip$/i.test(entry.name));
+    if (!archives.length) throw new Error('Windows packaging completed without a standalone CO-Agent ZIP in ' + releaseDir);
+    for (const archive of archives) {
+      const stat = await fs.stat(path.join(releaseDir, archive.name));
+      if (stat.size < 1024 * 1024) throw new Error('Windows ZIP package is unexpectedly small: ' + archive.name + ' (' + stat.size + ' bytes)');
+      process.stdout.write('Verified Windows ZIP: ' + archive.name + ' (' + stat.size + ' bytes)\n');
+    }
   }
   process.stdout.write('Release verification passed for CO-Agent ' + pkg.version + '. Required runtime files and package identity are present.\n');
 }
