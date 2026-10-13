@@ -12,7 +12,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 [![Release](https://img.shields.io/github/v/release/mickel112233/CO-Agent-v0.6.1-enhanced-source?display_name=tag)](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/releases)
 [![Version](https://img.shields.io/badge/app-0.6.1-informational)](package.json)
 
-**[Quick start](#-quick-start) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
+**[Install CO-Agent](INSTALLATION.md) · [Quick start](#-quick-start) · [Integrations](#-integrations--optional-tools) · [Import a GitHub repo](#-import-a-github-repository) · [Architecture](#-project-map) · [Version history](#-version-history--rollback) · [AI-agent guide](AGENTS.md)**
 
 </div>
 
@@ -98,7 +98,7 @@ A successful renderer build does not prove external tools, all IPC flows, or pla
 
 ## 🧠 Agents, workflows, and terminal
 
-Open **Agents & terminal** in the sidebar. Describe the outcome you want, choose an installed local Ollama model, and create a 3–7 step workflow. The planner assigns specialist roles, skills, dependencies, deliverables, and acceptance criteria. Run each step individually; completed outputs become context for later steps. Available roles include lead planner, research analyst, implementation engineer, independent reviewer, test engineer, security reviewer, UX specialist, and documentation specialist.
+Open **Settings → Agents & terminal** from the sidebar. Describe the outcome you want, choose an installed local Ollama model, and create a 3–7 step workflow. The planner assigns specialist roles, skills, dependencies, deliverables, and acceptance criteria. Run each step individually; completed outputs become context for later steps. Available roles include lead planner, research analyst, implementation engineer, independent reviewer, test engineer, security reviewer, UX specialist, and documentation specialist.
 
 Choose a project folder to let agents inspect selected context files and propose source changes. Proposed file contents are previewed in the UI. **Review and apply files** triggers a native confirmation; existing files are backed up in `.co-agent-backups`. Agent output is untrusted, and changes are not applied automatically.
 
@@ -108,7 +108,7 @@ Built-in skills cover planning, implementation, code review, test engineering, d
 
 ## 🖥️ Computer Use
 
-Open **Computer Use** from the sidebar to capture your desktop, inspect top-level window names through Windows UI Automation, optionally read visible text with locally installed Tesseract, and send an individual mouse click, text entry, or allow-listed key.
+Open **Settings → Computer Use** to capture your desktop, inspect top-level window names through Windows UI Automation, optionally read visible text with locally installed Tesseract, and send an individual mouse click, text entry, or allow-listed key.
 
 - **Every input action requires a confirmation dialog.** Review the screenshot and approve only the specific action you intend.
 - Clicks are bounded to the selected display and coordinates are scaled from the captured screenshot.
@@ -118,13 +118,19 @@ Open **Computer Use** from the sidebar to capture your desktop, inspect top-leve
 
 ## 🎬 Multi-track Video Studio
 
-Video Studio opens the timeline editor first. Import local video, audio, and image files, add assets to video/audio tracks, add title/caption clips, adjust source in-points and durations, move clips, split at the playhead, save/load `.coagent-project.json` project files, and render an MP4 through the bundled FFmpeg runtime when available.
+Video Studio opens a ChatCut-inspired workspace: the reviewable natural-language edit assistant and media assets sit beside the actual preview and multi-track timeline. Import local video, audio, and image files, add assets to video/audio tracks, add title/caption clips, adjust source in-points and durations, move clips, split at the playhead, save/load `.coagent-project.json` project files, and render an MP4 through the bundled FFmpeg runtime when available. The reference is layout only; CO-Agent does not claim feature parity with ChatCut.
 
 The current renderer composites video and image clips on the timeline and mixes audio clips on the dedicated audio track. Source media stays where it is; project files store paths rather than copying all media into a project package. Keep source files available when reopening a project. This is a practical timeline MVP, not a claim of parity with Premiere/DaVinci or the recovered original editor: transitions, keyframes, effects, automatic transcription/captions, audio waveforms, and advanced color grading are still not implemented; undo/redo is available for project edits.
 
+## 🐾 Desktop Pets
+
+Open **Pets** from the primary sidebar to check the included companion source and control the CO-Agent desktop overlay. The complete AI-Desktop-Pet upstream project, sprite assets, and licenses live in the `integrations/AI-Desktop-Pet` submodule; use `git clone --recurse-submodules` to obtain them. The [self-contained source ZIP](CO-Agent-v0.6.1-manus-chatcut-pets.zip) also includes the full pinned pet source, assets, and license files. The in-app overlay can be explicitly shown or hidden. The separate native Windows pet launches only when its executable has been built, and CO-Agent asks for native confirmation before starting it; the native pet receives no CO-Agent chat history or API keys.
+
+On Windows with the Tauri/Rust prerequisites installed, `npm run build:pet:win` builds the native pet source. `npm run dist:win` then packages CO-Agent. The Pets screen reports the actual executable state instead of implying that source code alone is a runnable binary.
+
 ## 🧩 Integrations & optional tools
 
-Open **CO-Agent → Integrations** to check optional tool status, install supported tools, read setup guides, and manage imported repositories.
+Open **Integrations** from the primary sidebar to check optional tool status, install supported tools, read setup guides, and manage imported repositories.
 
 The app deliberately keeps these integrations **optional**, rather than making every user download OCR, voice, or video-rendering runtimes. Install only what your workflow needs.
 
