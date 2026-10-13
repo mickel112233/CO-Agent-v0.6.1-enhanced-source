@@ -18,7 +18,7 @@ async function installNodeDependencies(projectPath,userDataPath,{platform=proces
  if(!stat?.isDirectory()||stat.isSymbolicLink())throw Error('Imported project folder is missing or unsafe.');
  const manifestPath=path.join(dir,'package.json'),manifestStat=await fs.lstat(manifestPath).catch(()=>null);
  if(!manifestStat?.isFile()||manifestStat.isSymbolicLink()||manifestStat.size>2*1024*1024)throw Error('A small, regular package.json is required for dependency installation.');
- if(await fs.access(path.join(dir,'.npmrc')).then(()=>true).catch(()=>false))throw Error('This project includes .npmrc. Remove it from the reviewed copy before installing to avoid untrusted registry configuration.');
+ let ancestor=dir; while(ancestor===root||ancestor.startsWith(root+path.sep)){if(await fs.access(path.join(ancestor,'.npmrc')).then(()=>true).catch(()=>false))throw Error('This project includes .npmrc. Remove it from the review tree before installing to avoid untrusted registry configuration.');if(ancestor===root)break;ancestor=path.dirname(ancestor);}
  const manifest=JSON.parse(await fs.readFile(manifestPath,'utf8'));
  const deps={...(manifest.dependencies||{}),...(manifest.devDependencies||{}),...(manifest.optionalDependencies||{}),...(manifest.peerDependencies||{})};
  if(!Object.keys(deps).length)throw Error('package.json declares no npm dependencies.');
@@ -30,6 +30,7 @@ async function installNodeDependencies(projectPath,userDataPath,{platform=proces
    const lockStat=await fs.stat(lockPath);
    if(lockStat.size>15*1024*1024)throw Error('package-lock.json exceeds the 15 MB review limit.');
    const lock=JSON.parse(await fs.readFile(lockPath,'utf8'));
+   if(!lock.packages||typeof lock.packages!=='object')throw Error('Legacy package-lock format is not accepted for automated installs. Review/remove the lockfile first.');
    const packages=Object.values(lock.packages||{});
    for(const pkg of packages) if(pkg?.resolved && !/^https:\/\/registry\.npmjs\.org\//i.test(pkg.resolved)) throw Error('Lockfile includes a non-default package source. Review/remove package-lock.json before installing.');
  }
