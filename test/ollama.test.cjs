@@ -80,3 +80,14 @@ test('normalizes cancellation while the Ollama pull request is still connecting'
   await assert.rejects(pending, /model download cancelled/i);
 });
 
+
+test('does not issue a pull request when cancellation already happened', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let fetchCalls = 0;
+  await assert.rejects(
+    () => pullOllamaModel('qwen3.5:2b', () => {}, 'http://127.0.0.1:11434', async () => { fetchCalls++; }, controller.signal),
+    /model download cancelled/i
+  );
+  assert.equal(fetchCalls, 0);
+});
