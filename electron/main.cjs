@@ -39,6 +39,7 @@ let chatHistoryWriteQueue = Promise.resolve();
 const activeChatRequests = new Map();
 const activeModelPulls = new Map();
 const activeAcpRuns = new Map();
+const activeAgentRuns = new Map();
 const mcpClients = new Map();
 function getMcpClient(serverUrl) {
   const endpoint = mcpClient.validateServerUrl(serverUrl);
@@ -138,7 +139,21 @@ function registerIpc() {
   handle('runtime:ollama-status', () => ollama.getOllamaStatus());
   handle('agents:list', () => ({ ok: true, agents: agentOrchestrator.getAgents(), skills: agentOrchestrator.getSkills() }));
   handle('agents:plan-workflow', payload => agentOrchestrator.planWorkflow(payload));
-  handle('agents:run-step', payload => agentOrchestrator.runWorkflowStep(payload));
+  handle('agents:run-step', async payload => {
+    const requestId = String(payload?.requestId || '');
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)) throw new Error('Agent step request ID is missing or invalid.');
+    if (activeAgentRuns.has(requestId)) throw new Error('An agent step with this ID is already running.');
+    const controller = new AbortController();
+    activeAgentRuns.set(requestId, controller);
+    try { return await agentOrchestrator.runWorkflowStep(payload, controller.signal); }
+    finally { activeAgentRuns.delete(requestId); }
+  });
+  handle('agents:run-step-cancel', requestId => {
+    const controller = activeAgentRuns.get(String(requestId || ''));
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort();
+    return { ok: true, cancelled: true };
+  });
   handle('workspace:get-root', () => { try { return { ok: true, root: workspace.getRoot() }; } catch { return { ok: true, root: '' }; } });
   handle('workspace:choose-root', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { title: 'Choose a project workspace', properties: ['openDirectory'] });
@@ -482,6 +497,9 @@ app.on('before-quit', event => {
   event.preventDefault();
   isQuitting = true;
   petRuntime.stop();
+  for (const controller of activeAgentRuns.values()) controller.abort();
+  for (const controller of activeChatRequests.values()) controller.abort();
+  for (const controller of activeModelPulls.values()) controller.abort();
   petOverlay?.destroy();
   if (tray) { tray.destroy(); tray = null; }
   Promise.resolve(petOverlay?.flush?.()).catch(() => {}).finally(() => app.quit());
