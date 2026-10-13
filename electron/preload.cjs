@@ -1,5 +1,5 @@
 'use strict';
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const invoke = channel => (...args) => ipcRenderer.invoke(channel, ...args);
 const subscribe = (channel, callback) => {
   if (typeof callback !== 'function') return () => {};
@@ -9,6 +9,7 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('coAgent', Object.freeze({
   app: Object.freeze({ name: 'CO-Agent', version: '0.6.1' }),
+  imports: Object.freeze({ scanZip: invoke('imports:scan-zip'), getPathForFile: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } } }),
   chatHistory: Object.freeze({ load: invoke('chat-history:load'), save: invoke('chat-history:save') }),
   agents: Object.freeze({ list: invoke('agents:list'), planWorkflow: invoke('agents:plan-workflow'), runStep: invoke('agents:run-step') }),
   workspace: Object.freeze({ getRoot: invoke('workspace:get-root'), chooseRoot: invoke('workspace:choose-root'), listFiles: invoke('workspace:list-files'), readFile: invoke('workspace:read-file'), applyChanges: invoke('workspace:apply-changes') }),
