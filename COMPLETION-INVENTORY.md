@@ -7,26 +7,26 @@
 
 ## Verified at the current baseline
 
-- [x] GitHub Actions CI passed on Windows and Ubuntu at commit `3bb6c95`: Node regression suite, Vite renderer build, Windows pet frontend/Rust executable build, NSIS + ZIP packaging, and package-content verification. This is baseline evidence only; later commits need their own green runs.
+- [x] GitHub Actions CI passed on Windows and Ubuntu at `9c1ee60` (workflow run [#498](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/runs/38360364158)): Node regression suite and Vite build passed on both OSes; Windows also built the pet frontend/Rust executable, packaged NSIS + ZIP, verified release contents, launched the ZIP and installed app in smoke mode, and uninstalled the NSIS package. The packaged renderer smoke test verified a mounted UI and no captured console errors. This evidence applies to that exact commit; newer commits need their own green runs.
 - [x] Windows Download workflow passed at commit `3bb6c95` and published a workflow artifact.
 - [x] Repository contains a persistent project-context document and an initial pet/video/setup/import completion gate.
 - [x] Desktop pet source, isolated preload, transparent overlay, persistence, display-bound clamping, tray controls, and runtime bridge exist in source. Existing pet tests are mostly source-contract checks, not real desktop interaction.
 - [x] Video Studio contains an advanced timeline, natural-language edit-plan review/apply, LuxTTS voiceover path, FFmpeg-generated SFX, project save/load, and FFmpeg/FFprobe export validation paths. A provisioned-runtime LuxTTS test now synthesizes against a deterministic WAV fixture and validates the output RIFF/WAVE headers; it skips unless `CO_AGENT_LUXTTS_PYTHON` points at an installed runtime, so a model-backed pass is still required.
 - [x] ZIP import has traversal, symlink, file-count, expanded-size, and review-only scanning protections plus regression tests. It still needs adversarial fixtures against both platform extractors and full drag/drop UI acceptance.
 - [x] Ollama status/model inventory and streamed pull progress exist.
-- [x] Model pull cancellation is wired end-to-end with request IDs, an abort controller, stream-reader cancellation, and a renderer Cancel button. A regression test covers abort behavior; CI for the current head is pending.
+- [x] Model pull cancellation is wired end-to-end with request IDs, an abort controller, stream-reader cancellation, and a renderer Cancel button. Regression tests passed in the Windows/Ubuntu CI run for `9c1ee60`.
 - [x] First-run model setup now checks the live Ollama model inventory after the pull and refuses to report readiness if the requested model is missing.
 - [x] ZIP path validation now rejects NTFS alternate data streams, Windows reserved device names, trailing dots/spaces, symlinks, traversal, and duplicate normalized entries on both platform extractors; real ZIP extraction tests cover valid and malicious archives.
 - [x] Third-party pet asset license files and the repository's third-party notice are configured as package resources.
-- [x] Added a packaged smoke-test mode and CI steps for standalone ZIP and installed NSIS startup; latest CI must confirm the workflow and package contents.
-- [x] Media integration test now creates a real video fixture, inserts generated audio, renders MP4, probes both streams and duration, and decodes the output to null; latest CI must confirm it passes.
+- [x] Packaged smoke-test mode and CI checks for standalone ZIP startup, installed NSIS startup, required package resources, and uninstall passed on Windows in run [#498](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/runs/38360364158).
+- [x] Media integration test creates a real video fixture, inserts generated audio, renders MP4, probes both streams and duration, and decodes the output to null; the test suite passed on Windows and Ubuntu in run [#498](https://github.com/mickel112233/CO-Agent-v0.6.1-enhanced-source/actions/runs/38360364158).
 - [x] Chat history persistence, agent orchestration, audit log, computer-use approval, MCP/ACP adapters, and workspace file protections exist in source.
 
 ## P0 — build/test correctness and reliable setup
 
-- [x] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implemented; latest CI is pending.**
+- [x] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implemented; regression suite passed on Windows and Ubuntu at `9c1ee60`.**
 - [x] Model pulls are request-scoped and abort the fetch plus stream reader; renderer `finally` clears busy/request state and cancellation is surfaced distinctly. A fresh Ollama inventory check is required before a pull is reported ready.
-- [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; latest CI is pending.**
+- [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; regression suite passed on Windows and Ubuntu at `9c1ee60`.**
 - [x] First-run setup reports Ollama reachability/runtime errors, offers re-check and the official installer, disables model downloads until Ollama responds, surfaces download errors, supports cancellation/retry, verifies model inventory, and always allows safe skip. Interactive first-run acceptance still requires a Windows desktop session.
 - [x] LuxTTS setup has a cancellable request ID, progress UI, Python version preflight (3.10/3.11 only), and post-install import/version verification. Real voice-cloning synthesis still requires a reference-audio fixture and model download before marking synthesis end-to-end verified.
 - [x] API keys remain in renderer memory only, are passed only to the selected provider call, and chat-history validation persists role/content only. Request IDs isolate streamed chunks and AbortController cancellation is wired to the active model request; orchestration-wide recovery still needs acceptance testing.
