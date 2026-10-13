@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { recoverInterruptedWorkflow } from './agent-state.mjs';
 import { Activity, Bot, BrainCircuit, CheckCircle2, Circle, FileCode2, FolderOpen, Gauge, GitBranch, Layers, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Terminal, Wrench, XCircle } from 'lucide-react';
 
 const desktop = window.coAgent;
@@ -75,6 +76,18 @@ export default function Agents() {
     });
     return () => unsubscribe();
   }, [refreshFiles]);
+
+  useEffect(() => {
+    const recovery = recoverInterruptedWorkflow(workflow);
+    if (!recovery.interruptedIds.length) return;
+    setWorkflow(recovery.workflow);
+    setResults(old => {
+      const next = { ...old };
+      for (const id of recovery.interruptedIds) delete next[id];
+      return next;
+    });
+    setNotice(recovery.message);
+  }, []);
 
   useEffect(() => {
     try {
