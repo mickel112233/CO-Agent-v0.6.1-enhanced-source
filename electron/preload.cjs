@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('coAgent', Object.freeze({
     cancelAcp: invoke('integrations:acp-cancel'),
     onAcpUpdate: callback => subscribe('integrations:acp-update', callback)
   }),
-  pet: Object.freeze({ status: invoke('pet:status'), launch: invoke('pet:launch'), close: invoke('pet:close') }),
+  pet: Object.freeze({ status: invoke('pet:status'), launch: invoke('pet:launch'), close: invoke('pet:close'), showOverlay: invoke('pet:show-overlay'), hideOverlay: invoke('pet:hide-overlay'), toggleOverlay: invoke('pet:toggle-overlay'), onIncomingMessage: callback => subscribe('pet:incoming-message', callback) }),
   luxTTS: Object.freeze({ status: invoke('luxtts:status'), setup: invoke('luxtts:setup'), generate: invoke('luxtts:generate'), cancel: invoke('luxtts:cancel'), onSetupProgress: callback => subscribe('luxtts:setup-progress', callback), onGenerationProgress: callback => subscribe('luxtts:generation-progress', callback) }),
   voice: Object.freeze({ synthesize: invoke('voice:synthesize') }),
   dialog: Object.freeze({ openFiles: invoke('dialog:open-files'), openTextFiles: invoke('dialog:open-text-files'), saveFile: invoke('dialog:save-file'), chooseDirectory: invoke('dialog:choose-directory') })
