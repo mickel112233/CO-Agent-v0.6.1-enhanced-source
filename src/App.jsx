@@ -115,6 +115,28 @@ export default function App() {
   const send = async (text = message, retry = false) => {
     const value = text.trim();
     if (!value || busy) return;
+    const directRepoUrl = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/i.test(value);
+    if (directRepoUrl) {
+      if (!window.confirm('Import and scan this public GitHub repository?\\n\\n' + value + '\\n\\nCO-Agent will inspect known manifests and report install scripts/dependencies. It will not execute code or install packages automatically.')) {
+        setNotice('Repository import cancelled. Nothing was downloaded or executed.');
+        return;
+      }
+      setBusy(true); setNotice('Importing repository and inspecting manifests…');
+      try {
+        const result = await desktop.integrations.installRepo({ url: value, ref: '' });
+        if (result?.ok === false || result?.error) throw new Error(result.error || 'Repository import failed.');
+        const repo = result.repository || {};
+        const scripts = Array.isArray(repo.installScripts) && repo.installScripts.length ? repo.installScripts.join(', ') : 'No common install lifecycle scripts detected in package.json.';
+        const report = 'Repository imported and scanned: **' + (repo.name || repo.slug || value) + '**\\n\\n- Type: ' + (repo.type || 'repository') + '\\n- Dependencies declared: ' + (Number(repo.dependencies) || 0) + '\\n- Install-related scripts: ' + scripts + '\\n- SKILL.md: ' + (repo.hasSkill ? 'found; review before enabling' : 'not found') + '\\n- Plugin manifest: ' + (repo.hasPluginManifest ? 'found; review before enabling' : 'not found') + '\\n\\n**Safety:** files were imported for review only. CO-Agent did not run scripts, install dependencies, or execute repository code. Review the repository in Integrations before deciding what to do next.';
+        setMessages(old => [...old, { role: 'user', content: value }, { role: 'assistant', content: report }]);
+        setFailedPrompt('');
+        setNotice('Repository scan complete. No imported code was executed.');
+      } catch (error) {
+        setMessages(old => [...old, { role: 'user', content: value }, { role: 'assistant', content: 'Repository import failed: ' + (error.message || String(error)) }]);
+        setNotice('Repository import failed.');
+      } finally { setBusy(false); }
+      return;
+    }
     if (chatProvider !== 'ollama' && !apiKey.trim()) { setNotice('Add your API key in Models & settings before sending to a cloud provider.'); setSection('Settings'); return; }
     const next = retry ? messages.slice(0, -1) : [...messages, { role: 'user', content: value }];
     const attachmentContext = attachments.length
