@@ -216,6 +216,7 @@ function registerIpc() {
   handle('studio:ocr-image', args => ocr.recognizeImage(args?.input, args?.language || 'eng'));
   handle('studio:hyperframes-status', () => hyperframes.getStatus());
   handle('studio:hyperframes-run', args => hyperframes.runAction(args?.action, args?.projectDir));
+  handle('studio:hyperframes-create', args => hyperframes.createComposition(args));
   handle('audit:list', limit => getAuditLogStore().list(limit));
   handle('integrations:acp-run', async payload => {
     const runId = String(payload?.runId || '');
