@@ -9,8 +9,8 @@ const zipImport = require('../electron/zip-import.cjs');
 test('ZIP entry validation rejects traversal and absolute paths', () => {
   assert.equal(zipImport.normalizeEntryName('folder/file.txt'), 'folder/file.txt');
   assert.throws(() => zipImport.normalizeEntryName('../outside.txt'), /path-traversal|unsafe path/i);
-  assert.throws(() => zipImport.normalizeEntryName('C:/Windows/system.ini'), /absolute|path-traversal/i);
-  assert.throws(() => zipImport.normalizeEntryName('/rooted.txt'), /absolute|path-traversal/i);
+  assert.throws(() => zipImport.normalizeEntryName('C:/Windows/system.ini'), /unsafe ZIP path|path-traversal/i);
+  assert.throws(() => zipImport.normalizeEntryName('/rooted.txt'), /unsafe ZIP path|path-traversal/i);
 });
 
 test('ZIP scanner identifies manifests, lifecycle scripts, and risky files without executing them', async () => {
