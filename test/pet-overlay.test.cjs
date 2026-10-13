@@ -75,3 +75,12 @@ test('main window close hides to tray and tray exposes app and companion control
   assert.match(main, /mainWindow\.on\('close', event => \{ if \(!isQuitting\)/);
   assert.match(main, /tray\.destroy\(\)/);
 });
+
+
+test('application waits for companion preferences to flush before final quit', () => {
+  const main = fs.readFileSync(path.join(root, 'electron', 'main.cjs'), 'utf8');
+  const overlay = fs.readFileSync(path.join(root, 'electron', 'pet-overlay.cjs'), 'utf8');
+  assert.match(main, /event\.preventDefault\(\);\s*isQuitting = true/);
+  assert.match(main, /petOverlay\?\.flush\?\.\(\)/);
+  assert.match(overlay, /flush: \(\) => writeQueue/);
+});
