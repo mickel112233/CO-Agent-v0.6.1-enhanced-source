@@ -34,12 +34,13 @@ async function getOllamaStatus(baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAU
   }
 }
 
-async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch) {
+async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch, signal) {
   const name = validateModelName(model);
   const base = normalizeBaseUrl(baseUrl);
+  if (signal?.aborted) throw new Error('Model download cancelled.');
   const response = await fetchImpl(`${base}/api/pull`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: name, stream: true })
+    body: JSON.stringify({ model: name, stream: true }), signal
   });
   if (!response.ok) throw await readError(response);
   if (!response.body) throw new Error('Ollama did not return a model-download progress stream.');
@@ -59,7 +60,10 @@ async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.e
     onProgress({ model: name, status: item.status || 'Downloading model…', digest: item.digest || '', total, completed, percent: total > 0 ? Math.min(100, Math.floor(completed / total * 100)) : null });
   };
   const reader = response.body.getReader();
-  while (true) {
+  const abortReader = () => { reader.cancel().catch(() => {}); };
+  signal?.addEventListener('abort', abortReader, { once: true });
+  try { while (true) {
+    if (signal?.aborted) throw new Error('Model download cancelled.');
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -69,8 +73,10 @@ async function pullOllamaModel(model, onProgress = () => {}, baseUrl = process.e
   }
   buffer += decoder.decode();
   if (buffer.trim()) consume(buffer);
+  if (signal?.aborted) throw new Error('Model download cancelled.');
   if (!last || last.status !== 'success') throw new Error(last?.status || 'Ollama ended the pull before reporting success.');
   return { model: name, status: 'success' };
+  } finally { signal?.removeEventListener('abort', abortReader); }
 }
 
 async function deleteOllamaModel(model, baseUrl = process.env.ATELIER_OLLAMA_URL || DEFAULT_OLLAMA_URL, fetchImpl = fetch) {
