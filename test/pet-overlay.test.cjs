@@ -44,7 +44,7 @@ test('pet overlay persists visibility and bounds and restores safely after resta
   assert.match(source, /persistPreferences/);
   assert.match(source, /async function loadPreferences/);
   assert.match(source, /function restore\(\)/);
-  assert.match(source, /screen\.getDisplayMatching/);
+  assert.match(source, /screenApi\.getDisplayMatching/);
   assert.match(source, /display-metrics-changed/);
   assert.match(source, /display-removed/);
   assert.match(source, /clampBounds/);
