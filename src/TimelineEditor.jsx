@@ -11,7 +11,7 @@ const initialProject = () => ({ version: 1, title: 'Untitled project', clips: []
 const baseName = value => String(value || '').split(/[\\/]/).pop();
 const newId = () => 'clip-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 
-export default function TimelineEditor({ onTools }) {
+export default function TimelineEditor({ onTools, chatConfig = { provider: 'ollama' } }) {
   const [project, setProject] = useState(initialProject);
   const projectRef = useRef(project);
   const [undoStack, setUndoStack] = useState([]);
@@ -172,7 +172,13 @@ export default function TimelineEditor({ onTools }) {
         'Project state JSON: ' + JSON.stringify(snapshot),
         'User request: ' + instruction
       ].join('\n\n');
-      const result = await desktop.runtime.chat({ requestId: 'timeline-' + Date.now().toString(36), provider: 'ollama', messages: [{ role: 'user', content: prompt }] });
+      const selectedProvider = chatConfig?.provider === 'api' ? 'api' : 'ollama';
+      if (selectedProvider === 'api' && !String(chatConfig?.apiKey || '').trim()) throw new Error('Add your Cloud API key in Models & settings before planning timeline edits.');
+      const result = await desktop.runtime.chat({
+        ...(selectedProvider === 'api' ? { provider: 'api', providerConfig: chatConfig.providerConfig, apiKey: chatConfig.apiKey } : { provider: 'ollama', model: String(chatConfig?.model || '').trim() }),
+        requestId: 'timeline-' + Date.now().toString(36),
+        messages: [{ role: 'user', content: prompt }]
+      });
       if (result?.ok === false || result?.error) throw new Error(result.error || 'Timeline planner failed.');
       const raw = String(result.message || '').trim().replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/, '');
       const parsed = JSON.parse(raw);
