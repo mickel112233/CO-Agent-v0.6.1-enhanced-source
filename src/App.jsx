@@ -117,7 +117,7 @@ export default function App() {
     if (!zipPaths.length) { setNotice('Drop a .zip project archive to scan it.'); return; }
     if (zipPaths.length > 3) { setNotice('Scan up to 3 ZIP archives at a time.'); return; }
     for (const archivePath of zipPaths) {
-      if (!window.confirm('Extract and scan this ZIP into a review-only folder?\\n\\n' + archivePath.split(/[\\\\/]/).pop() + '\\n\\nCO-Agent will not run scripts or install packages. ZIPs are limited to 100 MB compressed, 250 MB expanded, 10,000 entries, and 25 MB per file.')) {
+      if (!window.confirm('Extract and scan this ZIP into a review-only folder?\\n\\n' + archivePath.split(String.fromCharCode(92)).pop().split('/').pop() + '\\n\\nCO-Agent will not run scripts or install packages. ZIPs are limited to 100 MB compressed, 250 MB expanded, 10,000 entries, and 25 MB per file.')) {
         setNotice('ZIP import cancelled. No files were extracted.'); continue;
       }
       setBusy(true); setNotice('Safely extracting and scanning ZIP…');
