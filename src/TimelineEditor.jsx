@@ -30,7 +30,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   const [planningEdit, setPlanningEdit] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const [voiceReference, setVoiceReference] = useState('');
-  const [voiceStatus, setVoiceStatus] = useState({ installed: false, message: 'Checking LuxTTS…' });
+  const [voiceStatus, setVoiceStatus] = useState({ installed: false, ffprobeReady: false, message: 'Checking LuxTTS…' });
   const [soundPreset, setSoundPreset] = useState('impact');
   const [soundDuration, setSoundDuration] = useState(2);
   const [generationProgress, setGenerationProgress] = useState('');
@@ -71,8 +71,10 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
   const patchClip = (id, patch) => updateProject(clips => clips.map(clip => clip.id === id ? { ...clip, ...patch } : clip));
 
   async function refreshVoiceStatus() {
-    try { const status = await desktop?.luxTTS?.status?.(); if (status) setVoiceStatus(status); }
-    catch (error) { setVoiceStatus({ installed: false, message: error.message || String(error) }); }
+    try {
+      const [status, capabilities] = await Promise.all([desktop?.luxTTS?.status?.(), desktop?.studio?.getCapabilities?.()]);
+      if (status) setVoiceStatus({ ...status, ffprobeReady: Boolean(capabilities?.ffprobe), message: capabilities?.ffprobe ? status.message : 'FFprobe is required to verify generated WAV files before they enter the timeline.' });
+    } catch (error) { setVoiceStatus({ installed: false, ffprobeReady: false, message: error.message || String(error) }); }
   }
   React.useEffect(() => {
     refreshVoiceStatus();
@@ -331,7 +333,7 @@ export default function TimelineEditor({ onTools, chatConfig = { provider: 'olla
       <div className="panel-heading"><strong><Sparkles size={16}/> Generate assets for this edit</strong><span>Local voice + sound effects</span></div>
       <p className="studio-footnote">Voiceover uses LuxTTS voice cloning and a reference recording you choose. Sound effects are generated locally with FFmpeg and placed directly on Audio 1. Generated assets remain editable timeline clips.</p>
       <label>Voiceover script<textarea value={voiceText} onChange={e => setVoiceText(e.target.value)} rows={3} maxLength={12000} placeholder="Write narration for this video…"/></label>
-      <div className="export-row"><button className="secondary-button" onClick={chooseVoiceReference}><FolderOpen size={14}/>{voiceReference ? baseName(voiceReference) : 'Choose reference voice'}</button><button className="primary-button" disabled={!!busy || !voiceStatus.installed || !voiceText.trim() || !voiceReference} onClick={generateVoiceover}><Music2 size={14}/>{busy === 'voice' ? 'Generating voice…' : 'Generate voiceover & add to timeline'}</button><button className="text-link" onClick={refreshVoiceStatus}>Refresh LuxTTS</button></div>
+      <div className="export-row"><button className="secondary-button" onClick={chooseVoiceReference}><FolderOpen size={14}/>{voiceReference ? baseName(voiceReference) : 'Choose reference voice'}</button><button className="primary-button" disabled={!!busy || !voiceStatus.installed || !voiceStatus.ffprobeReady || !voiceText.trim() || !voiceReference} onClick={generateVoiceover}><Music2 size={14}/>{busy === 'voice' ? 'Generating voice…' : 'Generate voiceover & add to timeline'}</button><button className="text-link" onClick={refreshVoiceStatus}>Refresh LuxTTS</button></div>
       {!voiceStatus.installed && <p className="tool-hint">{voiceStatus.message || 'LuxTTS is not installed. Set it up from first-run setup or Integrations.'}</p>}
       {generationProgress && <p className="tool-hint" role="status">{generationProgress}</p>}
       <div className="export-row"><label>Sound effect<select value={soundPreset} onChange={e => setSoundPreset(e.target.value)}><option value="impact">Impact / hit</option><option value="sweep">Rising sweep</option><option value="ambient">Soft ambient noise</option><option value="beep">UI notification</option></select></label><label>Duration (seconds)<input type="number" min="0.25" max="12" step="0.25" value={soundDuration} onChange={e => setSoundDuration(Math.max(0.25, Math.min(12, Number(e.target.value) || 2)))}/></label><button className="secondary-button" disabled={!!busy} onClick={generateSoundEffect}><Sparkles size={14}/>{busy === 'sound' ? 'Generating…' : 'Generate SFX & add to timeline'}</button></div>
