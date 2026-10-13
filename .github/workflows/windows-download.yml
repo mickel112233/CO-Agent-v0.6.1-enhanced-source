@@ -34,6 +34,12 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Set up Rust toolchain for desktop pet
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build desktop pet runtime
+        run: npm run build:pet:win
+
       - name: Build renderer
         run: npm run build
 
@@ -41,6 +47,39 @@ jobs:
         run: npx electron-builder --win nsis zip --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify release artifacts
+        run: npm run verify:release
+
+      - name: Smoke-test standalone ZIP package
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem 'release\*.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'Standalone ZIP package not found.' }
+          $zipDir = Join-Path $env:RUNNER_TEMP 'CO-Agent-ZIP-Smoke'
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath $zipDir -Force
+          $zipExe = Join-Path $zipDir 'CO-Agent.exe'
+          if (-not (Test-Path $zipExe)) { throw 'CO-Agent.exe missing from standalone ZIP.' }
+          foreach ($required in @('resources\pet\convai-desktop-pet.exe','resources\pet-assets\LICENSE','resources\THIRD-PARTY-NOTICES.txt')) {
+            if (-not (Test-Path (Join-Path $zipDir $required))) { throw "ZIP package missing required resource: $required" }
+          }
+          $smoke = Start-Process -FilePath $zipExe -ArgumentList '--co-agent-smoke-test' -Wait -PassThru -NoNewWindow
+          if ($smoke.ExitCode -ne 0) { throw "ZIP smoke test exited with code $($smoke.ExitCode)." }
+
+      - name: Install and smoke-test NSIS package
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'release\*Setup*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer not found.' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'CO-Agent-Installed-Smoke'
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
+          $installedExe = Join-Path $installDir 'CO-Agent.exe'
+          if (-not (Test-Path $installedExe)) { throw 'Installed CO-Agent.exe not found.' }
+          $smoke = Start-Process -FilePath $installedExe -ArgumentList '--co-agent-smoke-test' -Wait -PassThru -NoNewWindow
+          if ($smoke.ExitCode -ne 0) { throw "Installed app smoke test exited with code $($smoke.ExitCode)." }
+          $uninstaller = Join-Path $installDir 'Uninstall CO-Agent.exe'
+          if (Test-Path $uninstaller) { Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait }
 
       - name: Verify downloadable files exist
         shell: pwsh
