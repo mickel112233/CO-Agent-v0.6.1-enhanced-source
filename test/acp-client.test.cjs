@@ -50,4 +50,14 @@ test('ACP permission requests require an explicitly selected advertised option',
     assert.equal(requested, true);
     assert.equal(result.output, 'Approved');
   } finally { client.close(); }
+
+  const deniedClient = createClient({
+    command: process.execPath, args: ['-e', permissionAgent], cwd: process.cwd(),
+    onPermission: async () => ({ outcome: 'cancelled' })
+  });
+  try {
+    await deniedClient.initialize(); await deniedClient.newSession();
+    const denied = await deniedClient.runPrompt('Do one denied action');
+    assert.equal(denied.output, 'Denied', 'a denied permission request must never be treated as approved');
+  } finally { deniedClient.close(); }
 });

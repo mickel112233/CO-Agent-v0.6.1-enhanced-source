@@ -33,3 +33,14 @@ test('workflow steps propagate cancellation to the model call and recover runnin
   assert.match(agents, /Cancel step/);
   assert.match(agents, /status: cancelled \? 'queued' : 'blocked'/);
 });
+
+test('agent reruns clear stale results and shutdown aborts active requests', async () => {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const main = await fs.readFile(path.join(root, 'electron', 'main.cjs'), 'utf8');
+  const agents = await fs.readFile(path.join(root, 'src', 'Agents.jsx'), 'utf8');
+  assert.match(agents, /delete next\[step\.id\]/);
+  assert.match(agents, /status: 'running', result: null/);
+  assert.match(main, /for \(const controller of activeAgentStepRequests\.values\(\)\) controller\.abort\(\)/);
+});
