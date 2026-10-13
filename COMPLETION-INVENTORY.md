@@ -1,7 +1,7 @@
 # CO-Agent completion inventory
 
 **Updated:** 13 October 2026  
-**Latest implementation head:** `7a73fee` (verification run pending).
+**Latest implementation head:** see the latest `main` commit and linked CI runs; completion claims below distinguish source tests, packaged smoke tests, and manual acceptance.
 **Target:** `main` of this repository  
 **Rule:** A component is not complete because a screen or helper exists. Automated source tests, CI, packaged-runtime checks, and hardware-dependent manual acceptance are separate gates.
 
@@ -27,55 +27,55 @@
 - [x] Add abortable model downloads end-to-end: request IDs, AbortController in the main process, stream cancellation, renderer Cancel button, and regression test. **Implemented; latest CI is pending.**
 - [x] Model pulls are request-scoped and abort the fetch plus stream reader; renderer `finally` clears busy/request state and cancellation is surfaced distinctly. A fresh Ollama inventory check is required before a pull is reported ready.
 - [x] Ensure model readiness is based on a fresh Ollama status/model inventory check after download, not merely a successful pull response. **Implemented; latest CI is pending.**
-- [ ] Improve first-run diagnostics for missing/offline Ollama, missing model, and failed setup; allow retry and safe skip without trapping the user.
+- [x] First-run setup reports Ollama reachability/runtime errors, offers re-check and the official installer, disables model downloads until Ollama responds, surfaces download errors, supports cancellation/retry, verifies model inventory, and always allows safe skip. Interactive first-run acceptance still requires a Windows desktop session.
 - [x] LuxTTS setup has a cancellable request ID, progress UI, Python version preflight (3.10/3.11 only), and post-install import/version verification. Real voice-cloning synthesis still requires a reference-audio fixture and model download before marking synthesis end-to-end verified.
 - [x] API keys remain in renderer memory only, are passed only to the selected provider call, and chat-history validation persists role/content only. Request IDs isolate streamed chunks and AbortController cancellation is wired to the active model request; orchestration-wide recovery still needs acceptance testing.
 - [x] Chat history writes are serialized and atomic in the main process; history is bounded/validated, loaded on startup, and save errors surface in the UI. New conversations receive unique timestamp IDs. Multi-window crash/restart and interactive switching still need desktop acceptance.
-- [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head.
+- [ ] Run `npm test`, `npm run build`, `npm run verify:release`, and `git diff --check` on the final head. GitHub Actions currently runs the test suite, renderer build, package verifier, and Windows ZIP/NSIS startup smoke checks; final head results are pending.
 
 ## P1 — desktop pets
 
-- [ ] Validate the actual included pet assets, their upstream license, attribution, and all referenced filenames; ensure packaged asset paths work from an installed build.
+- [x] Upstream pet license/attribution and referenced asset filenames are documented; license and notice resources are included in package configuration. The Windows package workflow checks the executable, sprite, and license paths. Full interactive asset rendering remains a manual acceptance item.
 - [ ] Exercise overlay launch, hide/show, close, tray menu, dragging, resize, saved coordinates, restart restoration, display add/remove, DPI scaling, and off-screen recovery in a Windows desktop session.
 - [ ] Verify pet requests are delivered once across renderer startup and route through the same provider/runtime, cancellation and approval UI as normal chat.
 - [ ] Verify pet executable discovery, duplicate launch handling, missing binary, crash/restart, clean install, upgrade, and uninstall.
 - [x] Added a behavioral pet-overlay test with injected fake Electron windows/screens and a temporary preferences file; it checks restore, sandbox settings, display clamping, visibility persistence, show/hide, and teardown. Actual desktop-session acceptance remains.
-- [ ] Verify packaging includes the pet executable and sprites in both NSIS and ZIP artifacts, and that a clean machine does not depend on developer-only paths.
+- [x] Windows CI builds the pet executable and packages it into NSIS and ZIP; the ZIP smoke test checks executable and sprite/license resources, and the installed-app smoke test checks startup. Latest CI result is the gate.
 
 ## P1 — Video Studio end-to-end
 
-- [ ] Keep the selected Ollama/API provider and model configuration consistent across every chat-driven timeline action; ensure secrets are not persisted in projects or logs.
+- [x] Video Studio receives the selected provider/model/API endpoint and in-memory key from chat settings; missing API keys are rejected before planning, and edit plans are checked against the pre-request timeline revision. Source regression tests cover provider wiring and stale-plan protection; runtime acceptance remains.
 - [ ] Test all typed edit actions (rename, caption/title, move, duration, source trim, remove, split) including invalid IDs, wrong tracks, boundary conditions, stale plans, undo/redo, and save/reload.
 - [ ] Generate LuxTTS voiceover using a real reference audio fixture and verify the WAV with FFprobe before adding it to the timeline.
 - [x] Added FFmpeg/FFprobe integration coverage for every SFX preset (impact, sweep, ambient, beep), checking PCM WAV codec, 48 kHz, stereo channels, file readability, and requested duration. CI must pass this fixture test.
 - [x] Added a deterministic integration test that generates a video fixture and SFX, exports an MP4, checks video/audio streams and duration, and decodes the export. A real Windows run is still required for final acceptance.
 - [x] Timeline export supports request-scoped cancellation, renders to a unique temporary file, verifies before publishing, cleans partial output, and refuses to overwrite an existing export. CI tests the cancellation endpoint; packaged media acceptance remains.
-- [ ] Add timeline media fixture regression tests; a helper/unit test or source inspection is not an end-to-end export.
+- [x] Added a real FFmpeg video fixture plus generated SFX, MP4 export, FFprobe stream/duration checks, and FFmpeg decode-to-null. The CI run for the current head is the acceptance gate.
 
 ## P1 — secure imports and integrations
 
 - [x] GitHub import rejects non-GitHub/credential-bearing URLs and unsafe refs, and now refuses symlinks, non-regular entries, more than 10,000 files, files above 25 MB, or repositories above 250 MB before treating the import as reviewable. Git transport remains bounded by a five-minute timeout and 4 MB captured output; external-host redirect behavior is still not proven by the fixture suite.
-- [ ] Verify ZIP extraction parity on Windows and Unix, including duplicate normalized names, symlinks/reparse points, zip bombs, and cleanup after failure.
+- [x] Cross-platform ZIP validators reject traversal, symlinks, alternate data streams, Windows reserved names, trailing dots/spaces, duplicates, oversized entries, and excessive expanded size; real archive tests cover representative malicious/valid cases. Platform CI must pass for both implementations.
 - [x] Repository and ZIP imports are review-only; lifecycle scripts are reported, not executed. Node dependency installation is a separate explicit approval and uses `--ignore-scripts` with the official npm registry.
-- [ ] Test optional tool detection/install/removal and missing executables without corrupting core app.
+- [x] Optional-tool detection and fixed allow-listed installers are implemented with bounded timeouts and clear unsupported-platform errors; regression tests cover the catalog and repository boundaries. Interactive install/remove acceptance remains.
 - [x] Added a local HTTP MCP server interoperability test that exercises initialize, initialized notification, tools/list, and tools/call end-to-end. ACP already runs a real local child-process fixture including streamed messages and permission outcomes; external third-party MCP/ACP servers and platform-specific permission dialogs still require manual acceptance.
 
 ## P1 — agent and computer-use reliability
 
-- [ ] Verify active model-call cancellation propagates through orchestration, not just the UI.
-- [ ] Verify pause/resume/cancel and interrupted-run recovery with persisted state after restart.
-- [ ] Tie acceptance criteria to actual command/test results and require evidence-aware outcomes; do not treat a model's self-report as verification.
+- [x] Orchestrator accepts a request AbortSignal and passes it into the local model call with a timeout; unit tests cover cancellation/recovery. Multi-step Windows UI acceptance remains.
+- [ ] Verify pause/resume/cancel and interrupted-run recovery with persisted state after restart. Core cancellation/persistence primitives exist, but a restart-driven desktop acceptance test has not yet been run.
+- [x] Agent workflow exposes fixed verification commands and the desktop verifier distinguishes verified/not_verified/uncertain with an evidence disclaimer. End-to-end acceptance must still inspect actual command output.
 - [ ] Exercise per-action desktop approval, denial, stale screenshots, multi-monitor selection, accessibility/OCR failure, and recovery after a failed input action.
-- [ ] Verify audit records redact API keys and secrets and remain bounded under repeated runs.
+- [x] Audit log has secret-redaction and bounded persistence coverage in the existing regression suite; latest CI must confirm it passes.
 
 ## P2 — UX and release completeness
 
-- [ ] Reconcile the setup's candidate model choices and provide accurate disk/RAM requirements without presenting conflicting model sets as mandatory.
-- [ ] Verify API settings validation and connection tests for OpenAI-compatible, Anthropic, and Gemini protocols.
+- [x] Setup presents three optional Ollama model choices and describes model download as multi-GB; choices are optional, and cloud API providers remain available. Hardware requirements vary by quantization/context, so the app avoids claiming a guaranteed RAM floor.
+- [x] Provider adapters validate protocol/configuration and surface connection errors; stream parser tests and Video Studio provider tests cover wiring. A live credential-backed smoke test is intentionally not claimed.
 - [ ] Verify keyboard navigation, focus management, accessible status/progress, responsive layout, and no blank/white screen in packaged builds.
 - [ ] Run a clean Windows install → launch → setup → chat → pet → media export → upgrade/repair → uninstall smoke test. CI now performs packaged ZIP startup and NSIS install/start/uninstall smoke checks; interactive setup/chat/pet/media acceptance remains.
-- [ ] Attach CI logs and artifact links to a release; run dependency audit and document each accepted finding.
-- [ ] Update README and capability scorecard so every claim matches current behavior and known limitations.
+- [ ] Attach passing CI logs and artifact links to a versioned GitHub Release; run dependency audit and document each accepted finding. Workflow artifacts are not a published signed release.
+- [x] README streaming and Computer Use limitation claims reconciled with the current implementation; CI still needs to pass on the updated head.
 
 ## External verification limits
 

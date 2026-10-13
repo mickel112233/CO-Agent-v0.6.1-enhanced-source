@@ -35,7 +35,7 @@ Chat with local models. Create and inspect media. Add optional tools. Import tru
 | HTML-to-video | Hyperframes lint, preview, and MP4 rendering | Optional external Hyperframes CLI and FFmpeg |
 | Repository skills | Import public GitHub repositories and inspect manifests; explicitly enable a detected `SKILL.md` for local chat | Imported plugin code is not executed; skills are third-party instructions and must be reviewed |
 | Computer Use | Desktop screenshot capture, top-level Windows UI Automation inspection, optional local screenshot OCR, approved mouse click/text/key actions | Windows-only native input; one action per confirmation; no autonomous action loop or arbitrary shell execution |
-| Voice foundation | Optional Piper wrapper plus a LuxTTS worker, isolated Python environment setup, and local voice-generation UI | LuxTTS dependencies/model weights are large and are not bundled; first setup and model download require network access; voice cloning needs reference audio |\n| Desktop pet | Approved Electron launch/close bridge and executable discovery for the pinned Tauri pet source | Windows CI now builds the pinned upstream Tauri executable and bundles it into the Windows CO-Agent package. For local Windows builds, run `npm run build:pet:win` before `npm run dist:win` (requires Rust/Cargo and the Windows Tauri build prerequisites). Alternatively, place `convai-desktop-pet.exe` under CO-Agent's Electron user-data folder at `runtime/pet/convai-desktop-pet.exe` |
+| Voice foundation | Optional Piper wrapper plus a LuxTTS worker, isolated Python environment setup, and local voice-generation UI | LuxTTS dependencies/model weights are large and are not bundled; first setup and model download require network access; voice cloning needs reference audio |\n\n| Desktop pet | Approved Electron launch/close bridge and executable discovery for the pinned Tauri pet source | Windows CI now builds the pinned upstream Tauri executable and bundles it into the Windows CO-Agent package. For local Windows builds, run `npm run build:pet:win` before `npm run dist:win` (requires Rust/Cargo and the Windows Tauri build prerequisites). Alternatively, place `convai-desktop-pet.exe` under CO-Agent's Electron user-data folder at `runtime/pet/convai-desktop-pet.exe` |
 
 ## ⬇️ Download a test build (Windows)
 
@@ -279,9 +279,9 @@ A named checkpoint is available at [`checkpoint/v0.6.1-before-tool-integrations`
 ## 🧭 Known gaps
 
 - Full original source restoration is not complete; see [RESTORE-ROADMAP.md](RESTORE-ROADMAP.md).
-- Computer Use is a Windows-only, one-action-at-a-time MVP; autonomous planning, deep accessibility trees, and automatic action verification are not yet implemented.
+- Computer Use is a Windows-only, one-action-at-a-time MVP; it has screenshot-grounded planning and model-assisted verification helpers, but no autonomous action loop. Verify the visible result manually before continuing.
 - The timeline editor supports core clip arrangement and rendering, but transitions, keyframes, waveforms, undo/redo, advanced effects, and automatic transcription/captions are not yet implemented.
-- Chat does not yet stream tokens; Ollama model-pull progress is not fully surfaced.
+- Chat streams text incrementally for supported local/API providers. Stream completion can still be interrupted by provider/network failures; incomplete responses are marked. Ollama model-pull progress is surfaced when the server reports it.
 - The multi-track editor is not yet a full professional NLE; see the video-editor limitations above.
 - Full API-provider configuration/credential management is incomplete.
 - Imported generic plugin code is not activated. Only explicitly selected `SKILL.md` text can be loaded into local chat.
