@@ -21,6 +21,7 @@ const ocr = require('./ocr.cjs');
 const hyperframes = require('./hyperframes.cjs');
 const integrations = require('./integrations.cjs');
 const textAttachments = require('./text-attachments.cjs');
+const zipImport = require('./zip-import.cjs');
 const mcpClient = require('./mcp-client.cjs');
 const acpClient = require('./acp-client.cjs');
 const auditModule = require('./audit-log.cjs');
@@ -315,6 +316,7 @@ function registerIpc() {
     if (result.canceled) return [];
     return textAttachments.readTextAttachments(result.filePaths);
   });
+  handle('imports:scan-zip', async archivePath => zipImport.scanZip(archivePath, app.getPath('userData')));
   handle('dialog:open-files', async options => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: options?.multiple === false ? ['openFile'] : ['openFile','multiSelections'],
