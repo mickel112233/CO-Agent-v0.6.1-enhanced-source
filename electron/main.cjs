@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { isTrustedRendererUrl } = require('./security.cjs');
@@ -29,6 +29,8 @@ const auditModule = require('./audit-log.cjs');
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow;
 let petOverlay;
+let tray = null;
+let isQuitting = false;
 let petMessageBridgeReady = false;
 const pendingPetMessages = [];
 const registered = new Set();
@@ -360,6 +362,31 @@ function registerIpc() {
     return result.canceled ? null : result.filePaths[0];
   });
 }
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+}
+function createTray() {
+  if (tray) return tray;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="9" fill="#30372d"/><path d="M9 10h14v3H12v3h9v3h-9v3H9z" fill="#f8f8f6"/></svg>';
+  const icon = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  tray = new Tray(icon);
+  tray.setToolTip('CO-Agent');
+  const menu = Menu.buildFromTemplate([
+    { label: 'Open CO-Agent', click: showMainWindow },
+    { label: 'Show companion', click: () => petOverlay?.show() },
+    { label: 'Hide companion', click: () => petOverlay?.hide() },
+    { type: 'separator' },
+    { label: 'Quit CO-Agent', click: () => app.quit() }
+  ]);
+  tray.setContextMenu(menu);
+  tray.on('click', showMainWindow);
+  return tray;
+}
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440, height: 920, minWidth: 900, minHeight: 620,
@@ -378,6 +405,7 @@ function createWindow() {
   const load = isDev ? mainWindow.loadURL(devUrl) : mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   load.catch(error => console.error('CO-Agent renderer failed to load:', error));
   mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => console.error('Renderer load failed:', { code, description, url }));
+  mainWindow.on('close', event => { if (!isQuitting) { event.preventDefault(); mainWindow.hide(); } });
   mainWindow.on('closed', () => { mainWindow = null; petMessageBridgeReady = false; });
 }
 app.whenReady().then(async () => {
@@ -388,9 +416,10 @@ app.whenReady().then(async () => {
   } catch {}
   registerIpc();
   createWindow();
+  createTray();
   petOverlay = createPetOverlay({ onMessage: deliverPetMessage });
   await petOverlay.restore();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', showMainWindow);
 });
-app.on('before-quit', () => { petRuntime.stop(); petOverlay?.destroy(); });
+app.on('before-quit', () => { isQuitting = true; petRuntime.stop(); petOverlay?.destroy(); if (tray) { tray.destroy(); tray = null; } });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
